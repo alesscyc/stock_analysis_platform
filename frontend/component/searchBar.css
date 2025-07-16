@@ -1,0 +1,182 @@
+/* SearchBar Component Styles */
+.search-bar {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.search-bar input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.3s ease;
+  background-color: #fff;
+}
+
+.search-bar input:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.search-bar input::placeholder {
+  color: #999;
+  font-style: italic;
+}
+
+/* Loading indicator */
+.search-loading {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #666;
+  border-radius: 0 0 8px 8px;
+  z-index: 1000;
+}
+
+/* Suggestions dropdown */
+.suggestions-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Individual suggestion item */
+.suggestion-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background-color 0.2s ease;
+}
+
+.suggestion-item:hover {
+  background-color: #f8f9fa;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+/* Symbol styling */
+.symbol {
+  font-weight: bold;
+  color: #007bff;
+  font-size: 16px;
+  min-width: 60px;
+}
+
+/* Company name styling */
+.name {
+  flex: 1;
+  margin-left: 12px;
+  color: #333;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Volume styling */
+.volume {
+  font-size: 12px;
+  color: #666;
+  background-color: #e9ecef;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+/* No results message */
+.no-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  padding: 16px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  border-radius: 0 0 8px 8px;
+  z-index: 1000;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .search-bar {
+    max-width: 100%;
+  }
+  
+  .suggestion-item {
+    padding: 10px 12px;
+  }
+  
+  .name {
+    display: none; /* Hide company name on small screens */
+  }
+  
+  .search-bar input {
+    font-size: 14px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .search-bar input {
+    background-color: #2d3748;
+    border-color: #4a5568;
+    color: #e2e8f0;
+  }
+  
+  .search-bar input::placeholder {
+    color: #a0aec0;
+  }
+  
+  .suggestions-dropdown,
+  .search-loading,
+  .no-results {
+    background-color: #2d3748;
+    border-color: #4a5568;
+    color: #e2e8f0;
+  }
+  
+  .suggestion-item:hover {
+    background-color: #4a5568;
+  }
+  
+  .symbol {
+    color: #63b3ed;
+  }
+  
+  .name {
+    color: #e2e8f0;
+  }
+  
+  .volume {
+    background-color: #4a5568;
+    color: #a0aec0;
+  }
+}
