@@ -50,6 +50,7 @@ function SearchBar({ onStockSelect }) {
     };
 
     const handleStockSelect = (stock) => {
+        console.log('Stock selected:', stock); // Debug log
         setSearchTerm('');
         setStocks([]);
         setShowDropdown(false);
@@ -70,7 +71,7 @@ function SearchBar({ onStockSelect }) {
         // Delay hiding dropdown to allow clicks on items
         setTimeout(() => {
             setShowDropdown(false);
-        }, 200);
+        }, 300);
     };
     
     return (
@@ -91,7 +92,10 @@ function SearchBar({ onStockSelect }) {
                         <div 
                             key={index}
                             className="suggestion-item"
-                            onClick={() => handleStockSelect(stock)}
+                            onMouseDown={(e) => {
+                                e.preventDefault(); // Prevent input blur
+                                handleStockSelect(stock);
+                            }}
                         >
                             <span className="symbol">{stock.symbol}</span>
                         </div>

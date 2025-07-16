@@ -8,54 +8,51 @@ from datetime import datetime, timedelta, date
 # Get free API key at polygon.io
 API_KEY = 'VssgjSHYbvmp2nmpe8mn6mVLVTo8iUus'  # Replace with your Polygon.io API key
 
-def get_stock_price_history(symbol):
-    
+def get_stock_price_history(symbol, date_range='max', interval='1d'): 
     try:
-        # Calculate date range (2 years back for free tier)
-        end_date = date.today()
-        start_date = end_date - timedelta(days=730)  # 2 years back
+        # Use yfinance to get stock data
+        ticker = yf.Ticker(symbol)
         
-        # Format dates for Polygon API
-        start_str = start_date.strftime('%Y-%m-%d')
-        end_str = end_date.strftime('%Y-%m-%d')
+        # Map date range to yfinance periods or calculate dates
+        if date_range == 'max':
+            hist = ticker.history(period="max", interval=interval)
+        elif date_range in ['1y', '2y', '5y']:
+            hist = ticker.history(period=date_range, interval=interval)
+        else:
+            # Default to 2 years if invalid range provided
+            hist = ticker.history(period="2y", interval=interval)
         
-        # Polygon.io aggregates endpoint for daily data
-        url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/range/1/day/{start_str}/{end_str}?adjusted=true&sort=desc&limit=50000&apikey={API_KEY}"
-        
-        response = requests.get(url)
-        data = response.json()
-        
-        # Check for API errors
-        if data.get('status') == 'ERROR':
-            return {"error": f"API Error: {data.get('error', 'Unknown error')}"}
-        
-        if data.get('status') != 'OK':
-            return {"error": f"No data found for symbol: {symbol}"}
-        
-        if 'results' not in data or not data['results']:
+        # Check if data is available
+        if hist.empty:
             return {"error": f"No data found for symbol: {symbol}"}
         
         # Convert to list of dictionaries
         stock_data = []
-        for item in data['results']:
-            # Convert timestamp to date string
-            date_str = datetime.fromtimestamp(item['t'] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+        for date_index, row in hist.iterrows():
+            # Format date based on interval
+            if interval in ['1d', '5d', '1wk', '1mo', '3mo']:
+                # Daily and longer intervals: date only (YYYY-MM-DD)
+                date_str = str(date_index)[:10]
+            else:
+                # Intraday intervals: include time (YYYY-MM-DD HH:MM:SS)
+                date_str = str(date_index)[:19]
             
             stock_data.append({
                 "Date": date_str,
-                "Open": float(item['o']),
-                "High": float(item['h']),
-                "Low": float(item['l']),
-                "Close": float(item['c']),
-                "Volume": int(item['v'])
+                "Open": float(row['Open']),
+                "High": float(row['High']),
+                "Low": float(row['Low']),
+                "Close": float(row['Close']),
+                "Volume": int(row['Volume'])
             })
+        
+        # Sort by date descending (most recent first)
+        stock_data.sort(key=lambda x: x['Date'])
         
         return stock_data
         
-    except requests.exceptions.RequestException as e:
-        return {"error": f"Network error: {str(e)}"}
     except Exception as e:
-        return {"error": f"Unexpected error: {str(e)}"}
+        return {"error": f"Error fetching data: {str(e)}"}
     
 def get_all_symbols():
     """
@@ -140,7 +137,10 @@ if __name__ == "__main__":
             result = {"error": "Symbol required for get_stock_price_history"}
         else:
             symbol = sys.argv[2]
-            result = get_stock_price_history(symbol)
+            # Optional parameters: date_range, interval
+            date_range = sys.argv[3] if len(sys.argv) > 3 else '2y'
+            interval = sys.argv[4] if len(sys.argv) > 4 else '1d'
+            result = get_stock_price_history(symbol, date_range, interval)
     
     elif function_name == "get_all_symbols":
         result = get_all_symbols()

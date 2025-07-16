@@ -2,6 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const { execFile } = require('child_process');
+const path = require('path');
 const app = express();
 const port = 3001;
 
@@ -10,19 +11,28 @@ app.use(express.json());
 
 app.get('/api/stock/:symbol', async (req, res) => {
 
-
   try {
     const { symbol } = req.params;
-    const pythonArgs = ['../analysis/stock_data.py', 'get_stock_price_history', symbol];
+    const { date_range, interval } = req.query;
+    
+    const pythonArgs = [path.join(__dirname, '../analysis/stock_data.py'), 'get_stock_price_history', symbol, date_range, interval];
   
-    execFile('python', pythonArgs,{maxBuffer:1024*2024*10}, (error, stdout, stderr) => {
+    execFile('python', pythonArgs,{maxBuffer:1024*1024*5}, (error, stdout, stderr) => {
       if (error) {
         console.error('Error executing Python script:', error);
         return res.status(500).json({ error: 'Internal server error' });
       }
 
+      console.log('Python stdout length:', stdout.length);
+      console.log('Python stderr:', stderr);
+
       try {
         const result = JSON.parse(stdout);
+        console.log('Parsed result length:', result.length);
+        if (result.length > 0) {
+          console.log('First record:', result[0]);
+          console.log('Last record:', result[result.length - 1]);
+        }
         res.json(result);
       } catch (parseError) {
         console.error('Error parsing Python output:', parseError);
@@ -39,7 +49,7 @@ app.get('/api/stocks/search', async (req, res) => {
     const { q: query } = req.query;
     const pythonArgs = ['../analysis/stock_data.py', 'search_stocks', query];
   
-    execFile('python', pythonArgs, {maxBuffer:1024*2024*10}, (error, stdout, stderr) => {
+    execFile('python', pythonArgs, {maxBuffer:1024*1024*5}, (error, stdout, stderr) => {
       if (error) {
         console.error('Error executing Python script:', error);
         return res.status(500).json({ error: 'Internal server error' });
@@ -62,7 +72,7 @@ app.get('/api/stocks/getallsysmbol', async (req, res) => {
   try {
     const pythonArgs = ['../analysis/stock_data.py', 'get_all_symbols'];
   
-    execFile('python', pythonArgs, {maxBuffer:1024*2024*10}, (error, stdout, stderr) => {
+    execFile('python', pythonArgs, {maxBuffer:1024*1024*50}, (error, stdout, stderr) => {
       if (error) {
         console.error('Error executing Python script:', error);
         return res.status(500).json({ error: 'Internal server error' });
