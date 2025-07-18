@@ -8,11 +8,14 @@ import {
   Title,
   Tooltip,
   Legend,
-  TimeScale
+  TimeScale,
+  registerables
 } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Chart } from 'react-chartjs-2';
+import { CandlestickController, CandlestickElement, OhlcController, OhlcElement } from 'chartjs-chart-financial';
 import zoomPlugin from 'chartjs-plugin-zoom';
 import 'chartjs-adapter-date-fns';
+import { min } from 'date-fns';
 
 ChartJS.register(
   CategoryScale,
@@ -23,49 +26,70 @@ ChartJS.register(
   Tooltip,
   Legend,
   TimeScale,
-  zoomPlugin
+  zoomPlugin,
+  CandlestickController,
+  CandlestickElement,
+  OhlcController,
+  OhlcElement
 );
 
-function StockChart({ stockData, stockSymbol }) {
+function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange }) {
   const chartRef = useRef(null);
-  
-  console.log('StockChart received data:', stockData);
-  console.log('Data length:', stockData?.length);
-  console.log('First item:', stockData?.[0]);
-  console.log('Last item:', stockData?.[stockData.length - 1]);
-  
-  // Check date range
-  if (stockData && stockData.length > 0) {
-    const dates = stockData.map(item => new Date(item.Date));
-    const minDate = new Date(Math.min(...dates));
-    const maxDate = new Date(Math.max(...dates));
-    console.log('Date range:', minDate.toISOString().split('T')[0], 'to', maxDate.toISOString().split('T')[0]);
-    console.log('Years covered:', (maxDate.getFullYear() - minDate.getFullYear()));
-  }
 
   if (!stockData || stockData.length === 0) {
     return <div>No stock data available</div>;
   }
 
-  // Sort data by date to ensure chronological order
-  const sortedData = [...stockData].sort((a, b) => new Date(a.Date) - new Date(b.Date));
+  const intervals = [
+    { value: '1d', label: 'Daily' },
+    { value: '1wk', label: 'Weekly' },
+    { value: '1mo', label: 'Monthly' }
+  ];
 
-  // Get the actual data range for setting axis limits
-  const firstDate = new Date(sortedData[0].Date);
-  const lastDate = new Date(sortedData[sortedData.length - 1].Date);
+  // Calculate initial visible range based on interval
+  let initialVisibleCount;
+  
+  switch (currentInterval) {
+    case '1d':
+      // Show 1 year (approximately 252 trading days)
+      initialVisibleCount = Math.min(252, stockData.length);
+      break;
+    case '1wk':
+      // Show 5 years (approximately 52 weeks * 5)
+      initialVisibleCount = Math.min(260, stockData.length);
+      break;
+    case '1mo':
+      // Show 10 years (approximately 12 months * 10)
+      initialVisibleCount = Math.min(120, stockData.length);
+      break;
+  }
+  
+  const startIndex = Math.max(0, stockData.length - initialVisibleCount);
+  const endIndex = stockData.length - 1;
 
   const data = {
-    labels: sortedData.map(item => item.Date),
+    labels: stockData.map(item => item.Date),
     datasets: [
       {
-        label: 'Close Price',
-        data: sortedData.map(item => item.Close),
-        borderColor: 'rgb(75, 192, 192)',
-        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-        tension: 0.1,
-        borderWidth: 1,
-        pointRadius: 0,
-        pointHoverRadius: 4
+        type: 'candlestick',
+        label: 'Stock Price',
+        data: stockData.map((item, index) => ({
+          x: index,
+          o: Math.round(parseFloat(item.Open) * 100) / 100,
+          h: Math.round(parseFloat(item.High) * 100) / 100,
+          l: Math.round(parseFloat(item.Low) * 100) / 100,
+          c: Math.round(parseFloat(item.Close) * 100) / 100
+        })),
+        color: {
+          up: '#00ff00',
+          down: '#ff0000',
+          unchanged: '#999999'
+        },
+        borderColor: {
+          up: '#00aa00',
+          down: '#aa0000',
+          unchanged: '#666666'
+        }
       }
     ]
   };
@@ -73,13 +97,7 @@ function StockChart({ stockData, stockSymbol }) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    interaction: {
-      intersect: false,
-    },
     plugins: {
-      legend: {
-        position: 'top',
-      },
       title: {
         display: true,
         text: stockSymbol || 'Stock Price Chart'
@@ -88,6 +106,7 @@ function StockChart({ stockData, stockSymbol }) {
         zoom: {
           wheel: {
             enabled: true,
+            speed: 0.1
           },
           pinch: {
             enabled: true
@@ -97,52 +116,58 @@ function StockChart({ stockData, stockSymbol }) {
         pan: {
           enabled: true,
           mode: 'x',
+          threshold: 5
         },
         limits: {
-          x: {
-            min: firstDate,
-            max: lastDate,
-            minRange: 24 * 60 * 60 * 1000 * 30 // minimum 30 days visible
-          }
+          x: {min: 0, max: stockData.length - 1},
+          y: {min: 0, max: 'original'}
         }
       }
     },
     scales: {
       x: {
-        type: 'time',
-        time: {
-          parser: 'yyyy-MM-dd',
-          tooltipFormat: 'MMM dd, yyyy',
-          displayFormats: {
-            day: 'MMM dd',
-            month: 'MMM yyyy',
-            year: 'yyyy'
-          }
-        },
-        min: firstDate,
-        max: lastDate,
-        display: true,
-        ticks: {
-          maxTicksLimit: 20,
-          autoSkip: true
-        }
+        type: 'category',
+        min: startIndex,
+        max: endIndex
       },
       y: {
         beginAtZero: false,
-        display: true
-      }
-    },
-    elements: {
-      point: {
-        radius: 0,
-        hoverRadius: 4
+        grace: '5%',
+        min: 0
       }
     }
   };
 
   return (
-    <div style={{ width: '100%', height: '100%', minHeight: '400px' }}>
-      <Line ref={chartRef} data={data} options={options} />
+    <div style={{ width: '100%', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* Controls section */}
+      <div style={{ marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
+        {/* Interval selector buttons */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <span style={{ fontWeight: 'bold', marginRight: '10px' }}>Interval:</span>
+          {intervals.map(interval => (
+            <button
+              key={interval.value}
+              onClick={() => onIntervalChange(interval.value)}
+              style={{
+                padding: '5px 15px',
+                backgroundColor: currentInterval === interval.value ? '#007bff' : '#f8f9fa',
+                color: currentInterval === interval.value ? 'white' : '#333',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              {interval.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <Chart ref={chartRef} type='candlestick' data={data} options={options} />
+      </div>
     </div>
   );
 }

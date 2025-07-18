@@ -28,11 +28,6 @@ app.get('/api/stock/:symbol', async (req, res) => {
 
       try {
         const result = JSON.parse(stdout);
-        console.log('Parsed result length:', result.length);
-        if (result.length > 0) {
-          console.log('First record:', result[0]);
-          console.log('Last record:', result[result.length - 1]);
-        }
         res.json(result);
       } catch (parseError) {
         console.error('Error parsing Python output:', parseError);

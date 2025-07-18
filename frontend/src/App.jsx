@@ -6,24 +6,31 @@ import StockChart from '../component/StockChart';
 function App() {
   const [selectedStock, setSelectedStock] = useState(null);
   const [stockData, setStockData] = useState([]);
+  const [currentInterval, setCurrentInterval] = useState('1d');
 
-  const handleStockSelect = async (stock) => {
-    setSelectedStock(stock);
+  const fetchStockData = async (stock, interval = '1d') => {
     try {
-      // Fetch stock data from your API with max date range and 1d interval
-      const response = await fetch(`http://localhost:3001/api/stock/${stock.symbol}?date_range=max&interval=1d`);
+      // Fetch stock data from your API with max date range and specified interval
+      const response = await fetch(`http://localhost:3001/api/stock/${stock.symbol}?date_range=max&interval=${interval}`);
       const data = await response.json();
-      console.log('Raw API response:', data);
-      console.log('Data length from API:', data?.length);
-      if (data && data.length > 0) {
-        console.log('First date from API:', data[0]?.Date);
-        console.log('Last date from API:', data[data.length - 1]?.Date);
-      }
+      
       if (Array.isArray(data) && data.length > 0) {
         setStockData(data);
+        setCurrentInterval(interval);
       }
     } catch (error) {
       console.error('Error fetching stock data:', error);
+    }
+  };
+
+  const handleStockSelect = async (stock) => {
+    setSelectedStock(stock);
+    await fetchStockData(stock, currentInterval);
+  };
+
+  const handleIntervalChange = async (interval) => {
+    if (selectedStock) {
+      await fetchStockData(selectedStock, interval);
     }
   };
   
@@ -34,7 +41,12 @@ function App() {
       </div>
       {stockData.length > 0 && (
         <div className="chart-container">
-          <StockChart stockData={stockData} stockSymbol={selectedStock?.symbol} />
+          <StockChart 
+            stockData={stockData} 
+            stockSymbol={selectedStock?.symbol}
+            currentInterval={currentInterval}
+            onIntervalChange={handleIntervalChange}
+          />
         </div>
       )}
     </div>

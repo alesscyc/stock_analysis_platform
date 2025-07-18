@@ -45,8 +45,8 @@ def get_stock_price_history(symbol, date_range='max', interval='1d'):
                 "Close": float(row['Close']),
                 "Volume": int(row['Volume'])
             })
-        
-        # Sort by date descending (most recent first)
+
+        # Sort by date ascending (oldest first)
         stock_data.sort(key=lambda x: x['Date'])
         
         return stock_data
