@@ -89,7 +89,7 @@ node server.js
 **Terminal 2 - Frontend:**
 ```bash
 cd frontend
-npm start
+npm run dev
 ```
 
 The application will be available at `http://localhost:3000`
