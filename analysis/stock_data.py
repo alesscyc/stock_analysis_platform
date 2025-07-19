@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import sys
 import json
+import queue
 from datetime import datetime, timedelta, date
 
 # Get free API key at polygon.io
@@ -26,6 +27,12 @@ def get_stock_price_history(symbol, date_range='max', interval='1d'):
         if hist.empty:
             return {"error": f"No data found for symbol: {symbol}"}
         
+        hist['200MA'] = hist['Close'].rolling(window=200, min_periods=200).mean()
+        hist['150MA'] = hist['Close'].rolling(window=150, min_periods=150).mean()
+        hist['50MA'] = hist['Close'].rolling(window=50, min_periods=50).mean()
+        hist['20MA'] = hist['Close'].rolling(window=20, min_periods=20).mean()
+        hist['10MA'] = hist['Close'].rolling(window=10, min_periods=10).mean()
+        
         # Convert to list of dictionaries
         stock_data = []
         for date_index, row in hist.iterrows():
@@ -43,7 +50,12 @@ def get_stock_price_history(symbol, date_range='max', interval='1d'):
                 "High": float(row['High']),
                 "Low": float(row['Low']),
                 "Close": float(row['Close']),
-                "Volume": int(row['Volume'])
+                "Volume": int(row['Volume']),
+                "200MA": round(float(row['200MA']), 2) if pd.notna(row['200MA']) else None,
+                "150MA": round(float(row['150MA']), 2) if pd.notna(row['150MA']) else None,
+                "50MA": round(float(row['50MA']), 2) if pd.notna(row['50MA']) else None,
+                "20MA": round(float(row['20MA']), 2) if pd.notna(row['20MA']) else None,
+                "10MA": round(float(row['10MA']), 2) if pd.notna(row['10MA']) else None
             })
 
         # Sort by date ascending (oldest first)

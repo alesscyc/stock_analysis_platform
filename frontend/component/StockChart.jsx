@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -36,6 +36,15 @@ ChartJS.register(
 function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange }) {
   const chartRef = useRef(null);
 
+  // Add state for MA visibility
+  const [maVisibility, setMaVisibility] = useState({
+    '200MA': true,
+    '150MA': true,
+    '50MA': true,
+    '20MA': true,
+    '10MA': true
+  });
+
   if (!stockData || stockData.length === 0) {
     return <div>No stock data available</div>;
   }
@@ -48,24 +57,29 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
 
   // Calculate initial visible range based on interval
   let initialVisibleCount;
-  
+
   switch (currentInterval) {
     case '1d':
-      // Show 1 year (approximately 252 trading days)
       initialVisibleCount = Math.min(252, stockData.length);
       break;
     case '1wk':
-      // Show 5 years (approximately 52 weeks * 5)
       initialVisibleCount = Math.min(260, stockData.length);
       break;
     case '1mo':
-      // Show 10 years (approximately 12 months * 10)
       initialVisibleCount = Math.min(120, stockData.length);
       break;
   }
-  
+
   const startIndex = Math.max(0, stockData.length - initialVisibleCount);
   const endIndex = stockData.length - 1;
+
+  // Handle MA checkbox changes
+  const handleMAToggle = (maType) => {
+    setMaVisibility(prev => ({
+      ...prev,
+      [maType]: !prev[maType]
+    }));
+  };
 
   const data = {
     labels: stockData.map(item => item.Date),
@@ -89,7 +103,108 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
           up: '#00aa00',
           down: '#aa0000',
           unchanged: '#666666'
-        }
+        },
+        yAxisID: 'y',
+      },
+      {
+        type: 'line',
+        label: '200 MA',
+        data: stockData.map((item, index) => ({
+          x: index,
+          y: item['200MA'] ? Math.round(parseFloat(item['200MA']) * 100) / 100 : null
+        })),
+        borderColor: maVisibility['200MA'] ? '#000000' : 'transparent',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        fill: false,
+        pointRadius: 0,
+        spanGaps: false,
+        yAxisID: 'y',
+        hidden: !maVisibility['200MA'] // Hide the dataset and its label
+      },
+      {
+        type: 'line',
+        label: '150 MA',
+        data: stockData.map((item, index) => ({
+          x: index,
+          y: item['150MA'] ? Math.round(parseFloat(item['150MA']) * 100) / 100 : null
+        })),
+        borderColor: maVisibility['150MA'] ? '#ffff00' : 'transparent',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        fill: false,
+        pointRadius: 0,
+        spanGaps: false,
+        yAxisID: 'y',
+        hidden: !maVisibility['150MA'] // Hide the dataset and its label
+      },
+      {
+        type: 'line',
+        label: '50 MA',
+        data: stockData.map((item, index) => ({
+          x: index,
+          y: item['50MA'] ? Math.round(parseFloat(item['50MA']) * 100) / 100 : null
+        })),
+        borderColor: maVisibility['50MA'] ? '#0000FF' : 'transparent',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        fill: false,
+        pointRadius: 0,
+        spanGaps: false,
+        yAxisID: 'y',
+        hidden: !maVisibility['50MA'] // Hide the dataset and its label
+      },
+      {
+        type: 'line',
+        label: '20 MA',
+        data: stockData.map((item, index) => ({
+          x: index,
+          y: item['20MA'] ? Math.round(parseFloat(item['20MA']) * 100) / 100 : null
+        })),
+        borderColor: maVisibility['20MA'] ? '#00ff00' : 'transparent',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        fill: false,
+        pointRadius: 0,
+        spanGaps: false,
+        yAxisID: 'y',
+        hidden: !maVisibility['20MA'] // Hide the dataset and its label
+      },
+      {
+        type: 'line',
+        label: '10 MA',
+        data: stockData.map((item, index) => ({
+          x: index,
+          y: item['10MA'] ? Math.round(parseFloat(item['10MA']) * 100) / 100 : null
+        })),
+        borderColor: maVisibility['10MA'] ? '#ff0000' : 'transparent',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        fill: false,
+        pointRadius: 0,
+        spanGaps: false,
+        yAxisID: 'y',
+        hidden: !maVisibility['10MA'] // Hide the dataset and its label
+      },
+      {
+        type: 'bar',
+        label: 'Volume',
+        data: stockData.map((item, index) => ({
+          x: index,
+          y: parseInt(item.Volume)
+        })),
+        backgroundColor: stockData.map((item) => {
+          const open = parseFloat(item.Open);
+          const close = parseFloat(item.Close);
+          return close >= open ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 0, 0, 0.3)';
+        }),
+        borderColor: stockData.map((item) => {
+          const open = parseFloat(item.Open);
+          const close = parseFloat(item.Close);
+          return close >= open ? 'rgba(0, 255, 0, 0.6)' : 'rgba(255, 0, 0, 0.6)';
+        }),
+        borderWidth: 1,
+        yAxisID: 'y1'
       }
     ]
   };
@@ -119,8 +234,8 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
           threshold: 5
         },
         limits: {
-          x: {min: 0, max: stockData.length - 1},
-          y: {min: 0, max: 'original'}
+          x: { min: 0, max: stockData.length - 1 },
+          y: { min: 0, max: 'original' }
         }
       }
     },
@@ -134,6 +249,29 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
         beginAtZero: false,
         grace: '5%',
         min: 0
+      },
+      y1: {
+        type: 'linear',
+        display: false,
+        position: 'right',
+        beginAtZero: false,
+        grace: '5%',
+        max: function (context) {
+          // Get the visible range from the x-axis
+          const chart = context.chart;
+          const xAxis = chart.scales.x;
+          const visibleMin = Math.max(0, Math.floor(xAxis.min || 0));
+          const visibleMax = Math.min(stockData.length - 1, Math.ceil(xAxis.max || stockData.length - 1));
+
+          // Calculate max volume only from visible data
+          const visibleVolumeData = stockData.slice(visibleMin, visibleMax + 1);
+          const maxVolume = Math.max(...visibleVolumeData.map(item => parseInt(item.Volume) || 0));
+
+          return maxVolume * 4; // Volume takes up bottom 25% (1/4 of total height)
+
+        },
+        min: 0,
+
       }
     }
   };
@@ -141,8 +279,16 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
   return (
     <div style={{ width: '100%', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Controls section */}
-      <div style={{ marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
-        {/* Interval selector buttons */}
+      <div style={{
+        marginBottom: '10px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        flexShrink: 0,
+        gap: '20px'
+      }}>
+        {/* Interval selector buttons - Left side */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <span style={{ fontWeight: 'bold', marginRight: '10px' }}>Interval:</span>
           {intervals.map(interval => (
@@ -163,8 +309,40 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
             </button>
           ))}
         </div>
+
+        {/* MA checkboxes - Right side */}
+        <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 'bold' }}>Moving Averages:</span>
+          {[
+            { key: '200MA', label: '200 MA' },
+            { key: '150MA', label: '150 MA' },
+            { key: '50MA', label: '50 MA' },
+            { key: '20MA', label: '20 MA' },
+            { key: '10MA', label: '10 MA' }
+          ].map(ma => (
+            <label key={ma.key} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}>
+              <input
+                type="checkbox"
+                checked={maVisibility[ma.key]}
+                onChange={() => handleMAToggle(ma.key)}
+                style={{ cursor: 'pointer' }}
+              />
+              <span style={{
+                fontWeight: 'bold'
+              }}>
+                {ma.label}
+              </span>
+            </label>
+          ))}
+        </div>
       </div>
-      
+
       <div style={{ flex: 1, minHeight: 0 }}>
         <Chart ref={chartRef} type='candlestick' data={data} options={options} />
       </div>
