@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import  { useRef, useState } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -9,7 +9,6 @@ import {
   Tooltip,
   Legend,
   TimeScale,
-  registerables
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import { CandlestickController, CandlestickElement, OhlcController, OhlcElement } from 'chartjs-chart-financial';

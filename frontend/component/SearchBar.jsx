@@ -49,6 +49,20 @@ function SearchBar({ onStockSelect }) {
         setSearchTerm(e.target.value.toUpperCase());
     };
 
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            
+            // If there are suggestions, select the first one
+            if (stocks.length > 0) {
+                handleStockSelect(stocks[0]);
+            } else if (searchTerm.length > 0) {
+                // If no suggestions but user typed something, treat it as a direct symbol search
+                handleStockSelect({ symbol: searchTerm.trim() });
+            }
+        }
+    };
+
     const handleStockSelect = (stock) => {
         console.log('Stock selected:', stock); // Debug log
         setSearchTerm('');
@@ -81,6 +95,7 @@ function SearchBar({ onStockSelect }) {
                 placeholder="Search stocks..."
                 value={searchTerm}
                 onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
                 onFocus={handleInputFocus}
                 onBlur={handleInputBlur}
                 autoComplete="chrome-off"
