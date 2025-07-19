@@ -8,10 +8,11 @@ function App() {
   const [stockData, setStockData] = useState([]);
   const [currentInterval, setCurrentInterval] = useState('1d');
 
-  const fetchStockData = async (stock, interval = '1d') => {
+  const fetchStockData = async (stock, interval = '1d', autoPredictEnabled = true) => {
     try {
       // Fetch stock data from your API with max date range and specified interval
-      const response = await fetch(`http://localhost:3001/api/stock/${stock.symbol}?date_range=max&interval=${interval}`);
+      const autoPredictParam = autoPredictEnabled ? 'true' : 'false';
+      const response = await fetch(`http://localhost:3001/api/stock/${stock.symbol}?date_range=max&interval=${interval}&auto_predict=${autoPredictParam}`);
       const data = await response.json();
       
       if (Array.isArray(data) && data.length > 0) {
@@ -30,7 +31,7 @@ function App() {
 
   const handleIntervalChange = async (interval) => {
     if (selectedStock) {
-      await fetchStockData(selectedStock, interval);
+      await fetchStockData(selectedStock, interval, false); // auto_predict = false for interval changes
     }
   };
   

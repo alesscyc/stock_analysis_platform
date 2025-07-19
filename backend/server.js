@@ -13,11 +13,11 @@ app.get('/api/stock/:symbol', async (req, res) => {
 
   try {
     const { symbol } = req.params;
-    const { date_range, interval } = req.query;
+    const { date_range = 'max', interval = '1d', auto_predict = 'false' } = req.query;
     
-    const pythonArgs = [path.join(__dirname, '../analysis/stock_data.py'), 'get_stock_price_history', symbol, date_range, interval];
+    const pythonArgs = [path.join(__dirname, '../analysis/stock_data.py'), 'get_stock_price_history', symbol, date_range, interval, auto_predict];
   
-    execFile('python', pythonArgs,{maxBuffer:1024*1024*5}, (error, stdout, stderr) => {
+    execFile('python', pythonArgs,{maxBuffer:1024*1024*10}, (error, stdout, stderr) => {
       if (error) {
         console.error('Error executing Python script:', error);
         return res.status(500).json({ error: 'Internal server error' });
@@ -42,7 +42,7 @@ app.get('/api/stock/:symbol', async (req, res) => {
 app.get('/api/stocks/search', async (req, res) => {
   try {
     const { q: query } = req.query;
-    const pythonArgs = ['../analysis/stock_data.py', 'search_stocks', query];
+    const pythonArgs = [path.join(__dirname, '../analysis/stock_data.py'), 'search_stocks', query];
   
     execFile('python', pythonArgs, {maxBuffer:1024*1024*5}, (error, stdout, stderr) => {
       if (error) {
@@ -65,7 +65,7 @@ app.get('/api/stocks/search', async (req, res) => {
 });
 app.get('/api/stocks/getallsysmbol', async (req, res) => {
   try {
-    const pythonArgs = ['../analysis/stock_data.py', 'get_all_symbols'];
+    const pythonArgs = [path.join(__dirname, '../analysis/stock_data.py'), 'get_all_symbols'];
   
     execFile('python', pythonArgs, {maxBuffer:1024*1024*50}, (error, stdout, stderr) => {
       if (error) {

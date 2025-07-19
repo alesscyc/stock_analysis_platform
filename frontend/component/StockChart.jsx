@@ -15,7 +15,6 @@ import { Chart } from 'react-chartjs-2';
 import { CandlestickController, CandlestickElement, OhlcController, OhlcElement } from 'chartjs-chart-financial';
 import zoomPlugin from 'chartjs-plugin-zoom';
 import 'chartjs-adapter-date-fns';
-import { min } from 'date-fns';
 
 ChartJS.register(
   CategoryScale,
@@ -48,6 +47,9 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
   if (!stockData || stockData.length === 0) {
     return <div>No stock data available</div>;
   }
+
+  // Extract AI prediction from stockData
+  const aiPrediction = stockData.find(item => item.prediction)?.prediction;
 
   const intervals = [
     { value: '1d', label: 'Daily' },
@@ -120,7 +122,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
         pointRadius: 0,
         spanGaps: false,
         yAxisID: 'y',
-        hidden: !maVisibility['200MA'] // Hide the dataset and its label
+        hidden: !maVisibility['200MA'], // Hide the dataset and its label
       },
       {
         type: 'line',
@@ -208,7 +210,6 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
       }
     ]
   };
-
   const options = {
     responsive: true,
     maintainAspectRatio: false,
@@ -255,23 +256,40 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
         display: false,
         position: 'right',
         beginAtZero: false,
-        grace: '5%',
         max: function (context) {
-          // Get the visible range from the x-axis
           const chart = context.chart;
           const xAxis = chart.scales.x;
-          const visibleMin = Math.max(0, Math.floor(xAxis.min || 0));
-          const visibleMax = Math.min(stockData.length - 1, Math.ceil(xAxis.max || stockData.length - 1));
 
-          // Calculate max volume only from visible data
+          // Calculate initial volume range based on current startIndex/endIndex
+          const currentInitialData = stockData.slice(startIndex, endIndex + 1);
+          const currentInitialMaxVolume = Math.max(...currentInitialData.map(item => parseInt(item.Volume) || 0));
+
+          // Use current initial max if chart not ready or during initial load
+          if (!xAxis || typeof xAxis.min !== 'number' || typeof xAxis.max !== 'number') {
+            return currentInitialMaxVolume * 4;
+          }
+
+          // Chart is ready and user is panning/zooming
+          const visibleMin = Math.max(0, Math.floor(xAxis.min));
+          const visibleMax = Math.min(stockData.length - 1, Math.ceil(xAxis.max));
+          
+          // Ensure we have valid range
+          if (visibleMin >= visibleMax) {
+            return currentInitialMaxVolume * 4;
+          }
+
           const visibleVolumeData = stockData.slice(visibleMin, visibleMax + 1);
+          
+          // Handle empty data
+          if (visibleVolumeData.length === 0) {
+            return currentInitialMaxVolume * 4;
+          }
+
           const maxVolume = Math.max(...visibleVolumeData.map(item => parseInt(item.Volume) || 0));
-
-          return maxVolume * 4; // Volume takes up bottom 25% (1/4 of total height)
-
+          
+          return maxVolume * 4;
         },
-        min: 0,
-
+        min: 0
       }
     }
   };
@@ -288,26 +306,80 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
         flexShrink: 0,
         gap: '20px'
       }}>
-        {/* Interval selector buttons - Left side */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span style={{ fontWeight: 'bold', marginRight: '10px' }}>Interval:</span>
-          {intervals.map(interval => (
-            <button
-              key={interval.value}
-              onClick={() => onIntervalChange(interval.value)}
-              style={{
-                padding: '5px 15px',
-                backgroundColor: currentInterval === interval.value ? '#007bff' : '#f8f9fa',
-                color: currentInterval === interval.value ? 'white' : '#333',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              {interval.label}
-            </button>
-          ))}
+        {/* Left side - Interval selector and AI Recommendation */}
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Interval selector buttons */}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <span style={{ fontWeight: 'bold', marginRight: '10px' }}>Interval:</span>
+            {intervals.map(interval => (
+              <button
+                key={interval.value}
+                onClick={() => onIntervalChange(interval.value)}
+                style={{
+                  padding: '5px 15px',
+                  backgroundColor: currentInterval === interval.value ? '#007bff' : '#f8f9fa',
+                  color: currentInterval === interval.value ? 'white' : '#333',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                {interval.label}
+              </button>
+            ))}
+          </div>
+
+          {/* AI Recommendation */}
+          {aiPrediction && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              backgroundColor: aiPrediction.status === 'success' 
+                ? (aiPrediction.recommendation === 'BUY' ? '#c3e6cb' : '#f8d7da')
+                : '#fff3cd',
+              border: aiPrediction.status === 'success'
+                ? `2px solid ${aiPrediction.recommendation === 'BUY' ? '#28a745' : '#dc3545'}`
+                : '2px solid #ffc107',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            }}>
+              <span style={{ color: '#333' }}>AI:</span>
+              {aiPrediction.status === 'success' ? (
+                <>
+                  <span style={{
+                    color: aiPrediction.recommendation === 'BUY' ? '#155724' : '#721c24',
+                    fontSize: '16px'
+                  }}>
+                    {aiPrediction.recommendation}
+                  </span>
+                  <span style={{
+                    color: '#666',
+                    fontSize: '12px',
+                    fontWeight: 'normal'
+                  }}>
+                    ({aiPrediction.confidence}% confidence)
+                  </span>
+                </>
+              ) : (
+                <span style={{
+                  color: '#856404',
+                  fontSize: '14px',
+                  fontWeight: 'normal'
+                }}>
+                  {aiPrediction.status === 'insufficient_data' 
+                    ? 'Insufficient data for prediction'
+                    : aiPrediction.status === 'prediction_error'
+                    ? 'Prediction failed'
+                    : 'AI unavailable'
+                  }
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* MA checkboxes - Right side */}
