@@ -1,4 +1,5 @@
 # 🚀 AI-Powered Stock Analysis Platform
+<img width="1905" height="947" alt="螢幕擷取畫面 2025-07-19 181121" src="https://github.com/user-attachments/assets/1e6100d7-92b7-48b3-a666-fe076378fc3d" />
 
 A full-stack web application that provides real-time stock data visualization with AI-powered buy/sell recommendations using machine learning.
 
