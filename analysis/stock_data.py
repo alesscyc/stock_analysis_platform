@@ -6,9 +6,6 @@ import json
 import queue
 from datetime import datetime, timedelta, date
 
-# Get free API key at polygon.io
-API_KEY = 'VssgjSHYbvmp2nmpe8mn6mVLVTo8iUus'  # Replace with your Polygon.io API key
-
 def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predict=False): 
     try:
         # Use yfinance to get stock data
@@ -239,77 +236,6 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
     except Exception as e:
         return {"error": f"Error fetching data: {str(e)}"}
 
-def get_all_symbols():
-    """
-    Get all available stock symbols from Polygon.io
-    """
-    try:
-        url = f"https://api.polygon.io/v3/reference/tickers?market=stocks&active=true&limit=1000&apikey={API_KEY}"
-        response = requests.get(url)
-        data = response.json()
-        
-        # Check for API errors
-        if data.get('status') == 'ERROR':
-            return {"error": f"API Error: {data.get('error', 'Unknown error')}"}
-        
-        if data.get('status') != 'OK':
-            return {"error": "Failed to fetch symbols from Polygon.io"}
-        
-        if 'results' not in data:
-            return {"error": "No data received from API"}
-        
-        # Extract symbols
-        symbols_data = []
-        for ticker in data['results']:
-            # Filter for US stocks only
-            if ticker.get('market') == 'stocks' and ticker.get('locale') == 'us':
-                symbols_data.append({
-                    "symbol": ticker.get('ticker', '')
-                    #"name": ticker.get('name', 'Unknown'),
-                    #"type": ticker.get('type', 'Unknown'),
-                    #"active": ticker.get('active', True)
-                })
-        
-        return symbols_data
-        
-    except Exception as e:
-        return {"error": f"Failed to fetch symbols: {str(e)}"}
-
-def search_stocks(query):
-    """
-    Search for stocks using a keyword - returns matching symbols
-    """
-    try:
-        # Use Polygon.io search endpoint
-        url = f"https://api.polygon.io/v3/reference/tickers?search={query}&market=stocks&active=true&limit=50&apikey={API_KEY}"
-        response = requests.get(url)
-        data = response.json()
-        
-        # Check for API errors
-        if data.get('status') == 'ERROR':
-            return {"error": f"API Error: {data.get('error', 'Unknown error')}"}
-        
-        if data.get('status') != 'OK':
-            return {"error": "No matches found"}
-        
-        if 'results' not in data:
-            return {"error": "No matches found"}
-        
-        # Extract matching symbols
-        results = []
-        for ticker in data['results']:
-            # Filter for US stocks only
-            if ticker.get('market') == 'stocks' and ticker.get('locale') == 'us':
-                results.append({
-                    "symbol": ticker.get('ticker', '')
-                    #"name": ticker.get('name', 'Unknown'),
-                    #"type": ticker.get('type', 'Unknown')
-                })
-        
-        return results
-        
-    except Exception as e:
-        return {"error": f"Search failed: {str(e)}"}
 
 def train_random_forest_model(stock_data):
     """
@@ -519,16 +445,6 @@ if __name__ == "__main__":
             interval = sys.argv[4] if len(sys.argv) > 4 else '1d'
             auto_predict = sys.argv[5].lower() == 'true' if len(sys.argv) > 5 else False
             result = get_stock_price_history(symbol, date_range, interval, auto_predict)
-    
-    elif function_name == "get_all_symbols":
-        result = get_all_symbols()
-    
-    elif function_name == "search_stocks":
-        if len(sys.argv) < 3:
-            result = {"error": "Query required for search_stocks"}
-        else:
-            query = sys.argv[2]
-            result = search_stocks(query)
     
     else:
         result = {"error": f"Unknown function: {function_name}"}
