@@ -27,11 +27,6 @@ A full-stack web application that provides real-time stock data visualization wi
 - **Volatility Indicators**: Weekly and monthly price ranges
 - **Trend Analysis**: Rise vs fall day patterns
 
-### 🔍 **Smart Stock Search**
-- Real-time stock symbol search
-- Company name and ticker lookup
-- Filtered results for US stock markets
-
 ## 🏗️ Architecture
 
 ```
