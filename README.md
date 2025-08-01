@@ -102,15 +102,6 @@ The application will be available at `http://localhost:3000`
 GET /api/stock/:symbol?date_range=max&interval=1d&auto_predict=true
 ```
 
-### Stock Search
-```http
-GET /api/stocks/search?q=apple
-```
-
-### Available Symbols
-```http
-GET /api/stocks/getallsysmbol
-```
 
 ## 🤖 Machine Learning Model
 
@@ -177,7 +168,6 @@ GET /api/stocks/getallsysmbol
 
 ### APIs:
 - **Yahoo Finance** - Historical stock data
-- **Polygon.io** - Stock search and metadata
 
 ## 🙏 Acknowledgments
 
