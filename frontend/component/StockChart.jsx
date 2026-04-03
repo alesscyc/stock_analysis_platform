@@ -13,6 +13,7 @@ import {
 import { Chart } from 'react-chartjs-2';
 import { CandlestickController, CandlestickElement, OhlcController, OhlcElement } from 'chartjs-chart-financial';
 import zoomPlugin from 'chartjs-plugin-zoom';
+import annotationPlugin from 'chartjs-plugin-annotation';
 import 'chartjs-adapter-date-fns';
 import TradeDialog from './TradeDialog';
 
@@ -26,6 +27,7 @@ ChartJS.register(
   Legend,
   TimeScale,
   zoomPlugin,
+  annotationPlugin,
   CandlestickController,
   CandlestickElement,
   OhlcController,
@@ -86,6 +88,9 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
 
   // Extract AI prediction from stockData
   const aiPrediction = stockData.find(item => item.prediction)?.prediction;
+
+  const latestPriceItem = [...stockData].reverse().find(item => item.Close != null);
+  const latestClose = latestPriceItem ? Math.round(parseFloat(latestPriceItem.Close) * 100) / 100 : null;
 
   const intervals = [
     { value: '1d', label: 'Daily' },
@@ -350,6 +355,18 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
           }
         }
       },
+      annotation: {
+        annotations: latestClose != null ? {
+          horizontalLine: {
+            type: 'line',
+            yMin: latestClose,
+            yMax: latestClose,
+            yScaleID: 'y',
+            borderColor: 'rgba(255, 165, 0, 0.9)',
+            borderWidth: 2
+          }
+        } : {}
+      },
       zoom: {
         zoom: {
           wheel: {
@@ -424,7 +441,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
         min: 0
       }
     }
-  }), [stockSymbol, stockData, startIndex, endIndex]);
+  }), [stockSymbol, stockData, startIndex, endIndex, latestClose]);
 
   return (
     <div style={{ width: '100%', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
