@@ -1,0 +1,6 @@
+backend/.env
+AGENTS.md
+*.pkl
+node_modules/
+.opencode.json
+stock_rf_model.pkl

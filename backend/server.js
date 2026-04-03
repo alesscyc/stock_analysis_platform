@@ -1,8 +1,13 @@
 // server.js
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { execFile } = require('child_process');
 const path = require('path');
+const db = require('./db');
+const util = require('util');
+const execFileAsync = util.promisify(execFile);
+
 const app = express();
 const port = 3001;
 
@@ -59,6 +64,20 @@ app.get('/api/stock/:symbol', async (req, res) => {
   }
 });
 
+app.post('/api/orders', async (req, res) => {
+  try {
+    let { symbol, price, amount } = req.body;
+    const queryText = 'INSERT INTO orders (type, symbol, price, amount, status) VALUES ($1, $2, $3, $4, $5) RETURNING price';
+    const values = ['buy', symbol, price, amount, false];
+    const dbResult = await db.query(queryText, values);
+    const finalPrice = dbResult.rows[0].price;
+    res.json({ success: true, message: 'Order submitted successfully', price: finalPrice });
+
+  } catch (error) {
+    console.error('Error submitting order:', error);
+    res.status(500).json({ error: 'Failed to submit order' });
+  }
+});
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);

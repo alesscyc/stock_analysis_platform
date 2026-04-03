@@ -237,6 +237,21 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
         return {"error": f"Error fetching data: {str(e)}"}
 
 
+def get_current_stock_price(symbol):
+    """
+    Get the most recent current price for a stock symbol.
+    """
+    try:
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="1d")
+        if hist.empty:
+            return {"error": f"No price data found for symbol: {symbol}"}
+        
+        current_price = float(hist["Close"].iloc[-1])
+        return {"symbol": symbol, "price": round(current_price, 2), "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+    except Exception as e:
+        return {"error": f"Error fetching current price: {str(e)}"}
+
 def train_random_forest_model(stock_data):
     """
     Train a Random Forest model using pre-fetched stock data from a single symbol.
@@ -445,8 +460,14 @@ if __name__ == "__main__":
             interval = sys.argv[4] if len(sys.argv) > 4 else '1d'
             auto_predict = sys.argv[5].lower() == 'true' if len(sys.argv) > 5 else False
             result = get_stock_price_history(symbol, date_range, interval, auto_predict)
+    elif function_name == "get_current_stock_price":
+        if len(sys.argv) < 3:
+            result = {"error": "Symbol required for get_current_stock_price"}
+        else:
+            symbol = sys.argv[2]
+            result = get_current_stock_price(symbol)
     
     else:
         result = {"error": f"Unknown function: {function_name}"}
-    
     print(json.dumps(result, separators=(',', ':')))
+

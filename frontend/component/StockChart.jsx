@@ -82,15 +82,17 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
     '10MA': true
   });
 
-  if (!stockData || stockData.length === 0) {
-    return <div>No stock data available</div>;
-  }
 
-  // Extract AI prediction from stockData
-  const aiPrediction = stockData.find(item => item.prediction)?.prediction;
+  const aiPrediction = useMemo(() => {
+    if (!stockData || stockData.length === 0) return null;
+    return stockData.find(item => item.prediction)?.prediction;
+  }, [stockData]);
 
-  const latestPriceItem = [...stockData].reverse().find(item => item.Close != null);
-  const latestClose = latestPriceItem ? Math.round(parseFloat(latestPriceItem.Close) * 100) / 100 : null;
+  const latestClose = useMemo(() => {
+    if (!stockData || stockData.length === 0) return null;
+    const latestPriceItem = [...stockData].reverse().find(item => item.Close != null);
+    return latestPriceItem ? Math.round(parseFloat(latestPriceItem.Close) * 100) / 100 : null;
+  }, [stockData]);
 
   const intervals = [
     { value: '1d', label: 'Daily' },
@@ -99,6 +101,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
   ];
 
   const { startIndex, endIndex } = useMemo(() => {
+    if (!stockData || stockData.length === 0) return { startIndex: 0, endIndex: 0 };
     let initialVisibleCount;
     switch (currentInterval) {
       case '1d':
@@ -117,8 +120,8 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
       startIndex: Math.max(0, stockData.length - initialVisibleCount),
       endIndex: stockData.length - 1
     };
-  }, [stockData.length, currentInterval]);
-
+  }, [stockData, currentInterval]);
+  
   // Handle MA checkbox changes
   const handleMAToggle = (maType) => {
     setMaVisibility(prev => ({
@@ -128,6 +131,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
   };
 
   const data = useMemo(() => {
+    if (!stockData || stockData.length === 0) return { labels: [], datasets: [] };
     const labels = [];
     const candlestickData = [];
     const ma200Data = [];
@@ -258,190 +262,198 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
     };
   }, [stockData, maVisibility]);
 
-  const options = useMemo(() => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: {
-      duration: 0
-    },
-    interaction: {
-      mode: 'index',
-      intersect: false,
-    },
-    plugins: {
-      title: {
-        display: true,
-        text: stockSymbol || 'Stock Price Chart'
+  const options = useMemo(() => {
+    if (!stockData || stockData.length === 0) return {};
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {
+        duration: 0
       },
-      // Customize tooltip to format volume in thousands (k)
-      tooltip: {
+      interaction: {
         mode: 'index',
         intersect: false,
-        position: 'highPrice',
-        animation: false,
-        callbacks: {
-          label: function(context) {
-            // Get numeric value defensively - parsed.y for bar/candlestick, raw.y or raw for others
-            const rawValue = (context.parsed && typeof context.parsed.y !== 'undefined')
-              ? context.parsed.y
-              : (context.raw && typeof context.raw.y !== 'undefined')
-              ? context.raw.y
-              : context.raw;
-            // If this dataset is the candlestick price dataset, show OHLC lines like the original tooltip
-            if (context.dataset && (context.dataset.type === 'candlestick' || context.dataset.label === 'Stock Price')) {
-              const raw = context.raw || {};
-              const parseNum = (v) => {
-                const n = Number(v);
-                return Number.isFinite(n) ? n : null;
-              };
+      },
+      plugins: {
+        title: {
+          display: true,
+          text: stockSymbol || 'Stock Price Chart'
+        },
+        // Customize tooltip to format volume in thousands (k)
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          position: 'highPrice',
+          animation: false,
+          callbacks: {
+            label: function(context) {
+              // Get numeric value defensively - parsed.y for bar/candlestick, raw.y or raw for others
+              const rawValue = (context.parsed && typeof context.parsed.y !== 'undefined')
+                ? context.parsed.y
+                : (context.raw && typeof context.raw.y !== 'undefined')
+                ? context.raw.y
+                : context.raw;
+              // If this dataset is the candlestick price dataset, show OHLC lines like the original tooltip
+              if (context.dataset && (context.dataset.type === 'candlestick' || context.dataset.label === 'Stock Price')) {
+                const raw = context.raw || {};
+                const parseNum = (v) => {
+                  const n = Number(v);
+                  return Number.isFinite(n) ? n : null;
+                };
 
-              const o = parseNum(raw.o);
-              const h = parseNum(raw.h);
-              const l = parseNum(raw.l);
-              const c = parseNum(raw.c);
+                const o = parseNum(raw.o);
+                const h = parseNum(raw.h);
+                const l = parseNum(raw.l);
+                const c = parseNum(raw.c);
 
-              const fmt = (v) => v === null ? 'N/A' : v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const fmt = (v) => v === null ? 'N/A' : v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-              const lines = [];
-              if (o !== null) lines.push(`Open: ${fmt(o)}`);
-              if (h !== null) lines.push(`High: ${fmt(h)}`);
-              if (l !== null) lines.push(`Low: ${fmt(l)}`);
-              if (c !== null) lines.push(`Close: ${fmt(c)}`);
+                const lines = [];
+                if (o !== null) lines.push(`Open: ${fmt(o)}`);
+                if (h !== null) lines.push(`High: ${fmt(h)}`);
+                if (l !== null) lines.push(`Low: ${fmt(l)}`);
+                if (c !== null) lines.push(`Close: ${fmt(c)}`);
 
-              // If no OHLC data, fallback to showing dataset label and raw value
-              if (lines.length === 0) {
-                if (typeof rawValue === 'number') {
-                  return `${context.dataset.label}: ${rawValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                // If no OHLC data, fallback to showing dataset label and raw value
+                if (lines.length === 0) {
+                  if (typeof rawValue === 'number') {
+                    return `${context.dataset.label}: ${rawValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                  }
+                  return `${context.dataset.label}: ${rawValue}`;
                 }
-                return `${context.dataset.label}: ${rawValue}`;
+
+                return lines;
               }
 
-              return lines;
-            }
+              // If this dataset is the volume dataset, show in thousands (K) or millions (M)
+              if (context.dataset && context.dataset.label === 'Volume') {
+                const value = Number(rawValue) || 0;
 
-            // If this dataset is the volume dataset, show in thousands (K) or millions (M)
-            if (context.dataset && context.dataset.label === 'Volume') {
-              const value = Number(rawValue) || 0;
+                const abs = Math.abs(value);
+                // Millions
+                if (abs >= 1_000_000) {
+                  const millions = value / 1_000_000;
+                  const formatted = (Math.abs(millions) >= 100 || Number.isInteger(millions))
+                    ? `${Math.round(millions).toLocaleString()}M`
+                    : `${millions.toFixed(1)}M`;
+                  return `${context.dataset.label}: ${formatted}`;
+                }
 
-              const abs = Math.abs(value);
-              // Millions
-              if (abs >= 1_000_000) {
-                const millions = value / 1_000_000;
-                const formatted = (Math.abs(millions) >= 100 || Number.isInteger(millions))
-                  ? `${Math.round(millions).toLocaleString()}M`
-                  : `${millions.toFixed(1)}M`;
-                return `${context.dataset.label}: ${formatted}`;
+                // Thousands
+                if (abs >= 1_000) {
+                  const thousands = value / 1000;
+                  const formatted = (Math.abs(thousands) >= 100 || Number.isInteger(thousands))
+                    ? `${Math.round(thousands).toLocaleString()}K`
+                    : `${thousands.toFixed(1)}K`;
+                  return `${context.dataset.label}: ${formatted}`;
+                }
+
+                // Less than 1000 - show raw with thousand separators
+                return `${context.dataset.label}: ${value.toLocaleString()}`;
               }
 
-              // Thousands
-              if (abs >= 1_000) {
-                const thousands = value / 1000;
-                const formatted = (Math.abs(thousands) >= 100 || Number.isInteger(thousands))
-                  ? `${Math.round(thousands).toLocaleString()}K`
-                  : `${thousands.toFixed(1)}K`;
-                return `${context.dataset.label}: ${formatted}`;
+              // Fallback for other datasets - show a nicely formatted number
+              if (typeof rawValue === 'number') {
+                // For prices, show two decimals
+                return `${context.dataset.label}: ${rawValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
               }
-
-              // Less than 1000 - show raw with thousand separators
-              return `${context.dataset.label}: ${value.toLocaleString()}`;
+              return `${context.dataset.label}: ${rawValue}`;
             }
-
-            // Fallback for other datasets - show a nicely formatted number
-            if (typeof rawValue === 'number') {
-              // For prices, show two decimals
-              return `${context.dataset.label}: ${rawValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            }
-            return `${context.dataset.label}: ${rawValue}`;
           }
-        }
-      },
-      annotation: {
-        annotations: latestClose != null ? {
-          horizontalLine: {
-            type: 'line',
-            yMin: latestClose,
-            yMax: latestClose,
-            yScaleID: 'y',
-            borderColor: 'rgba(255, 165, 0, 0.9)',
-            borderWidth: 2
-          }
-        } : {}
-      },
-      zoom: {
+        },
+        annotation: {
+          annotations: latestClose != null ? {
+            horizontalLine: {
+              type: 'line',
+              yMin: latestClose,
+              yMax: latestClose,
+              yScaleID: 'y',
+              borderColor: 'rgba(255, 165, 0, 0.9)',
+              borderWidth: 2
+            }
+          } : {}
+        },
         zoom: {
-          wheel: {
+          zoom: {
+            wheel: {
+              enabled: true,
+              speed: 0.1
+            },
+            pinch: {
+              enabled: true
+            },
+            mode: 'x',
+          },
+          pan: {
             enabled: true,
-            speed: 0.1
+            mode: 'x',
+            threshold: 5
           },
-          pinch: {
-            enabled: true
+          limits: {
+            x: { min: 0, max: stockData.length - 1 },
+            y: { min: 0, max: 'original' }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'category',
+          min: startIndex,
+          max: endIndex
+        },
+        y: {
+          beginAtZero: false,
+          grace: '5%',
+          min: 0
+        },
+        y1: {
+          type: 'linear',
+          display: false,
+          position: 'right',
+          beginAtZero: false,
+          max: function (context) {
+            const chart = context.chart;
+            const xAxis = chart.scales.x;
+
+            // Calculate initial volume range based on current startIndex/endIndex
+            const currentInitialData = stockData.slice(startIndex, endIndex + 1);
+            const currentInitialMaxVolume = Math.max(...currentInitialData.map(item => parseInt(item.Volume) || 0));
+
+            // Use current initial max if chart not ready or during initial load
+            if (!xAxis || typeof xAxis.min !== 'number' || typeof xAxis.max !== 'number') {
+              return currentInitialMaxVolume * 4;
+            }
+
+            // Chart is ready and user is panning/zooming
+            const visibleMin = Math.max(0, Math.floor(xAxis.min));
+            const visibleMax = Math.min(stockData.length - 1, Math.ceil(xAxis.max));
+            
+            // Ensure we have valid range
+            if (visibleMin >= visibleMax) {
+              return currentInitialMaxVolume * 4;
+            }
+
+            const visibleVolumeData = stockData.slice(visibleMin, visibleMax + 1);
+            
+            // Handle empty data
+            if (visibleVolumeData.length === 0) {
+              return currentInitialMaxVolume * 4;
+            }
+
+            const maxVolume = Math.max(...visibleVolumeData.map(item => parseInt(item.Volume) || 0));
+            
+            return maxVolume * 4;
           },
-          mode: 'x',
-        },
-        pan: {
-          enabled: true,
-          mode: 'x',
-          threshold: 5
-        },
-        limits: {
-          x: { min: 0, max: stockData.length - 1 },
-          y: { min: 0, max: 'original' }
+          min: 0
         }
       }
-    },
-    scales: {
-      x: {
-        type: 'category',
-        min: startIndex,
-        max: endIndex
-      },
-      y: {
-        beginAtZero: false,
-        grace: '5%',
-        min: 0
-      },
-      y1: {
-        type: 'linear',
-        display: false,
-        position: 'right',
-        beginAtZero: false,
-        max: function (context) {
-          const chart = context.chart;
-          const xAxis = chart.scales.x;
+    };
+  }, [stockSymbol, stockData, startIndex, endIndex, latestClose]);
 
-          // Calculate initial volume range based on current startIndex/endIndex
-          const currentInitialData = stockData.slice(startIndex, endIndex + 1);
-          const currentInitialMaxVolume = Math.max(...currentInitialData.map(item => parseInt(item.Volume) || 0));
+  if (!stockData || stockData.length === 0) {
+    return <div>No stock data available</div>;
+  }
 
-          // Use current initial max if chart not ready or during initial load
-          if (!xAxis || typeof xAxis.min !== 'number' || typeof xAxis.max !== 'number') {
-            return currentInitialMaxVolume * 4;
-          }
-
-          // Chart is ready and user is panning/zooming
-          const visibleMin = Math.max(0, Math.floor(xAxis.min));
-          const visibleMax = Math.min(stockData.length - 1, Math.ceil(xAxis.max));
-          
-          // Ensure we have valid range
-          if (visibleMin >= visibleMax) {
-            return currentInitialMaxVolume * 4;
-          }
-
-          const visibleVolumeData = stockData.slice(visibleMin, visibleMax + 1);
-          
-          // Handle empty data
-          if (visibleVolumeData.length === 0) {
-            return currentInitialMaxVolume * 4;
-          }
-
-          const maxVolume = Math.max(...visibleVolumeData.map(item => parseInt(item.Volume) || 0));
-          
-          return maxVolume * 4;
-        },
-        min: 0
-      }
-    }
-  }), [stockSymbol, stockData, startIndex, endIndex, latestClose]);
 
   return (
     <div style={{ width: '100%', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -589,6 +601,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
         onClose={() => setIsTradeDialogOpen(false)} 
         stockSymbol={stockSymbol} 
       />
+
     </div>
   );
 }
