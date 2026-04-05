@@ -16,6 +16,7 @@ import zoomPlugin from 'chartjs-plugin-zoom';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import 'chartjs-adapter-date-fns';
 import TradeDialog from './TradeDialog';
+import './StockChart.css';
 
 ChartJS.register(
   CategoryScale,
@@ -456,35 +457,19 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
 
 
   return (
-    <div style={{ width: '100%', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div id="stock-chart-root">
       {/* Controls section */}
-      <div style={{
-        marginBottom: '10px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        flexShrink: 0,
-        gap: '20px'
-      }}>
+      <div id="stock-chart-controls">
         {/* Left side - Interval selector and AI Recommendation */}
-        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div id="stock-chart-controls-left">
           {/* Interval selector buttons */}
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <span style={{ fontWeight: 'bold', marginRight: '10px' }}>Interval:</span>
+          <div id="interval-selector">
+            <span id="interval-selector-label">Interval:</span>
             {intervals.map(interval => (
               <button
                 key={interval.value}
                 onClick={() => onIntervalChange(interval.value)}
-                style={{
-                  padding: '5px 15px',
-                  backgroundColor: currentInterval === interval.value ? '#007bff' : '#f8f9fa',
-                  color: currentInterval === interval.value ? 'white' : '#333',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
+                className={`interval-btn${currentInterval === interval.value ? ' active' : ''}`}
               >
                 {interval.label}
               </button>
@@ -493,44 +478,29 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
 
           {/* AI Recommendation */}
           {aiPrediction && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              backgroundColor: aiPrediction.status === 'success' 
-                ? (aiPrediction.recommendation === 'BUY' ? '#c3e6cb' : '#f8d7da')
-                : '#fff3cd',
-              border: aiPrediction.status === 'success'
-                ? `2px solid ${aiPrediction.recommendation === 'BUY' ? '#28a745' : '#dc3545'}`
-                : '2px solid #ffc107',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}>
-              <span style={{ color: '#333' }}>AI:</span>
+            <div
+              id="ai-recommendation"
+              className={
+                aiPrediction.status === 'success'
+                  ? aiPrediction.recommendation === 'BUY' ? 'ai-buy' : 'ai-sell'
+                  : 'ai-warning'
+              }
+            >
+              <span id="ai-recommendation-label">AI:</span>
               {aiPrediction.status === 'success' ? (
                 <>
-                  <span style={{
-                    color: aiPrediction.recommendation === 'BUY' ? '#155724' : '#721c24',
-                    fontSize: '16px'
-                  }}>
+                  <span
+                    id="ai-recommendation-action"
+                    className={aiPrediction.recommendation === 'BUY' ? 'buy' : 'sell'}
+                  >
                     {aiPrediction.recommendation}
                   </span>
-                  <span style={{
-                    color: '#666',
-                    fontSize: '12px',
-                    fontWeight: 'normal'
-                  }}>
+                  <span id="ai-recommendation-confidence">
                     ({aiPrediction.confidence}% confidence)
                   </span>
                 </>
               ) : (
-                <span style={{
-                  color: '#856404',
-                  fontSize: '14px',
-                  fontWeight: 'normal'
-                }}>
+                <span id="ai-recommendation-unavailable">
                   {aiPrediction.status === 'insufficient_data' 
                     ? 'Insufficient data for prediction'
                     : aiPrediction.status === 'prediction_error'
@@ -542,26 +512,17 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
             </div>
           )}
 
-          <button 
+          <button
+            id="trade-btn"
             onClick={() => setIsTradeDialogOpen(true)}
-            style={{
-              padding: '5px 15px',
-              backgroundColor: '#28a745',
-              color: 'white',
-              border: '1px solid #218838',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 'bold'
-            }}
           >
             Trade
           </button>
         </div>
 
         {/* MA checkboxes - Right side */}
-        <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 'bold' }}>Moving Averages:</span>
+        <div id="ma-controls">
+          <span id="ma-controls-label">Moving Averages:</span>
           {[
             { key: '200MA', label: '200 MA' },
             { key: '150MA', label: '150 MA' },
@@ -569,22 +530,13 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
             { key: '20MA', label: '20 MA' },
             { key: '10MA', label: '10 MA' }
           ].map(ma => (
-            <label key={ma.key} style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}>
+            <label key={ma.key} className="ma-checkbox-label">
               <input
                 type="checkbox"
                 checked={maVisibility[ma.key]}
                 onChange={() => handleMAToggle(ma.key)}
-                style={{ cursor: 'pointer' }}
               />
-              <span style={{
-                fontWeight: 'bold'
-              }}>
+              <span className="ma-checkbox-text">
                 {ma.label}
               </span>
             </label>
@@ -592,7 +544,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange 
         </div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div id="stock-chart-canvas-wrapper">
         <Chart ref={chartRef} type='candlestick' data={data} options={options} />
       </div>
 

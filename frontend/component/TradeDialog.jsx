@@ -1,5 +1,5 @@
 import { useState } from 'react';
-
+import './TradeDialog.css';
 
 function TradeDialog({ isOpen, onClose, stockSymbol }) {
   const [price, setPrice] = useState('');
@@ -51,73 +51,41 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
   return (
     <>
       {/* Backdrop/Mask */}
-      <div 
+      <div
+        id="trade-dialog-backdrop"
         onClick={onClose}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: 'rgba(0, 0, 0, 0.4)',
-          zIndex: 999,
-          cursor: 'default'
-        }}
       />
 
       {/* Sidebar */}
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        right: 0,
-        width: '30%',
-        height: '100%',
-        backgroundColor: 'white',
-        boxShadow: '-2px 0 10px rgba(0,0,0,0.1)',
-        zIndex: 1000,
-        boxSizing: 'border-box',
-        padding: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px'
-      }}>
-        <h2 style={{ margin: 0 }}>Trade {stockSymbol}</h2>
+      <div id="trade-dialog-sidebar">
+        <h2 id="trade-dialog-title">Trade {stockSymbol}</h2>
         
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <label style={{ fontWeight: 'bold' }}>Price</label>
-          <input 
-            type="number" 
-            placeholder="Price" 
+        <div className="trade-field-group">
+          <label htmlFor="trade-price-input">Price</label>
+          <input
+            id="trade-price-input"
+            type="number"
+            placeholder="Price"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            style={{ padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
           />
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <label style={{ fontWeight: 'bold' }}>Amount</label>
-          <input 
-            type="number" 
-            placeholder="Amount" 
+        <div className="trade-field-group">
+          <label htmlFor="trade-amount-input">Amount</label>
+          <input
+            id="trade-amount-input"
+            type="number"
+            placeholder="Amount"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            style={{ padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}
           />
         </div>
 
-        <button 
+        <button
+          id="trade-buy-btn"
           onClick={handleBuy}
           disabled={loading}
-          style={{
-            padding: '12px',
-            backgroundColor: loading ? '#ccc' : '#28a745',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            fontWeight: 'bold',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            marginTop: 'auto'
-          }}
         >
           {loading ? 'PROCESSING...' : 'BUY'}
         </button>

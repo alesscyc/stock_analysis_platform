@@ -1,0 +1,100 @@
+/* ── Backdrop ──────────────────────────────────────────── */
+#portfolio-dialog-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 999;
+  cursor: default;
+}
+
+/* ── Sidebar panel ─────────────────────────────────────── */
+#portfolio-dialog-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 40%;
+  height: 100%;
+  background-color: white;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  box-sizing: border-box;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+/* ── Header ────────────────────────────────────────────── */
+#portfolio-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#portfolio-dialog-title {
+  margin: 0;
+}
+
+/* ── Status messages ───────────────────────────────────── */
+#portfolio-loading-msg {
+  color: #666;
+}
+
+#portfolio-error-msg {
+  color: #dc3545;
+}
+
+#portfolio-empty-msg {
+  color: #666;
+}
+
+/* ── Holdings table ────────────────────────────────────── */
+#portfolio-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+#portfolio-table thead tr {
+  border-bottom: 2px solid #dee2e6;
+  text-align: left;
+}
+
+#portfolio-table th {
+  padding: 8px 6px;
+}
+
+#portfolio-table th.align-right {
+  text-align: right;
+}
+
+#portfolio-table td {
+  padding: 8px 6px;
+}
+
+#portfolio-table td.align-right {
+  text-align: right;
+}
+
+.portfolio-row-even {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.portfolio-row-odd {
+  background-color: white;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.portfolio-symbol-cell {
+  font-weight: bold;
+}
+
+.portfolio-type-cell {
+  color: #555;
+  text-transform: capitalize;
+}

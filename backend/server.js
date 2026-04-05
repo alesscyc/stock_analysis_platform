@@ -79,6 +79,18 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
+app.get('/api/portfolio', async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT id, symbol, type, quantity, average_price FROM portfolio ORDER BY symbol ASC'
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching portfolio:', error);
+    res.status(500).json({ error: 'Failed to fetch portfolio' });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Order-fill polling job
 // ---------------------------------------------------------------------------
@@ -124,7 +136,7 @@ async function processOpenBuyOrders() {
   try {
     // 1. Fetch all unfilled buy orders
     const { rows: openOrders } = await db.query(
-      "SELECT id, symbol, price FROM orders WHERE type = 'buy' AND status = false"
+      "SELECT id, symbol, price, amount FROM orders WHERE type = 'buy' AND status = false"
     );
 
     if (openOrders.length === 0) return; // nothing to do
@@ -159,6 +171,21 @@ async function processOpenBuyOrders() {
       await db.query(
         'UPDATE orders SET status = true WHERE id = ANY($1::bigint[])',
         [ids]
+      );
+
+      // 6. Upsert portfolio using current market price as the fill price
+      //    Weighted average: new_avg = (old_total_cost + fill_price * new_qty) / (old_qty + new_qty)
+      const totalFilledQty = toFill.reduce((sum, o) => sum + o.amount, 0);
+      const fillCost = currentPrice * totalFilledQty;
+
+      await db.query(
+        `INSERT INTO portfolio (symbol, type, quantity, average_price)
+         VALUES ($1, 'buy', $2, $3)
+         ON CONFLICT (symbol) DO UPDATE SET
+           quantity      = portfolio.quantity + EXCLUDED.quantity,
+           average_price = (portfolio.average_price * portfolio.quantity + $4) /
+                           (portfolio.quantity + EXCLUDED.quantity)`,
+        [symbol, totalFilledQty, currentPrice, fillCost]
       );
 
       console.log(

@@ -2,11 +2,13 @@ import './App.css'
 import { useState } from 'react';
 import SearchBar from '../component/searchBar'
 import StockChart from '../component/StockChart';
+import PortfolioDialog from '../component/PortfolioDialog';
 
 function App() {
   const [selectedStock, setSelectedStock] = useState(null);
   const [stockData, setStockData] = useState([]);
   const [currentInterval, setCurrentInterval] = useState('1d');
+  const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
 
   const fetchStockData = async (stock, interval = '1d', autoPredictEnabled = true) => {
     try {
@@ -39,6 +41,12 @@ function App() {
     <div className="app-container">
       <div className="search-bar-wrapper">
         <SearchBar onStockSelect={handleStockSelect} />
+        <button
+          id="portfolio-open-btn"
+          onClick={() => setIsPortfolioOpen(true)}
+        >
+          Portfolio
+        </button>
       </div>
       {stockData.length > 0 && (
         <div className="chart-container">
@@ -50,6 +58,7 @@ function App() {
           />
         </div>
       )}
+      <PortfolioDialog isOpen={isPortfolioOpen} onClose={() => setIsPortfolioOpen(false)} />
     </div>
   )
 }
