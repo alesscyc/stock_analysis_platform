@@ -79,6 +79,104 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Order-fill polling job
+// ---------------------------------------------------------------------------
+const ORDER_CHECK_INTERVAL_MS = 5000; // 5 seconds
+let orderCheckRunning = false;
+
+/**
+ * Call Python get_current_stock_price for a single symbol.
+ * Returns the numeric price, or null on any failure.
+ */
+async function fetchCurrentPrice(symbol) {
+  const pythonArgs = [
+    path.join(__dirname, '../analysis/stock_data.py'),
+    'get_current_stock_price',
+    symbol,
+  ];
+  try {
+    const { stdout } = await execFileAsync('python', pythonArgs, { maxBuffer: 1024 * 1024 });
+    const result = JSON.parse(stdout);
+    if (result.error) {
+      console.error(`[order-fill] Python error for ${symbol}:`, result.error);
+      return null;
+    }
+    return result.price;
+  } catch (err) {
+    console.error(`[order-fill] Failed to get price for ${symbol}:`, err.message);
+    return null;
+  }
+}
+
+/**
+ * Main polling job: checks open buy orders and fills qualifying ones.
+ * Groups orders by symbol so Python is called once per distinct symbol.
+ * Batch-updates all qualifying order IDs per symbol in a single query.
+ */
+async function processOpenBuyOrders() {
+  if (orderCheckRunning) {
+    console.log('[order-fill] Previous run still in progress, skipping.');
+    return;
+  }
+  orderCheckRunning = true;
+
+  try {
+    // 1. Fetch all unfilled buy orders
+    const { rows: openOrders } = await db.query(
+      "SELECT id, symbol, price FROM orders WHERE type = 'buy' AND status = false"
+    );
+
+    if (openOrders.length === 0) return; // nothing to do
+
+    console.log(`[order-fill] Checking ${openOrders.length} open buy order(s)...`);
+
+    // 2. Group orders by symbol
+    const bySymbol = {};
+    for (const order of openOrders) {
+      if (!bySymbol[order.symbol]) bySymbol[order.symbol] = [];
+      bySymbol[order.symbol].push(order);
+    }
+
+    // 3. Process each symbol group
+    for (const [symbol, orders] of Object.entries(bySymbol)) {
+      // Fetch current market price once per symbol
+      const currentPrice = await fetchCurrentPrice(symbol);
+      if (currentPrice === null) continue; // skip symbol on Python failure
+
+      console.log(`[order-fill] ${symbol} current price: ${currentPrice}`);
+
+      // 4. Filter orders where order.price >= currentPrice (buy fill condition)
+      const toFill = orders.filter(o => o.price >= currentPrice);
+
+      if (toFill.length === 0) {
+        console.log(`[order-fill] ${symbol}: no orders qualify (${orders.length} checked)`);
+        continue;
+      }
+
+      // 5. Batch-update all qualifying orders for this symbol in one query
+      const ids = toFill.map(o => o.id);
+      await db.query(
+        'UPDATE orders SET status = true WHERE id = ANY($1::bigint[])',
+        [ids]
+      );
+
+      console.log(
+        `[order-fill] ${symbol}: filled ${toFill.length}/${orders.length} order(s)` +
+        ` — ids: [${ids.join(', ')}], current price: ${currentPrice}`
+      );
+    }
+  } catch (err) {
+    console.error('[order-fill] Unexpected error:', err.message);
+  } finally {
+    orderCheckRunning = false;
+  }
+}
+
+// Start the polling job
+setInterval(processOpenBuyOrders, ORDER_CHECK_INTERVAL_MS);
+console.log(`[order-fill] Polling job started — running every ${ORDER_CHECK_INTERVAL_MS / 1000}s`);
+
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
