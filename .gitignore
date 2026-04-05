@@ -4,3 +4,4 @@ AGENTS.md
 node_modules/
 .opencode.json
 stock_rf_model.pkl
+.opencode/*
