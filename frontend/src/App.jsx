@@ -10,6 +10,7 @@ function App() {
   const [currentInterval, setCurrentInterval] = useState('1d');
   const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [aiPrediction, setAiPrediction] = useState(null);
 
   const fetchStockData = async (stock, interval = '1d', autoPredictEnabled = true) => {
     setLoading(true);
@@ -22,6 +23,10 @@ function App() {
       if (Array.isArray(data) && data.length > 0) {
         setStockData(data);
         setCurrentInterval(interval);
+        // Only update the prediction when the API actually returned one.
+        // This keeps the last known prediction visible during interval changes.
+        const prediction = data.find(item => item.prediction)?.prediction;
+        if (prediction) setAiPrediction(prediction);
       }
     } catch (error) {
       console.error('Error fetching stock data:', error);
@@ -32,6 +37,7 @@ function App() {
 
   const handleStockSelect = async (stock) => {
     setSelectedStock(stock);
+    setAiPrediction(null);
     await fetchStockData(stock, currentInterval);
   };
 
@@ -46,11 +52,6 @@ function App() {
     if (!stockData || stockData.length === 0) return null;
     const item = [...stockData].reverse().find(d => d.Close != null);
     return item ? (Math.round(parseFloat(item.Close) * 100) / 100) : null;
-  }, [stockData]);
-
-  const aiPrediction = useMemo(() => {
-    if (!stockData || stockData.length === 0) return null;
-    return stockData.find(item => item.prediction)?.prediction;
   }, [stockData]);
 
   return (
@@ -149,6 +150,7 @@ function App() {
               stockSymbol={selectedStock?.symbol}
               currentInterval={currentInterval}
               onIntervalChange={handleIntervalChange}
+              aiPrediction={aiPrediction}
             />
           </div>
         )}

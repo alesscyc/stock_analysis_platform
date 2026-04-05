@@ -216,6 +216,13 @@
   flex: 1;
   min-height: 0;
   padding: var(--space-2);
+  position: relative;
+}
+
+/* lightweight-charts mount target — must fill the wrapper */
+#lw-chart-container {
+  width: 100%;
+  height: 100%;
 }
 
 /* ── Responsive ────────────────────────────────────────── */
