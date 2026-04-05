@@ -1,182 +1,107 @@
-/* SearchBar Component Styles */
+/* ── SearchBar ─────────────────────────────────────────── */
 .search-bar {
+  width: 100%;
+}
+
+.search-bar-inner {
   position: relative;
-  width: 100%;
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-.search-bar input {
-  width: 100%;
-  padding: 12px 16px;
-  font-size: 16px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  outline: none;
-  transition: border-color 0.3s ease;
-  background-color: #fff;
-}
-
-.search-bar input:focus {
-  border-color: #007bff;
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
-}
-
-.search-bar input::placeholder {
-  color: #999;
-  font-style: italic;
-}
-
-/* Loading indicator */
-.search-loading {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: #f8f9fa;
-  border: 1px solid #e0e0e0;
-  border-top: none;
-  padding: 10px 16px;
-  font-size: 14px;
-  color: #666;
-  border-radius: 0 0 8px 8px;
-  z-index: 1000;
-}
-
-/* Suggestions dropdown */
-.suggestions-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-top: none;
-  border-radius: 0 0 8px 8px;
-  max-height: 300px;
-  overflow-y: auto;
-  z-index: 1000;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-/* Individual suggestion item */
-.suggestion-item {
-  padding: 12px 16px;
-  cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  transition: background-color 0.2s ease;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-md);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.suggestion-item:hover {
-  background-color: #f8f9fa;
+.search-bar-inner:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
-.suggestion-item:last-child {
-  border-bottom: none;
-}
-
-/* Symbol styling */
-.symbol {
-  font-weight: bold;
-  color: #007bff;
-  font-size: 16px;
-  min-width: 60px;
-}
-
-/* Company name styling */
-.name {
-  flex: 1;
-  margin-left: 12px;
-  color: #333;
-  font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Volume styling */
-.volume {
-  font-size: 12px;
-  color: #666;
-  background-color: #e9ecef;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-left: 8px;
-}
-
-/* No results message */
-.no-results {
+.search-icon {
   position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-top: none;
-  padding: 16px;
-  text-align: center;
-  color: #666;
-  font-style: italic;
-  border-radius: 0 0 8px 8px;
-  z-index: 1000;
+  left: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
+  flex-shrink: 0;
 }
 
-/* Responsive design */
+.search-bar-inner input {
+  width: 100%;
+  padding: 8px 70px 8px 34px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: 0.4px;
+  box-shadow: none;
+}
+
+.search-bar-inner input:focus {
+  border: none;
+  box-shadow: none;
+}
+
+.search-bar-inner input::placeholder {
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-weight: 400;
+  letter-spacing: 0;
+  font-size: 13px;
+}
+
+.search-bar-inner input:disabled {
+  opacity: 0.5;
+}
+
+/* GO submit button */
+.search-submit-btn {
+  position: absolute;
+  right: 6px;
+  padding: 3px 8px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.search-submit-btn:hover {
+  background: var(--accent-hover);
+}
+
+.search-submit-btn:focus-visible {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: 2px;
+}
+
+/* Loading spinner */
+.search-spinner {
+  position: absolute;
+  right: 10px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-normal);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive */
 @media (max-width: 768px) {
-  .search-bar {
-    max-width: 100%;
-  }
-  
-  .suggestion-item {
-    padding: 10px 12px;
-  }
-  
-  .name {
-    display: none; /* Hide company name on small screens */
-  }
-  
-  .search-bar input {
-    font-size: 14px;
-  }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .search-bar input {
-    background-color: #2d3748;
-    border-color: #4a5568;
-    color: #e2e8f0;
-  }
-  
-  .search-bar input::placeholder {
-    color: #a0aec0;
-  }
-  
-  .suggestions-dropdown,
-  .search-loading,
-  .no-results {
-    background-color: #2d3748;
-    border-color: #4a5568;
-    color: #e2e8f0;
-  }
-  
-  .suggestion-item:hover {
-    background-color: #4a5568;
-  }
-  
-  .symbol {
-    color: #63b3ed;
-  }
-  
-  .name {
-    color: #e2e8f0;
-  }
-  
-  .volume {
-    background-color: #4a5568;
-    color: #a0aec0;
+  .search-bar-inner input {
+    font-size: 14px; /* prevent iOS zoom */
   }
 }

@@ -1,13 +1,12 @@
 /* ── Backdrop ──────────────────────────────────────────── */
 #trade-dialog-backdrop {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.4);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
   z-index: 999;
   cursor: default;
+  animation: fadeIn 0.15s ease;
 }
 
 /* ── Sidebar panel ─────────────────────────────────────── */
@@ -15,53 +14,334 @@
   position: fixed;
   top: 0;
   right: 0;
-  width: 30%;
+  width: 360px;
+  max-width: 95vw;
   height: 100%;
-  background-color: white;
-  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-lg);
   z-index: 1000;
   box-sizing: border-box;
-  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  overflow-y: auto;
+  animation: slideIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ── Header ────────────────────────────────────────────── */
+#trade-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+#trade-dialog-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#trade-dialog-type-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--accent);
+  text-transform: uppercase;
 }
 
 #trade-dialog-title {
   margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text-primary);
 }
 
-/* ── Form field groups ─────────────────────────────────── */
+#trade-dialog-symbol {
+  font-family: var(--font-mono);
+  letter-spacing: -0.5px;
+}
+
+#trade-dialog-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+  padding: 0;
+}
+
+#trade-dialog-close-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+/* ── Order type selector ───────────────────────────────── */
+#trade-order-type {
+  display: flex;
+  gap: var(--space-1);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 3px;
+}
+
+.order-type-btn {
+  flex: 1;
+  padding: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.order-type-btn.active {
+  background: var(--green);
+  color: #fff;
+  box-shadow: 0 1px 6px rgba(38,166,154,0.35);
+}
+
+.order-type-btn.disabled-type {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Fields ────────────────────────────────────────────── */
+#trade-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 .trade-field-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-1);
 }
 
-.trade-field-group label {
-  font-weight: bold;
+.trade-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
-#trade-price-input,
-#trade-amount-input {
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+.trade-input-wrapper {
+  display: flex;
+  align-items: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-/* ── Buy button ────────────────────────────────────────── */
-#trade-buy-btn {
-  padding: 12px;
-  background-color: #28a745;
-  color: white;
+.trade-input-wrapper:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.trade-input-wrapper.has-error {
+  border-color: var(--red);
+}
+
+.trade-input-wrapper.has-error:focus-within {
+  box-shadow: 0 0 0 3px var(--red-dim);
+}
+
+.trade-input-prefix {
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-subtle);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+}
+
+.trade-input-wrapper input {
+  flex: 1;
+  padding: 10px 12px;
+  background: transparent;
   border: none;
-  border-radius: 4px;
-  font-weight: bold;
+  border-radius: 0;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  box-shadow: none;
+  min-width: 0;
+}
+
+.trade-input-wrapper input:focus {
+  border: none;
+  box-shadow: none;
+}
+
+.trade-input-wrapper input::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.trade-field-error {
+  font-size: 11px;
+  color: var(--red-bright);
+  font-weight: 500;
+}
+
+/* ── Order summary ─────────────────────────────────────── */
+#trade-order-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.summary-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+}
+
+.summary-value {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* ── Feedback ──────────────────────────────────────────── */
+.trade-feedback {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.trade-feedback-success {
+  background: var(--green-dim);
+  border: 1px solid rgba(38,166,154,0.4);
+  color: var(--green-bright);
+}
+
+.trade-feedback-error {
+  background: var(--red-dim);
+  border: 1px solid rgba(239,83,80,0.4);
+  color: var(--red-bright);
+}
+
+/* ── Buy CTA ───────────────────────────────────────────── */
+#trade-buy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 13px;
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
   cursor: pointer;
-  margin-top: auto;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+  box-shadow: 0 2px 16px rgba(38,166,154,0.3);
+}
+
+#trade-buy-btn:hover:not(:disabled) {
+  background: var(--green-bright);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 24px rgba(38,166,154,0.45);
+}
+
+#trade-buy-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 #trade-buy-btn:disabled {
-  background-color: #ccc;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  box-shadow: none;
   cursor: not-allowed;
+}
+
+.btn-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Disclaimer ────────────────────────────────────────── */
+#trade-disclaimer {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.5;
+  margin: 0;
+  padding-top: var(--space-1);
+}
+
+/* ── Responsive ────────────────────────────────────────── */
+@media (max-width: 480px) {
+  #trade-dialog-sidebar {
+    width: 100vw;
+    border-left: none;
+    border-top: 1px solid var(--border-subtle);
+    top: auto;
+    bottom: 0;
+    height: auto;
+    max-height: 90vh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    animation: slideUp 0.22s ease;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
 }

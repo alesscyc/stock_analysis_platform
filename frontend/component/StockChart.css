@@ -1,131 +1,176 @@
-/* ── StockChart layout ─────────────────────────────────── */
+/* ── StockChart root ───────────────────────────────────── */
 #stock-chart-root {
   width: 100%;
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: var(--shadow-md);
 }
 
-/* ── Top controls bar ──────────────────────────────────── */
+/* ── Controls bar ──────────────────────────────────────── */
 #stock-chart-controls {
-  margin-bottom: 10px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
-  gap: 20px;
 }
 
 #stock-chart-controls-left {
   display: flex;
-  gap: 20px;
   align-items: center;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
-/* ── Interval selector ─────────────────────────────────── */
+/* ── Interval segmented control ────────────────────────── */
 #interval-selector {
   display: flex;
-  gap: 10px;
   align-items: center;
+  gap: var(--space-1);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 3px;
 }
 
 #interval-selector-label {
-  font-weight: bold;
-  margin-right: 10px;
+  display: none; /* label replaced by grouping context */
 }
 
 .interval-btn {
-  padding: 5px 15px;
-  background-color: #f8f9fa;
-  color: #333;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  padding: 4px 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
   cursor: pointer;
-  font-size: 14px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.interval-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .interval-btn.active {
-  background-color: #007bff;
-  color: white;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(61,127,255,0.4);
 }
 
 /* ── AI Recommendation badge ───────────────────────────── */
 #ai-recommendation {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: bold;
+  gap: var(--space-2);
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid;
+  letter-spacing: 0.2px;
 }
 
 #ai-recommendation.ai-buy {
-  background-color: #c3e6cb;
-  border: 2px solid #28a745;
+  background: var(--green-dim);
+  border-color: rgba(38,166,154,0.4);
+  color: var(--green-bright);
 }
 
 #ai-recommendation.ai-sell {
-  background-color: #f8d7da;
-  border: 2px solid #dc3545;
+  background: var(--red-dim);
+  border-color: rgba(239,83,80,0.4);
+  color: var(--red-bright);
 }
 
 #ai-recommendation.ai-warning {
-  background-color: #fff3cd;
-  border: 2px solid #ffc107;
+  background: var(--warning-dim);
+  border-color: rgba(240,180,41,0.35);
+  color: var(--warning);
 }
 
 #ai-recommendation-label {
-  color: #333;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  opacity: 0.7;
 }
 
-#ai-recommendation-action.buy {
-  color: #155724;
-  font-size: 16px;
+#ai-recommendation-action {
+  font-size: 13px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
 }
 
-#ai-recommendation-action.sell {
-  color: #721c24;
-  font-size: 16px;
-}
+#ai-recommendation-action.buy { color: var(--green-bright); }
+#ai-recommendation-action.sell { color: var(--red-bright); }
 
 #ai-recommendation-confidence {
-  color: #666;
-  font-size: 12px;
-  font-weight: normal;
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.75;
 }
 
 #ai-recommendation-unavailable {
-  color: #856404;
-  font-size: 14px;
-  font-weight: normal;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 /* ── Trade button ──────────────────────────────────────── */
 #trade-btn {
-  padding: 5px 15px;
-  background-color: #28a745;
-  color: white;
-  border: 1px solid #218838;
-  border-radius: 4px;
+  padding: 6px 16px;
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: bold;
+  transition: background 0.15s ease, transform 0.1s ease;
+  box-shadow: 0 0 12px rgba(38,166,154,0.25);
 }
 
-/* ── MA checkboxes ─────────────────────────────────────── */
+#trade-btn:hover {
+  background: var(--green-bright);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 16px rgba(38,166,154,0.4);
+}
+
+#trade-btn:active {
+  transform: translateY(0);
+}
+
+/* ── MA Controls ───────────────────────────────────────── */
 #ma-controls {
   display: flex;
-  gap: 15px;
   align-items: center;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
 #ma-controls-label {
-  font-weight: bold;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: var(--space-1);
 }
 
 .ma-checkbox-label {
@@ -133,19 +178,62 @@
   align-items: center;
   gap: 5px;
   cursor: pointer;
-  font-size: 14px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+}
+
+.ma-checkbox-label:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-normal);
 }
 
 .ma-checkbox-label input[type="checkbox"] {
+  width: 12px;
+  height: 12px;
+  accent-color: var(--accent);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .ma-checkbox-text {
-  font-weight: bold;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  letter-spacing: 0.3px;
+}
+
+.ma-checkbox-label:has(input:checked) .ma-checkbox-text {
+  color: var(--text-primary);
 }
 
 /* ── Chart canvas wrapper ──────────────────────────────── */
 #stock-chart-canvas-wrapper {
   flex: 1;
   min-height: 0;
+  padding: var(--space-2);
+}
+
+/* ── Responsive ────────────────────────────────────────── */
+@media (max-width: 768px) {
+  #stock-chart-controls {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .interval-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  #ma-controls {
+    gap: var(--space-1);
+  }
+
+  .ma-checkbox-label {
+    padding: 3px 6px;
+  }
 }
