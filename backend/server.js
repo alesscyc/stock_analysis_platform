@@ -43,6 +43,10 @@ let lastPortfolioError = null;
 let lastPortfolioUpdatedAt = null;
 const portfolioWaiters = new Set();
 
+// Open orders tracking
+let openOrdersById = new Map();
+let openOrdersReady = false;
+
 function resetPortfolioSnapshot() {
   portfolioRowsByKey = new Map();
   portfolioReady = false;
@@ -129,6 +133,29 @@ function serializePortfolioRow(row) {
     secType: row.secType,
   };
 }
+
+function getOpenOrders() {
+  return Array.from(openOrdersById.values()).sort((a, b) => a.orderId - b.orderId);
+}
+
+function serializeOpenOrder(orderId, contract, order, orderState) {
+  return {
+    orderId,
+    symbol: contract?.symbol || 'UNKNOWN',
+    action: order?.action || 'UNKNOWN',
+    quantity: Number(order?.totalQuantity || order?.qty || 0),
+    limitPrice: Number(order?.lmtPrice || 0),
+    status: orderState?.status || 'UNKNOWN',
+    filled: Number(orderState?.filled || 0),
+    remaining: Number(orderState?.remaining || 0),
+  };
+}
+
+function resetOpenOrders() {
+  openOrdersById = new Map();
+  openOrdersReady = false;
+}
+
 
 function resolveOrderIdWaiters(orderId) {
   for (const waiter of orderIdWaiters) {
@@ -274,12 +301,14 @@ ib.on('connected', () => {
 
   console.log(`[ib] Connected to IB Gateway at ${IB_HOST}:${IB_PORT}`);
   resetPortfolioSnapshot();
+  resetOpenOrders();
 
   setImmediate(() => {
     try {
       requestingNextOrderId = true;
       ib.reqIds(1);
       ib.reqPositions();
+      ib.reqAllOpenOrders();
     } catch (error) {
       requestingNextOrderId = false;
       failPortfolioSnapshot(error.message);
@@ -339,6 +368,11 @@ ib.on('orderStatus', (id, status, filled, remaining, avgFillPrice) => {
   console.log(
     `[ib] Order ${id} status=${status} filled=${filled} remaining=${remaining} avgFillPrice=${avgFillPrice}`
   );
+  
+  // Remove order from tracking if it's filled, cancelled, or rejected
+  if (['Filled', 'Cancelled', 'ApiCancelled', 'Rejected','Inactive'].includes(status)) {
+    openOrdersById.delete(id);
+  }
 });
 
 ib.on('position', (account, contract, position, avgCost) => {
@@ -354,6 +388,19 @@ ib.on('positionEnd', () => {
     ? new Date(lastPortfolioUpdatedAt).toISOString()
     : 'unknown';
   console.log(`[ib] Portfolio snapshot updated with ${getPortfolioRows().length} position(s) at ${updatedAt}`);
+});
+
+ib.on('openOrder', (orderId, contract, order, orderState) => {
+  if (!ibConnected) return;
+  const serialized = serializeOpenOrder(orderId, contract, order, orderState);
+  openOrdersById.set(orderId, serialized);
+  console.log(`[ib] Open order ${orderId}: ${serialized.symbol} ${serialized.action} ${serialized.quantity} @ $${serialized.limitPrice} (status: ${serialized.status})`);
+});
+
+ib.on('openOrderEnd', () => {
+  if (!ibConnected) return;
+  openOrdersReady = true;
+  console.log(`[ib] Open orders snapshot complete with ${getOpenOrders().length} order(s)`);
 });
 
 app.use(cors());
@@ -499,6 +546,20 @@ app.get('/api/portfolio', async (req, res) => {
   } catch (error) {
     console.error('Error fetching IB portfolio:', error);
     res.status(503).json({ error: lastPortfolioError || error.message || 'Failed to fetch portfolio from IB Gateway' });
+  }
+});
+
+app.get('/api/orders/pending', (req, res) => {
+  try {
+    if (!ibConnected) {
+      return res.status(503).json({ error: 'IB Gateway is not connected' });
+    }
+    
+    const orders = getOpenOrders();
+    res.json(orders);
+  } catch (error) {
+    console.error('Error fetching pending IB orders:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch pending orders from IB Gateway' });
   }
 });
 
