@@ -2,8 +2,10 @@ import { useState } from 'react';
 import './TradeDialog.css';
 
 function TradeDialog({ isOpen, onClose, stockSymbol }) {
+  const [action, setAction] = useState('BUY');
   const [price, setPrice] = useState('');
   const [amount, setAmount] = useState('');
+  const [tif, setTif] = useState('DAY');
   const [loading, setLoading] = useState(false);
   const [priceError, setPriceError] = useState('');
   const [amountError, setAmountError] = useState('');
@@ -30,7 +32,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
     return valid;
   };
 
-  const handleBuy = async () => {
+  const handleSubmitOrder = async () => {
     if (!validate()) return;
 
     setLoading(true);
@@ -41,15 +43,18 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
         body: JSON.stringify({
           symbol: stockSymbol,
           price: parseFloat(price),
-          amount: parseInt(amount),
+          quantity: parseInt(amount),
+          action,
+          tif,
         }),
       });
 
       const data = await response.json();
       if (data.success) {
-        setSuccessMsg(`Order placed at $${data.price}`);
+        setSuccessMsg(`Order submitted: ${action} ${amount} ${stockSymbol} @ $${data.price ?? price}`);
         setPrice('');
         setAmount('');
+        setTif('DAY');
       } else {
         setErrorMsg('Failed to submit order: ' + (data.error || 'Unknown error'));
       }
@@ -61,12 +66,14 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
   };
 
   const handleClose = () => {
+    setAction('BUY');
     setPriceError('');
     setAmountError('');
     setSuccessMsg('');
     setErrorMsg('');
     setPrice('');
     setAmount('');
+    setTif('DAY');
     onClose();
   };
 
@@ -96,10 +103,22 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
           </button>
         </div>
 
-        {/* Order direction selector (BUY only for now) */}
+        {/* Order direction selector */}
         <div id="trade-order-type">
-          <button className="order-type-btn active" tabIndex={-1}>BUY</button>
-          <button className="order-type-btn disabled-type" disabled>SELL</button>
+          <button
+            className={`order-type-btn ${action === 'BUY' ? 'active buy' : ''}`}
+            onClick={() => setAction('BUY')}
+            type="button"
+          >
+            BUY
+          </button>
+          <button
+            className={`order-type-btn ${action === 'SELL' ? 'active sell' : ''}`}
+            onClick={() => setAction('SELL')}
+            type="button"
+          >
+            SELL
+          </button>
         </div>
 
         <div id="trade-fields">
@@ -142,6 +161,24 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
             </div>
             {amountError && <span className="trade-field-error">{amountError}</span>}
           </div>
+
+          <div className="trade-field-group">
+            <label htmlFor="trade-tif-select" className="trade-label">
+              Time in Force
+            </label>
+            <div className="trade-select-wrapper">
+              <select
+                id="trade-tif-select"
+                value={tif}
+                onChange={(e) => setTif(e.target.value)}
+              >
+                <option value="DAY">Day</option>
+                <option value="GTC">Good Till Cancelled</option>
+                <option value="IOC">Immediate or Cancel</option>
+                <option value="FOK">Fill or Kill</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Order summary */}
@@ -156,10 +193,10 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
         {successMsg && <div className="trade-feedback trade-feedback-success">{successMsg}</div>}
         {errorMsg && <div className="trade-feedback trade-feedback-error">{errorMsg}</div>}
 
-        {/* Buy CTA */}
+        {/* Submit order CTA */}
         <button
           id="trade-buy-btn"
-          onClick={handleBuy}
+          onClick={handleSubmitOrder}
           disabled={loading}
         >
           {loading ? (
@@ -170,13 +207,13 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
                 <polyline points="17 6 23 6 23 12"/>
               </svg>
-              Place Buy Order
+              {`Place ${action === 'SELL' ? 'Sell' : 'Buy'} Order`}
             </>
           )}
         </button>
 
         <p id="trade-disclaimer">
-          Order executes at market price. Simulation only — no real funds.
+          Orders are routed through your connected IB Gateway using the entered limit price.
         </p>
       </div>
     </>

@@ -127,9 +127,45 @@
   box-shadow: 0 1px 6px rgba(38,166,154,0.35);
 }
 
-.order-type-btn.disabled-type {
-  opacity: 0.4;
-  cursor: not-allowed;
+.order-type-btn.active.sell {
+  background: var(--red);
+  box-shadow: 0 1px 6px rgba(239,83,80,0.35);
+}
+
+.trade-select-wrapper {
+  display: flex;
+  align-items: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.trade-select-wrapper:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.trade-select-wrapper select {
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  box-shadow: none;
+  min-width: 0;
+  appearance: none;
+}
+
+.trade-select-wrapper select:focus {
+  border: none;
+  box-shadow: none;
+  outline: none;
 }
 
 /* ── Fields ────────────────────────────────────────────── */
@@ -266,7 +302,7 @@
   color: var(--red-bright);
 }
 
-/* ── Buy CTA ───────────────────────────────────────────── */
+/* ── Submit CTA ─────────────────────────────────────────── */
 #trade-buy-btn {
   display: flex;
   align-items: center;

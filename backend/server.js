@@ -4,9 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const { execFile } = require('child_process');
 const path = require('path');
-const db = require('./db');
-const util = require('util');
-const execFileAsync = util.promisify(execFile);
+const IB = require('ib');
 
 const app = express();
 const port = 3001;
@@ -14,6 +12,349 @@ const port = 3001;
 // Simple in-memory cache
 const cache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const ALLOWED_ORDER_ACTIONS = new Set(['BUY', 'SELL']);
+const ALLOWED_TIME_IN_FORCE = new Set(['DAY', 'GTC', 'IOC', 'FOK']);
+
+// Interactive Brokers Gateway portfolio cache
+const IB_HOST = process.env.IB_HOST;
+const IB_PORT = Number(process.env.IB_PORT);
+const IB_CLIENT_ID = Number(process.env.IB_CLIENT_ID);
+const IB_PORTFOLIO_SYNC_TIMEOUT_MS = Number(process.env.IB_PORTFOLIO_SYNC_TIMEOUT_MS);
+const IB_ORDER_ID_WAIT_TIMEOUT_MS = Number(process.env.IB_ORDER_ID_WAIT_TIMEOUT_MS);
+
+const ib = new IB({
+  host: IB_HOST,
+  port: IB_PORT,
+  clientId: IB_CLIENT_ID,
+});
+
+let ibConnecting = false;
+let ibConnected = false;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+let nextOrderId = null;
+let requestingNextOrderId = false;
+const orderIdWaiters = new Set();
+let orderPlacementQueue = Promise.resolve();
+
+let portfolioRowsByKey = new Map();
+let portfolioReady = false;
+let lastPortfolioError = null;
+let lastPortfolioUpdatedAt = null;
+const portfolioWaiters = new Set();
+
+function resetPortfolioSnapshot() {
+  portfolioRowsByKey = new Map();
+  portfolioReady = false;
+}
+
+function getPortfolioRows() {
+  return Array.from(portfolioRowsByKey.values()).sort((a, b) => {
+    const accountCompare = a.account.localeCompare(b.account);
+    if (accountCompare !== 0) return accountCompare;
+    return a.symbol.localeCompare(b.symbol);
+  });
+}
+
+function resolvePortfolioWaiters() {
+  const rows = getPortfolioRows();
+
+  for (const waiter of portfolioWaiters) {
+    clearTimeout(waiter.timer);
+    waiter.resolve(rows);
+  }
+
+  portfolioWaiters.clear();
+}
+
+function rejectPortfolioWaiters(message) {
+  for (const waiter of portfolioWaiters) {
+    clearTimeout(waiter.timer);
+    waiter.reject(new Error(message));
+  }
+
+  portfolioWaiters.clear();
+}
+
+function finalizePortfolioSnapshot() {
+  portfolioReady = true;
+  lastPortfolioError = null;
+  lastPortfolioUpdatedAt = Date.now();
+
+  resolvePortfolioWaiters();
+}
+
+function failPortfolioSnapshot(message) {
+  rejectPortfolioWaiters(message);
+  resetPortfolioSnapshot();
+  portfolioReady = false;
+  lastPortfolioError = message;
+  lastPortfolioUpdatedAt = null;
+}
+
+function waitForPortfolioSnapshot(timeoutMs = IB_PORTFOLIO_SYNC_TIMEOUT_MS) {
+  if (portfolioReady) {
+    return Promise.resolve(getPortfolioRows());
+  }
+
+  return new Promise((resolve, reject) => {
+    const waiter = {
+      resolve,
+      reject,
+      timer: null,
+    };
+
+    waiter.timer = setTimeout(() => {
+      portfolioWaiters.delete(waiter);
+      reject(new Error(`Timed out waiting for IB portfolio on ${IB_HOST}:${IB_PORT}`));
+    }, timeoutMs);
+
+    portfolioWaiters.add(waiter);
+  });
+}
+
+function serializePortfolioRow(row) {
+  return {
+    id: row.id,
+    account: row.account,
+    symbol: row.symbol,
+    type: row.type,
+    quantity: row.quantity,
+    avgCost: row.avgCost,
+    average_price: row.avgCost,
+    costBasis: row.costBasis,
+    cost_basis: row.costBasis,
+    currency: row.currency,
+    exchange: row.exchange,
+    secType: row.secType,
+  };
+}
+
+function resolveOrderIdWaiters(orderId) {
+  for (const waiter of orderIdWaiters) {
+    clearTimeout(waiter.timer);
+    waiter.resolve(orderId);
+  }
+
+  orderIdWaiters.clear();
+}
+
+function rejectOrderIdWaiters(message) {
+  for (const waiter of orderIdWaiters) {
+    clearTimeout(waiter.timer);
+    waiter.reject(new Error(message));
+  }
+
+  orderIdWaiters.clear();
+}
+
+function waitForNextOrderId(timeoutMs = IB_ORDER_ID_WAIT_TIMEOUT_MS) {
+  if (nextOrderId !== null) {
+    return Promise.resolve(nextOrderId);
+  }
+
+  return new Promise((resolve, reject) => {
+    const waiter = {
+      resolve,
+      reject,
+      timer: null,
+    };
+
+    waiter.timer = setTimeout(() => {
+      orderIdWaiters.delete(waiter);
+      requestingNextOrderId = false;
+      reject(new Error('Timed out waiting for next IB order id'));
+    }, timeoutMs);
+
+    orderIdWaiters.add(waiter);
+  });
+}
+
+function enqueueOrderPlacement(task) {
+  const run = orderPlacementQueue.then(() => task());
+  orderPlacementQueue = run.catch(() => {});
+  return run;
+}
+
+function normalizeTimeInForce(tif) {
+  const normalized = String(tif || 'DAY').trim().toUpperCase();
+  return ALLOWED_TIME_IN_FORCE.has(normalized) ? normalized : 'DAY';
+}
+
+function buildStockContract(symbol) {
+  return ib.contract.stock(symbol, 'SMART', 'USD');
+}
+
+function buildLimitOrder(action, quantity, price, tif) {
+  const order = ib.order.limit(action, quantity, price, true);
+  order.tif = tif;
+  return order;
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+
+  reconnectAttempts += 1;
+  const delayMs = Math.min(30000, 1000 * reconnectAttempts);
+
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connectIbGateway();
+  }, delayMs);
+}
+
+function connectIbGateway() {
+  if (ibConnecting || ibConnected) return;
+
+  ibConnecting = true;
+
+  try {
+    console.log(`[ib] Connecting to IB Gateway at ${IB_HOST}:${IB_PORT} (clientId ${IB_CLIENT_ID})`);
+    ib.connect();
+  } catch (error) {
+    ibConnecting = false;
+    failPortfolioSnapshot(error.message);
+    scheduleReconnect();
+  }
+}
+
+function buildPortfolioKey(account, contract) {
+  return [
+    account || '',
+    contract?.conId || '',
+    contract?.symbol || '',
+    contract?.localSymbol || '',
+    contract?.secType || '',
+    contract?.currency || '',
+    contract?.exchange || '',
+  ].join('|');
+}
+
+function normalizePortfolioRow(account, contract, position, avgCost) {
+  const quantity = Number(position) || 0;
+  const averageCost = Number(avgCost) || 0;
+  const symbol = contract?.symbol || contract?.localSymbol || 'UNKNOWN';
+  const type = quantity < 0 ? 'sell' : 'buy';
+  const costBasis = Math.abs(quantity) * averageCost;
+
+  return {
+    id: buildPortfolioKey(account, contract),
+    account: account || 'UNKNOWN',
+    symbol,
+    type,
+    localSymbol: contract?.localSymbol || symbol,
+    secType: contract?.secType || '',
+    currency: contract?.currency || 'USD',
+    exchange: contract?.exchange || '',
+    quantity,
+    avgCost: averageCost,
+    costBasis,
+  };
+}
+
+function upsertPortfolioPosition(account, contract, position, avgCost) {
+  const row = normalizePortfolioRow(account, contract, position, avgCost);
+  portfolioRowsByKey.set(row.id, row);
+  lastPortfolioUpdatedAt = Date.now();
+  lastPortfolioError = null;
+}
+
+ib.on('connected', () => {
+  ibConnecting = false;
+  ibConnected = true;
+  reconnectAttempts = 0;
+  lastPortfolioError = null;
+  nextOrderId = null;
+  requestingNextOrderId = false;
+
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
+  console.log(`[ib] Connected to IB Gateway at ${IB_HOST}:${IB_PORT}`);
+  resetPortfolioSnapshot();
+
+  setImmediate(() => {
+    try {
+      requestingNextOrderId = true;
+      ib.reqIds(1);
+      ib.reqPositions();
+    } catch (error) {
+      requestingNextOrderId = false;
+      failPortfolioSnapshot(error.message);
+      scheduleReconnect();
+    }
+  });
+});
+
+ib.on('nextValidId', (orderId) => {
+  const normalizedOrderId = Number(orderId);
+
+  if (!Number.isInteger(normalizedOrderId)) {
+    console.warn('[ib] Ignoring invalid nextValidId value:', orderId);
+    return;
+  }
+
+  nextOrderId = normalizedOrderId;
+  requestingNextOrderId = false;
+  resolveOrderIdWaiters(nextOrderId);
+  console.log(`[ib] Next order id ready: ${nextOrderId}`);
+});
+
+ib.on('disconnected', () => {
+  const wasConnected = ibConnected || ibConnecting;
+  ibConnecting = false;
+  ibConnected = false;
+  nextOrderId = null;
+  requestingNextOrderId = false;
+  rejectOrderIdWaiters('IB Gateway disconnected');
+
+  if (wasConnected) {
+    console.warn('[ib] Disconnected from IB Gateway');
+    failPortfolioSnapshot('IB Gateway disconnected');
+    scheduleReconnect();
+  }
+});
+
+ib.on('error', (error) => {
+  const message = error?.message || 'Unknown IB Gateway error';
+  console.error('[ib] Error:', message);
+  lastPortfolioError = message;
+
+  if (!portfolioReady) {
+    failPortfolioSnapshot(message);
+  }
+
+  if (!ibConnected) {
+    ibConnecting = false;
+    nextOrderId = null;
+    requestingNextOrderId = false;
+    rejectOrderIdWaiters(message);
+    scheduleReconnect();
+  }
+});
+
+ib.on('orderStatus', (id, status, filled, remaining, avgFillPrice) => {
+  console.log(
+    `[ib] Order ${id} status=${status} filled=${filled} remaining=${remaining} avgFillPrice=${avgFillPrice}`
+  );
+});
+
+ib.on('position', (account, contract, position, avgCost) => {
+  if (!ibConnected) return;
+  upsertPortfolioPosition(account, contract, position, avgCost);
+});
+
+ib.on('positionEnd', () => {
+  if (!ibConnected) return;
+  finalizePortfolioSnapshot();
+
+  const updatedAt = lastPortfolioUpdatedAt
+    ? new Date(lastPortfolioUpdatedAt).toISOString()
+    : 'unknown';
+  console.log(`[ib] Portfolio snapshot updated with ${getPortfolioRows().length} position(s) at ${updatedAt}`);
+});
 
 app.use(cors());
 app.use(express.json());
@@ -66,143 +407,102 @@ app.get('/api/stock/:symbol', async (req, res) => {
 
 app.post('/api/orders', async (req, res) => {
   try {
-    let { symbol, price, amount } = req.body;
-    const queryText = 'INSERT INTO orders (type, symbol, price, amount, status) VALUES ($1, $2, $3, $4, $5) RETURNING price';
-    const values = ['buy', symbol, price, amount, false];
-    const dbResult = await db.query(queryText, values);
-    const finalPrice = dbResult.rows[0].price;
-    res.json({ success: true, message: 'Order submitted successfully', price: finalPrice });
+    const body = req.body ?? {};
+    const symbol = String(body.symbol ?? '').trim().toUpperCase();
+    const action = String(body.action ?? 'BUY').trim().toUpperCase();
+    const quantity = Number(body.quantity ?? body.amount);
+    const price = Number(body.price);
+    const tif = normalizeTimeInForce(body.tif);
+
+    if (!symbol) {
+      return res.status(400).json({ error: 'Symbol is required' });
+    }
+
+    if (!ALLOWED_ORDER_ACTIONS.has(action)) {
+      return res.status(400).json({ error: 'Action must be BUY or SELL' });
+    }
+
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      return res.status(400).json({ error: 'Quantity must be a positive integer' });
+    }
+
+    if (!Number.isFinite(price) || price <= 0) {
+      return res.status(400).json({ error: 'Price must be a positive number' });
+    }
+
+    if (!ibConnected) {
+      return res.status(503).json({ error: 'IB Gateway is not connected' });
+    }
+
+    const result = await enqueueOrderPlacement(async () => {
+      if (!ibConnected) {
+        const error = new Error('IB Gateway is not connected');
+        error.statusCode = 503;
+        throw error;
+      }
+
+      if (nextOrderId === null) {
+        if (!requestingNextOrderId) {
+          try {
+            requestingNextOrderId = true;
+            ib.reqIds(1);
+          } catch (requestError) {
+            requestingNextOrderId = false;
+            console.warn('[ib] Failed to request next order id:', requestError.message);
+          }
+        }
+
+        await waitForNextOrderId();
+      }
+
+      if (nextOrderId === null) {
+        const error = new Error('IB Gateway is not ready to accept orders yet');
+        error.statusCode = 503;
+        throw error;
+      }
+
+      const orderId = nextOrderId;
+      const contract = buildStockContract(symbol);
+      const order = buildLimitOrder(action, quantity, price, tif);
+
+      ib.placeOrder(orderId, contract, order);
+      nextOrderId = orderId + 1;
+
+      console.log(
+        `[ib] Submitted ${action} order ${orderId} for ${symbol} quantity=${quantity} price=${price} tif=${tif}`
+      );
+
+      return {
+        success: true,
+        message: `Order submitted to IB Gateway (orderId ${orderId})`,
+        orderId,
+        symbol,
+        action,
+        quantity,
+        price,
+        tif,
+      };
+    });
+
+    res.json(result);
 
   } catch (error) {
-    console.error('Error submitting order:', error);
-    res.status(500).json({ error: 'Failed to submit order' });
+    console.error('Error submitting IB order:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to submit order to IB Gateway' });
   }
 });
 
 app.get('/api/portfolio', async (req, res) => {
   try {
-    const { rows } = await db.query(
-      'SELECT id, symbol, type, quantity, average_price FROM portfolio ORDER BY symbol ASC'
-    );
-    res.json(rows);
+    const rows = await waitForPortfolioSnapshot();
+    res.json(rows.map(serializePortfolioRow));
   } catch (error) {
-    console.error('Error fetching portfolio:', error);
-    res.status(500).json({ error: 'Failed to fetch portfolio' });
+    console.error('Error fetching IB portfolio:', error);
+    res.status(503).json({ error: lastPortfolioError || error.message || 'Failed to fetch portfolio from IB Gateway' });
   }
 });
 
-// ---------------------------------------------------------------------------
-// Order-fill polling job
-// ---------------------------------------------------------------------------
-const ORDER_CHECK_INTERVAL_MS = 5000; // 5 seconds
-let orderCheckRunning = false;
-
-/**
- * Call Python get_current_stock_price for a single symbol.
- * Returns the numeric price, or null on any failure.
- */
-async function fetchCurrentPrice(symbol) {
-  const pythonArgs = [
-    path.join(__dirname, '../analysis/stock_data.py'),
-    'get_current_stock_price',
-    symbol,
-  ];
-  try {
-    const { stdout } = await execFileAsync('python', pythonArgs, { maxBuffer: 1024 * 1024 });
-    const result = JSON.parse(stdout);
-    if (result.error) {
-      console.error(`[order-fill] Python error for ${symbol}:`, result.error);
-      return null;
-    }
-    return result.price;
-  } catch (err) {
-    console.error(`[order-fill] Failed to get price for ${symbol}:`, err.message);
-    return null;
-  }
-}
-
-/**
- * Main polling job: checks open buy orders and fills qualifying ones.
- * Groups orders by symbol so Python is called once per distinct symbol.
- * Batch-updates all qualifying order IDs per symbol in a single query.
- */
-async function processOpenBuyOrders() {
-  if (orderCheckRunning) {
-    console.log('[order-fill] Previous run still in progress, skipping.');
-    return;
-  }
-  orderCheckRunning = true;
-
-  try {
-    // 1. Fetch all unfilled buy orders
-    const { rows: openOrders } = await db.query(
-      "SELECT id, symbol, price, amount FROM orders WHERE type = 'buy' AND status = false"
-    );
-
-    if (openOrders.length === 0) return; // nothing to do
-
-    console.log(`[order-fill] Checking ${openOrders.length} open buy order(s)...`);
-
-    // 2. Group orders by symbol
-    const bySymbol = {};
-    for (const order of openOrders) {
-      if (!bySymbol[order.symbol]) bySymbol[order.symbol] = [];
-      bySymbol[order.symbol].push(order);
-    }
-
-    // 3. Process each symbol group
-    for (const [symbol, orders] of Object.entries(bySymbol)) {
-      // Fetch current market price once per symbol
-      const currentPrice = await fetchCurrentPrice(symbol);
-      if (currentPrice === null) continue; // skip symbol on Python failure
-
-      console.log(`[order-fill] ${symbol} current price: ${currentPrice}`);
-
-      // 4. Filter orders where order.price >= currentPrice (buy fill condition)
-      const toFill = orders.filter(o => o.price >= currentPrice);
-
-      if (toFill.length === 0) {
-        console.log(`[order-fill] ${symbol}: no orders qualify (${orders.length} checked)`);
-        continue;
-      }
-
-      // 5. Batch-update all qualifying orders for this symbol in one query
-      const ids = toFill.map(o => o.id);
-      await db.query(
-        'UPDATE orders SET status = true WHERE id = ANY($1::bigint[])',
-        [ids]
-      );
-
-      // 6. Upsert portfolio using current market price as the fill price
-      //    Weighted average: new_avg = (old_total_cost + fill_price * new_qty) / (old_qty + new_qty)
-      const totalFilledQty = toFill.reduce((sum, o) => sum + o.amount, 0);
-      const fillCost = currentPrice * totalFilledQty;
-
-      await db.query(
-        `INSERT INTO portfolio (symbol, type, quantity, average_price)
-         VALUES ($1, 'buy', $2, $3)
-         ON CONFLICT (symbol) DO UPDATE SET
-           quantity      = portfolio.quantity + EXCLUDED.quantity,
-           average_price = (portfolio.average_price * portfolio.quantity + $4) /
-                           (portfolio.quantity + EXCLUDED.quantity)`,
-        [symbol, totalFilledQty, currentPrice, fillCost]
-      );
-
-      console.log(
-        `[order-fill] ${symbol}: filled ${toFill.length}/${orders.length} order(s)` +
-        ` — ids: [${ids.join(', ')}], current price: ${currentPrice}`
-      );
-    }
-  } catch (err) {
-    console.error('[order-fill] Unexpected error:', err.message);
-  } finally {
-    orderCheckRunning = false;
-  }
-}
-
-// Start the polling job
-setInterval(processOpenBuyOrders, ORDER_CHECK_INTERVAL_MS);
-console.log(`[order-fill] Polling job started — running every ${ORDER_CHECK_INTERVAL_MS / 1000}s`);
+connectIbGateway();
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);

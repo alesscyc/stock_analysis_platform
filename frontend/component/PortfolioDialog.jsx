@@ -8,21 +8,50 @@ function PortfolioDialog({ isOpen, onClose }) {
 
   useEffect(() => {
     if (!isOpen) return;
+
+    const controller = new AbortController();
+    let active = true;
+
     setLoading(true);
     setError(null);
-    fetch('http://localhost:3001/api/portfolio')
-      .then(res => res.json())
-      .then(data => {
-        if (data.error) setError(data.error);
-        else setPortfolio(data);
-      })
-      .catch(() => setError('Failed to load portfolio'))
-      .finally(() => setLoading(false));
+
+    (async () => {
+      try {
+        const response = await fetch('http://localhost:3001/api/portfolio', {
+          signal: controller.signal,
+        });
+        const data = await response.json();
+
+        if (!active) return;
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to load portfolio');
+        }
+
+        setPortfolio(Array.isArray(data) ? data : []);
+      } catch (fetchError) {
+        if (active && fetchError.name !== 'AbortError') {
+          setError(fetchError.message || 'Failed to load portfolio');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const totalValue = portfolio.reduce((sum, row) => sum + row.quantity * row.average_price, 0);
+  const totalValue = portfolio.reduce((sum, row) => {
+    const avgCost = Number(row.avgCost ?? row.average_price ?? row.averagePrice ?? 0);
+    const quantity = Number(row.quantity ?? 0);
+    const costBasis = Number(row.costBasis ?? row.cost_basis ?? Math.abs(quantity) * avgCost);
+    return sum + costBasis;
+  }, 0);
 
   return (
     <>
@@ -48,7 +77,7 @@ function PortfolioDialog({ isOpen, onClose }) {
         {loading && (
           <div id="portfolio-loading-state">
             <span className="portfolio-spinner" />
-            <span>Loading holdings…</span>
+            <span>Loading IB positions…</span>
           </div>
         )}
 
@@ -73,8 +102,8 @@ function PortfolioDialog({ isOpen, onClose }) {
                 <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
               </svg>
             </div>
-            <span className="portfolio-empty-title">No holdings yet</span>
-            <span className="portfolio-empty-sub">Place a buy order to start building your portfolio.</span>
+            <span className="portfolio-empty-title">No IB positions</span>
+            <span className="portfolio-empty-sub">Make sure IB Gateway is connected and your account has holdings.</span>
           </div>
         )}
 
@@ -88,7 +117,7 @@ function PortfolioDialog({ isOpen, onClose }) {
                 <span className="portfolio-stat-value">{portfolio.length}</span>
               </div>
               <div className="portfolio-stat">
-                <span className="portfolio-stat-label">Total Cost</span>
+                <span className="portfolio-stat-label">Total Cost Basis</span>
                 <span className="portfolio-stat-value">
                   ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
@@ -99,26 +128,24 @@ function PortfolioDialog({ isOpen, onClose }) {
               <table id="portfolio-table">
                 <thead>
                   <tr>
-                    <th>Symbol</th>
                     <th>Type</th>
+                    <th>Symbol</th>
                     <th className="align-right">Qty</th>
-                    <th className="align-right">Avg Price</th>
+                    <th className="align-right">Avg Cost</th>
                     <th className="align-right">Cost Basis</th>
                   </tr>
                 </thead>
                 <tbody>
                   {portfolio.map((row) => (
                     <tr key={row.id}>
+                      <td>{row.type}</td>
                       <td className="portfolio-symbol-cell">{row.symbol}</td>
-                      <td>
-                        <span className={`portfolio-type-badge ${row.type === 'buy' ? 'type-buy' : 'type-sell'}`}>
-                          {row.type.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="align-right portfolio-num">{row.quantity.toLocaleString()}</td>
-                      <td className="align-right portfolio-num">${Number(row.average_price).toFixed(2)}</td>
+                      <td className="align-right portfolio-num">{Math.abs(Number(row.quantity ?? 0)).toLocaleString()}</td>
                       <td className="align-right portfolio-num">
-                        ${(row.quantity * row.average_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ${Number(row.avgCost ?? row.average_price ?? 0).toFixed(2)}
+                      </td>
+                      <td className="align-right portfolio-num">
+                        ${Number(row.costBasis ?? row.cost_basis ?? (Math.abs(Number(row.quantity ?? 0)) * Number(row.avgCost ?? row.average_price ?? 0))).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                     </tr>
                   ))}
