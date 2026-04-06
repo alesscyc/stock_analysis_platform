@@ -61,10 +61,9 @@ function App() {
       {/* ── Top nav bar ── */}
       <header className="app-topbar">
         <div className="app-brand">
-          <div className="app-brand-icon">S</div>
-          <span className="app-brand-name">StockAI</span>
-          <span className="app-brand-tag">Pro</span>
-        </div>
+           <div className="app-brand-icon">S</div>
+           <span className="app-brand-name">StockAI</span>
+         </div>
 
         <div className="topbar-divider" />
 
