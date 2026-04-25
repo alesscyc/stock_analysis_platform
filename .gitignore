@@ -1,5 +1,4 @@
 backend/.env
-AGENTS.md
 *.pkl
 node_modules/
 .opencode.json
