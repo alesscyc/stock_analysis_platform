@@ -425,7 +425,7 @@ app.get('/api/stock/:symbol', async (req, res) => {
     
     const pythonArgs = [path.join(__dirname, '../analysis/stock_data.py'), 'get_stock_price_history', symbol, date_range, interval, auto_predict];
   
-    execFile('python', pythonArgs,{maxBuffer:1024*1024*10}, (error, stdout, stderr) => {
+    execFile('python', pythonArgs,{maxBuffer:1024*1024*50}, (error, stdout, stderr) => {
       if (error) {
         console.error('Error executing Python script:', error);
         return res.status(500).json({ error: 'Internal server error' });
