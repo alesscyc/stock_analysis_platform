@@ -1,172 +1,104 @@
-# 🚀 AI-Powered Stock Analysis Platform
-<img width="1905" height="947" alt="螢幕擷取畫面 2025-07-19 181121" src="https://github.com/user-attachments/assets/1e6100d7-92b7-48b3-a666-fe076378fc3d" />
+# 🚀 Stock Analysis Platform (updated)
 
-A full-stack web application that provides real-time stock data visualization with AI-powered buy/sell recommendations using machine learning.
+This repository is a lightweight full‑stack stock analysis platform: a React/Vite frontend that renders candlestick charts and UI, an Express backend that proxies symbol search and dispatches Python analysis, and a small Python ML engine for per‑symbol predictions.
 
-![Stock Platform Demo](https://img.shields.io/badge/Status-Active-green) ![Python](https://img.shields.io/badge/Python-3.8+-blue) ![React](https://img.shields.io/badge/React-18+-blue) ![Node.js](https://img.shields.io/badge/Node.js-16+-green)
+Badges: Active • Python 3.8+ • React (ESM) • Node.js
 
-## ✨ Features
+Overview
+ - Frontend: React + Vite, lightweight-charts for candlesticks and overlays
+ - Backend: Express (CJS) — API routes, Finnhub proxy, Interactive Brokers (IB) Gateway bridge, Python CLI bridge
+ - Analysis: Python scripts that fetch OHLCV, compute moving averages & features, and train/predict with a RandomForest
 
-### 📊 **Real-Time Stock Data**
-- Interactive candlestick charts with volume indicators
-- Multiple timeframes (Daily, Weekly, Monthly)
-- Zoom and pan functionality for detailed analysis
-- Real-time price data from Yahoo Finance API
-
-### 🤖 **AI-Powered Predictions**
-- Machine Learning model using Random Forest Classifier
-- 16 technical indicators for comprehensive analysis
-- Buy/sell recommendations with confidence scores
-- Automatic model training for each stock symbol
-
-### 📈 **Technical Analysis**
-- **Moving Averages**: 10, 20, 50, 150, 200-day MAs
-- **Price Momentum**: 1-day, 1-week, 1-month, 3-month changes
-- **Volume Analysis**: 20-day volume moving average trends
-- **Price Patterns**: 52-week high/low analysis
-- **Volatility Indicators**: Weekly and monthly price ranges
-- **Trend Analysis**: Rise vs fall day patterns
-
-## 🏗️ Architecture
-
+Repository layout
 ```
-stock-platform/
-├── frontend/           # React.js frontend
-│   ├── src/
-│   │   ├── App.jsx    # Main application component
-│   │   └── component/
-│   │       └── StockChart.jsx  # Chart visualization
-├── backend/           # Node.js Express server
-│   └── server.js     # API endpoints and Python integration
-├── analysis/         # Python ML engine
-│   └── stock_data.py # Data processing and ML models
-└── README.md
+stock_analysis_platform/
+├── frontend/               # Vite + React frontend (components under frontend/component)
+├── backend/                # Express server (server.js) — CJS
+└── analysis/               # Python ML engine (stock_data.py)
 ```
 
-## 🚀 Quick Start
+Where to look quickly
+- Chart widget & MA overlays: frontend/component/StockChart.jsx
+- Search & autocomplete: frontend/component/SearchBar.jsx
+- App root & orchestration: frontend/src/App.jsx
+- API + IB bridge + Python proxy: backend/server.js
+- Python analysis (CLI entrypoints & features): analysis/stock_data.py
 
-### Prerequisites
-- **Node.js** 16+ and npm
-- **Python** 3.8+ with pip
-- **Git**
+Quick start (development)
+Prerequisites: Node.js (>=16), npm, Python (>=3.8), pip
 
-### 1. Clone Repository
-```bash
-git clone https://github.com/yourusername/stock-platform.git
-cd stock-platform
-```
+1) Install frontend deps
+   cd frontend && npm install
 
-### 2. Setup Backend
-```bash
-cd backend
-npm install
-```
+2) Install backend deps
+   cd ../backend && npm install
 
-### 3. Setup Python Environment
-```bash
-cd ../analysis
-pip install -r requirements.txt
-```
+3) Install Python deps (no requirements.txt in repo)
+   cd ../analysis
+   pip install yfinance pandas numpy scikit-learn requests
 
-### 4. Setup Frontend
-```bash
-cd ../frontend
-npm install
-```
+Configuration
+- backend/.env (required for IB gateway integration):
+  IB_HOST, IB_PORT, IB_CLIENT_ID
+  IB_PORTFOLIO_SYNC_TIMEOUT_MS, IB_ORDER_ID_WAIT_TIMEOUT_MS
+  FINNHUB_KEY (optional — symbol search degrades if absent)
 
-### 5. Start the Application
+Running the app (three terminals recommended)
+- Frontend dev server (Vite, port 5173):
+  cd frontend && npm run dev
+- Backend API (nodemon in dev):
+  cd backend && npm run dev    # serves on http://localhost:3001
+- (Optional) Start IB Gateway / services required by backend
 
-**Terminal 1 - Backend Server:**
-```bash
-cd backend
-node server.js
-```
+Notes: many frontend files call the backend at http://localhost:3001 (hard-coded). The Vite dev server runs on 5173 by default.
 
-**Terminal 2 - Frontend:**
-```bash
-cd frontend
-npm run dev
-```
+API highlights
+- Symbol search (proxies Finnhub):
+  GET /api/symbols?q=<term>
+  Returns: [{symbol, description}] (cached 5min)
+- Stock data + optional ML prediction:
+  GET /api/stock/:symbol?date_range=<>&interval=<>&auto_predict=<true|false>
+  The backend shells the Python CLI (analysis/stock_data.py get_stock_price_history ...) and returns the JSON produced by Python (cached 5min).
+- Trading endpoints (bridge to IB): POST /api/orders, GET /api/portfolio, GET /api/orders/pending
 
-The application will be available at `http://localhost:3000`
+Python CLI notes
+- Exposed CLI commands (used by backend):
+  python analysis/stock_data.py get_stock_price_history AAPL max 1d true
+  python analysis/stock_data.py get_current_stock_price AAPL
+- Important: the Python script MUST output pure JSON to stdout. Use sys.stderr for debug; stdout is parsed by the backend.
 
-## 🔧 API Endpoints
+Machine learning summary
+- Model: RandomForestClassifier (n_estimators=100, max_depth=10, class_weight='balanced', random_state=42)
+- Features: 16 technical features (MA relationships, volume trends, long-term MA trends, price vs 52-week high/low, momentum windows, volatility measures)
+- Label: BUY when 22-day forward return > 1%
+- NOTE: auto_predict=true triggers training a fresh model per request (expensive and non-deterministic).
 
-### Stock Data
-```http
-GET /api/stock/:symbol?date_range=max&interval=1d&auto_predict=true
-```
+Project conventions & gotchas (important)
+- Components live in frontend/component/ (NOT frontend/src/component/) — this repo uses case-sensitive filenames; one CSS file intentionally lowercased: searchBar.css
+- Charting: lightweight-charts v5.1.0; MA line colors are defined in StockChart.jsx and design tokens are in frontend/src/index.css
+- Backend: CommonJS (require) — server entry is server.js
+- Python: do not print non-JSON to stdout. The backend uses execFile with a 50MB stdout buffer; missing the -u flag when launching Python can cause buffering/hangs.
+- Caching: simple in-memory cache with 5-minute TTL (single-process). Cache keys: `${symbol}-${date_range}-${interval}-${auto_predict}` and `symbols-${query}`
+- Security & stability warnings:
+  - No authentication in API (development/demo only).
+  - Input values (symbol, date_range, interval) are passed directly to the Python CLI — potential injection risk.
+  - auto_predict retrains per request and writes stock_rf_model.pkl to CWD (race conditions possible if concurrent requests occur).
+  - backend/.env is required for IB features; missing values may crash the server.
 
+Testing & debugging tips
+- To reproduce the backend → Python flow locally, run the Python CLI example above and confirm it outputs valid JSON.
+- Use browser devtools to inspect network calls to http://localhost:3001 when exercising the UI.
 
-## 🤖 Machine Learning Model
+Contributions
+- This repo has no test suite or CI configured. When making changes, follow the project's style (surgical changes only) and run the frontend and backend locally to verify behavior.
 
-### Features Used (16 total):
-1. **MA Relationships**: 50MA > 150MA, 150MA > 200MA, Price > 50MA
-2. **Volume Trends**: 20-day volume MA uptrend patterns
-3. **Long-term Trends**: 200MA trends (1 month, 6 months, 1 year)
-4. **Price Positioning**: 30% above 52-week low, within 25% of 52-week high
-5. **Volatility**: Weekly and monthly price ranges
-6. **Momentum**: 1D, 1W, 1M, 3M percentage changes
-7. **Daily Patterns**: More rising days than falling days in past month
+Acknowledgements
+- Yahoo Finance (yfinance) for OHLCV data
+- Finnhub / Polygon for symbol search capabilities (proxied)
+- lightweight-charts and React ecosystem for the UI
 
-### Training Process:
-- **Data Selection**: 300 randomly selected historical data points
-- **Algorithm**: Random Forest Classifier
-- **Split**: 80% training, 20% testing
-- **Label**: 1 = BUY (>1% gain in next 22 days), 0 = SELL
-- **Retraining**: Fresh model for each prediction
-
-### Prediction Output:
-```json
-{
-  "recommendation": "BUY",
-  "confidence": 73.4,
-  "buy_probability": 73.4,
-  "sell_probability": 26.6,
-  "status": "success"
-}
-```
-
-## 📱 User Interface
-
-### Chart Features:
-- **Interactive Candlesticks**: OHLC data visualization
-- **Volume Bars**: Color-coded volume indicators
-- **Moving Averages**: Toggleable MA lines with custom colors
-- **Zoom & Pan**: Mouse wheel zoom and drag functionality
-- **Responsive Design**: Works on desktop and mobile
-
-### AI Recommendation Display:
-- **🟢 BUY**: Green background with confidence percentage
-- **🔴 SELL**: Red background with confidence percentage  
-- **⚠️ Warnings**: Yellow background for insufficient data or errors
-
-## 🛠️ Technology Stack
-
-### Frontend:
-- **React** 18+ - Modern UI framework
-- **Chart.js** - Interactive charting library
-- **chartjs-chart-financial** - Candlestick chart support
-- **chartjs-plugin-zoom** - Chart zoom and pan functionality
-
-### Backend:
-- **Node.js** - Server runtime
-- **Express.js** - Web framework
-- **Child Process** - Python script execution
-
-### Machine Learning:
-- **Python 3.8+** - Core language
-- **pandas** - Data manipulation
-- **scikit-learn** - Machine learning algorithms
-- **yfinance** - Yahoo Finance data API
-- **requests** - HTTP client for Polygon.io
-
-### APIs:
-- **Yahoo Finance** - Historical stock data
-
-## 🙏 Acknowledgments
-
-- **Yahoo Finance** for providing free historical stock data
-- **Polygon.io** for stock search capabilities
-- **Chart.js** community for excellent charting tools
-- **scikit-learn** for robust ML algorithms
+If you'd like, I can:
+- update the frontend to read backend URL from an env var (remove hard-coded http://localhost:3001)
+- change the backend to launch Python with -u to avoid buffering issues
+- stop retraining the model per request and instead reuse a cached model artifact
+Tell me which of the above you'd like implemented and I will make a surgical change and verify it locally.
