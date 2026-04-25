@@ -22,6 +22,9 @@ const IB_CLIENT_ID = Number(process.env.IB_CLIENT_ID);
 const IB_PORTFOLIO_SYNC_TIMEOUT_MS = Number(process.env.IB_PORTFOLIO_SYNC_TIMEOUT_MS);
 const IB_ORDER_ID_WAIT_TIMEOUT_MS = Number(process.env.IB_ORDER_ID_WAIT_TIMEOUT_MS);
 
+// Finnhub API key for symbol search
+const FINNHUB_KEY = process.env.FINNHUB_KEY;
+
 const ib = new IB({
   host: IB_HOST,
   port: IB_PORT,
@@ -449,6 +452,58 @@ app.get('/api/stock/:symbol', async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/symbols', async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || typeof q !== 'string' || q.trim().length === 0) {
+      return res.json([]);
+    }
+
+    const query = q.trim().substring(0, 50); // Limit query length
+    const cacheKey = `symbols-${query}`;
+    const cachedData = cache.get(cacheKey);
+
+    if (cachedData && (Date.now() - cachedData.timestamp < CACHE_TTL)) {
+      console.log('Returning cached symbols for:', query);
+      return res.json(cachedData.data);
+    }
+
+    if (!FINNHUB_KEY || FINNHUB_KEY === 'placeholder') {
+      console.warn('FINNHUB_KEY not configured, returning empty suggestions');
+      return res.json([]);
+    }
+
+    const url = `https://finnhub.io/api/v1/search?q=${encodeURIComponent(query)}&token=${FINNHUB_KEY}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      console.error('Finnhub API error:', response.status, response.statusText);
+      return res.json([]);
+    }
+
+    const data = await response.json();
+    const results = (data.result || [])
+      .slice(0, 10)
+      .map(item => ({
+        symbol: item.symbol || '',
+        description: item.description || '',
+      }))
+      .filter(item => item.symbol.length > 0);
+
+    // Cache the result
+    cache.set(cacheKey, {
+      timestamp: Date.now(),
+      data: results,
+    });
+
+    res.json(results);
+  } catch (error) {
+    console.error('Error fetching symbols:', error);
+    res.json([]);
   }
 });
 
