@@ -1,4 +1,5 @@
 import { useRef, useState, useMemo, useEffect, useCallback } from 'react';
+import usePersistedState from '../src/hooks/usePersistedState';
 import {
   createChart,
   CandlestickSeries,
@@ -18,6 +19,83 @@ const MA_CONFIG = [
   { key:  '20MA', label:  '20 MA', color: '#00e5c8' },
   { key:  '10MA', label:  '10 MA', color: '#ff5555' },
 ];
+
+// ── Swing Zones Primitive (custom canvas box drawing) ──────
+// lightweight-charts v5 uses ISeriesPrimitive for custom overlays.
+// This draws semi-transparent rectangles between consecutive swing points.
+function createSwingZonesPrimitive() {
+  let zones = [];
+  let chart = null;
+  let series = null;
+  let requestUpdate = null;
+
+  return {
+    setZones(newZones) {
+      zones = newZones;
+      requestUpdate?.();
+    },
+
+    attached(params) {
+      chart = params.chart;
+      series = params.series;
+      requestUpdate = params.requestUpdate;
+    },
+
+    detached() {
+      chart = null;
+      series = null;
+      requestUpdate = null;
+    },
+
+    paneViews() {
+      return [{
+        zOrder: () => 'bottom',
+        renderer: () => ({
+          draw: (target) => {
+            if (!chart || !series || !zones || zones.length === 0) return;
+
+            const timeScale = chart.timeScale();
+            target.useBitmapCoordinateSpace(scope => {
+              const ctx = scope.context;
+              const hr = scope.horizontalPixelRatio;
+              const vr = scope.verticalPixelRatio;
+
+              for (const z of zones) {
+                const x1 = timeScale.timeToCoordinate(z.time1);
+                const x2 = timeScale.timeToCoordinate(z.time2);
+                const y1 = series.priceToCoordinate(z.price1);
+                const y2 = series.priceToCoordinate(z.price2);
+
+                if (x1 === null || x2 === null || y1 === null || y2 === null) continue;
+
+                const left = Math.min(x1, x2) * hr;
+                const top  = Math.min(y1, y2) * vr;
+                const width  = Math.abs(x2 - x1) * hr;
+                const height = Math.abs(y2 - y1) * vr;
+
+                if (width < 1 || height < 1) continue;
+
+                ctx.strokeStyle = 'rgba(240, 180, 41, 0.85)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(left, top, width, height);
+
+                // Percent change label above the box
+                const pctChange = ((z.price2 - z.price1) / z.price1 * 100).toFixed(1);
+                const label = pctChange + '%';
+                const fontSize = Math.round(11 * hr);
+                ctx.font = `bold ${fontSize}px 'Inter', 'Helvetica Neue', Arial, sans-serif`;
+                ctx.fillStyle = 'rgba(240, 180, 41, 0.9)';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(label, left + width / 2, top - 4 * vr);
+              }
+            });
+          },
+        }),
+      }];
+    },
+  };
+}
 
 // Parse a "YYYY-MM-DD" or ISO date string to 'YYYY-MM-DD' string
 // lightweight-charts expects time as 'YYYY-MM-DD' business-day strings
@@ -41,12 +119,14 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   // series refs — held outside React state so we don't trigger re-renders
   const candleSeriesRef  = useRef(null);
   const volumeSeriesRef  = useRef(null);
-  const maSeriesRefs     = useRef({});
+  const maSeriesRefs          = useRef({});
+  const swingZonesPrimitiveRef = useRef(null);
 
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
-  const [maVisibility, setMaVisibility] = useState(() =>
-    Object.fromEntries(MA_CONFIG.map(m => [m.key, true]))
+  const [maVisibility, setMaVisibility] = usePersistedState('chart-ma-visibility',
+    () => Object.fromEntries(MA_CONFIG.map(m => [m.key, true]))
   );
+  const [swingVisibility, setSwingVisibility] = usePersistedState('chart-swing-visible', true);
 
   const intervals = [
     { value: '1d',  label: 'Daily'   },
@@ -109,6 +189,78 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
 
     return { candleData: candle, volumeData: volume, maData: ma };
   }, [stockData]);
+
+  // ── Swing boxes: pivot high → first candle that meets or exceeds that pivot high ──
+  const SWING_WINDOW = 3; // ±3 bars for local extrema
+  const swingZones = useMemo(() => {
+    if (!candleData || candleData.length < SWING_WINDOW * 2 + 1) return [];
+
+    // ── STEP 1: Detect pivot highs ──
+    const swingHighs = [];
+
+    const startIndex = Math.max(SWING_WINDOW, candleData.length - 365);
+    for (let i = startIndex; i < candleData.length - SWING_WINDOW; i++) {
+      const current = candleData[i];
+      let isSwingHigh = true;
+
+      for (let j = i - SWING_WINDOW; j <= i + SWING_WINDOW; j++) {
+        if (j === i) continue;
+        if (candleData[j].high >= current.high) isSwingHigh = false;
+      }
+
+      if (isSwingHigh) swingHighs.push({ index: i, time: current.time, price: current.high });
+    }
+
+    // Sort chronologically
+    swingHighs.sort((a, b) => a.time < b.time ? -1 : a.time > b.time ? 1 : 0);
+
+    // ── STEP 2: Build non-overlapping boxes ──
+    // A new box only starts once the previous box has closed (its end index is reached).
+    const zones = [];
+    let nextAllowedIndex = 0; // no new pivot before this index
+
+    for (const pivot of swingHighs) {
+      // Skip pivots that fall inside an active (unclosed) box
+      if (pivot.index < nextAllowedIndex) continue;
+
+      // Find the first subsequent candle with high >= pivot price
+      let endCandle = null;
+      let endIndex = -1;
+      for (let j = pivot.index + 1; j < candleData.length; j++) {
+        if (candleData[j].high >= pivot.price * 0.99) {
+          endCandle = candleData[j];
+          endIndex = j;
+          break;
+        }
+      }
+
+      // Skip if no candle has yet reached the pivot high (box still open — don't draw)
+      if (!endCandle) continue;
+
+      // Box top = pivot high; bottom = lowest low between pivot and end candle
+      const top = pivot.price;
+      let bottom = pivot.price;
+      for (const c of candleData) {
+        if (c.time > pivot.time && c.time < endCandle.time && c.low < bottom) {
+          bottom = c.low;
+        }
+      }
+
+      zones.push({
+        time1: pivot.time,
+        time2: endCandle.time,
+        price1: bottom,
+        price2: top,
+        color: 'rgba(240, 180, 41, 0.55)',
+      });
+
+      // Next box can start from the closing candle itself (it may qualify as the next pivot)
+      nextAllowedIndex = endIndex;
+    }
+
+    // Keep only the last 10 completed boxes
+    return zones.slice(-10);
+  }, [candleData]);
 
   // ── Compute initial visible range ────────────────────────
   const visibleRange = useMemo(() => {
@@ -181,6 +333,11 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     });
     candleSeriesRef.current = candleSeries;
 
+    // ── Swing zones primitive (custom canvas boxes) ──────────
+    const swingPrimitive = createSwingZonesPrimitive();
+    candleSeries.attachPrimitive(swingPrimitive);
+    swingZonesPrimitiveRef.current = swingPrimitive;
+
     // ── Volume histogram on an overlay price scale ──────────
     const volumeSeries = chart.addSeries(HistogramSeries, {
       priceFormat:  { type: 'volume' },
@@ -219,8 +376,9 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current  = null;
-      volumeSeriesRef.current  = null;
-      maSeriesRefs.current     = {};
+      volumeSeriesRef.current      = null;
+      maSeriesRefs.current         = {};
+      swingZonesPrimitiveRef.current = null;
     };
   }, []); // only on mount/unmount
 
@@ -250,6 +408,14 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       series.applyOptions({ visible: maVisibility[key] });
     }
   }, [maVisibility]);
+
+  // ── Sync swing zones with primitive ──────────────────────
+  useEffect(() => {
+    if (!swingZonesPrimitiveRef.current) return;
+    swingZonesPrimitiveRef.current.setZones(
+      swingVisibility ? swingZones : []
+    );
+  }, [swingZones, swingVisibility]);
 
   // ── MA toggle handler ────────────────────────────────────
   const handleMAToggle = useCallback((key) => {
@@ -319,7 +485,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
           </button>
         </div>
 
-        {/* Right side — MA toggles */}
+        {/* Right side — MA toggles + Swing */}
         <div id="ma-controls">
           <span id="ma-controls-label">Moving Averages:</span>
           {MA_CONFIG.map(({ key, label, color }) => (
@@ -334,6 +500,15 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
               </span>
             </label>
           ))}
+          <span id="ma-controls-divider" />
+          <label className="swing-checkbox-label">
+            <input
+              type="checkbox"
+              checked={swingVisibility}
+              onChange={() => setSwingVisibility(prev => !prev)}
+            />
+            <span className="swing-checkbox-text">Recent Volatility</span>
+          </label>
         </div>
       </div>
 

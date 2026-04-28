@@ -88,11 +88,15 @@ cd ../analysis && pip install yfinance pandas numpy scikit-learn requests
 # Run (3 terminals)
 cd frontend && npm run dev                    # Dev server on port 5173 (Vite 7)
 cd backend && npm run dev                     # API on port 3001 (nodemon auto-restart)
+(use cmd.exe if run by pty)
 
 # Direct Python CLI (for testing analysis — only these two are CLI-accessible)
 python analysis/stock_data.py get_stock_price_history AAPL max 1d true
 python analysis/stock_data.py get_current_stock_price AAPL
 ```
+
+Notes:
+- Using `cmd.exe /K <command>` launches a persistent shell that continues after the process starts (useful for manual interaction). The project agent tooling also uses this pattern when spawning PTY sessions.
 
 ## CONVENTIONS
 - **Frontend**: ESM (`"type": "module"`), default exports only, imports from `../component/` (relative, up one from `src/`).

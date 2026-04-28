@@ -211,6 +211,54 @@
   color: var(--text-primary);
 }
 
+/* ── Recent Volatility Toggle (formerly Swing Points) ───── */
+#ma-controls-divider {
+  display: inline-block;
+  width: 1px;
+  height: 20px;
+  background: var(--border-subtle);
+  margin: 0 var(--space-1);
+  flex-shrink: 0;
+}
+
+.swing-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+}
+
+.swing-checkbox-label:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-normal);
+}
+
+.swing-checkbox-label input[type="checkbox"] {
+  width: 12px;
+  height: 12px;
+  accent-color: var(--green);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.swing-checkbox-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  letter-spacing: 0.3px;
+}
+
+.swing-checkbox-label:has(input:checked) .swing-checkbox-text {
+  color: var(--text-primary);
+}
+
 /* ── Chart canvas wrapper ──────────────────────────────── */
 #stock-chart-canvas-wrapper {
   flex: 1;
