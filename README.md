@@ -96,9 +96,3 @@ Acknowledgements
 - Yahoo Finance (yfinance) for OHLCV data
 - Finnhub / Polygon for symbol search capabilities (proxied)
 - lightweight-charts and React ecosystem for the UI
-
-If you'd like, I can:
-- update the frontend to read backend URL from an env var (remove hard-coded http://localhost:3001)
-- change the backend to launch Python with -u to avoid buffering issues
-- stop retraining the model per request and instead reuse a cached model artifact
-Tell me which of the above you'd like implemented and I will make a surgical change and verify it locally.
