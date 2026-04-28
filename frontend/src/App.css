@@ -71,6 +71,31 @@
   margin-left: auto;
 }
 
+/* Watchlist button */
+.btn-watchlist {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 7px 14px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btn-watchlist:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.btn-watchlist svg {
+  flex-shrink: 0;
+}
+
 /* Portfolio button */
 .btn-portfolio {
   display: flex;

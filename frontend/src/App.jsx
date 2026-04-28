@@ -4,6 +4,7 @@ import SearchBar from '../component/SearchBar'
 import StockChart from '../component/StockChart';
 import PortfolioDialog from '../component/PortfolioDialog';
 import OrdersDialog from '../component/OrdersDialog';
+import WatchlistDialog from '../component/WatchlistDialog';
 
 function App() {
   const [selectedStock, setSelectedStock] = useState(null);
@@ -11,6 +12,7 @@ function App() {
   const [currentInterval, setCurrentInterval] = useState('1d');
   const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
+  const [isWatchlistOpen, setIsWatchlistOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [aiPrediction, setAiPrediction] = useState(null);
 
@@ -72,6 +74,16 @@ function App() {
         </div>
 
         <div className="topbar-actions">
+          <button
+            className="btn-watchlist"
+            onClick={() => setIsWatchlistOpen(true)}
+            aria-label="Open watchlist"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/>
+            </svg>
+            Watchlist
+          </button>
           <button
             className="btn-portfolio"
             onClick={() => setIsPortfolioOpen(true)}
@@ -170,6 +182,7 @@ function App() {
 
       <PortfolioDialog isOpen={isPortfolioOpen} onClose={() => setIsPortfolioOpen(false)} />
       <OrdersDialog isOpen={isOrdersOpen} onClose={() => setIsOrdersOpen(false)} />
+      <WatchlistDialog isOpen={isWatchlistOpen} onClose={() => setIsWatchlistOpen(false)} onStockSelect={handleStockSelect} />
     </div>
   );
 }
