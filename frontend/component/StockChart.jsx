@@ -49,7 +49,7 @@ function createSwingZonesPrimitive() {
 
     paneViews() {
       return [{
-        zOrder: () => 'bottom',
+        zOrder: () => 'top',
         renderer: () => ({
           draw: (target) => {
             if (!chart || !series || !zones || zones.length === 0) return;
