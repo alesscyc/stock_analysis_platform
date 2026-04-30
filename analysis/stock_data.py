@@ -1,10 +1,8 @@
-import requests
 import yfinance as yf
 import pandas as pd
 import sys
 import json
-import queue
-from datetime import datetime, timedelta, date
+from datetime import datetime
 
 def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predict=False): 
     try:

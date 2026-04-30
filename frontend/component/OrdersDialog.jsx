@@ -17,7 +17,7 @@ function OrdersDialog({ isOpen, onClose }) {
 
     (async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/orders/pending', {
+        const response = await fetch('/api/orders/pending', {
           signal: controller.signal,
         });
         const data = await response.json();

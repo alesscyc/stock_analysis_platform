@@ -46,7 +46,7 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
         watchlist.map(async (item) => {
           try {
             const res = await fetch(
-              `http://localhost:3001/api/stock/${item.symbol}?date_range=1d&interval=1d&auto_predict=false`
+              `/api/stock/${item.symbol}?date_range=1d&interval=1d&auto_predict=false`
             );
             const data = await res.json();
             if (Array.isArray(data) && data.length > 0) {
@@ -86,7 +86,7 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
     debounceTimer.current = setTimeout(async () => {
       try {
         const response = await fetch(
-          `http://localhost:3001/api/symbols?q=${encodeURIComponent(searchTerm)}`
+          `/api/symbols?q=${encodeURIComponent(searchTerm)}`
         );
         const data = await response.json();
         setSuggestions(Array.isArray(data) ? data : []);

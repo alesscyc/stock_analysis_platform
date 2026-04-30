@@ -26,7 +26,7 @@ function SearchBar({ onStockSelect, loading }) {
         debounceTimer.current = setTimeout(async () => {
             try {
                 const response = await fetch(
-                    `http://localhost:3001/api/symbols?q=${encodeURIComponent(searchTerm)}`
+                    `/api/symbols?q=${encodeURIComponent(searchTerm)}`
                 );
                 const data = await response.json();
                 setSuggestions(Array.isArray(data) ? data : []);

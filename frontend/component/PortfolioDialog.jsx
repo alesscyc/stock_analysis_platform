@@ -17,7 +17,7 @@ function PortfolioDialog({ isOpen, onClose }) {
 
     (async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/portfolio', {
+        const response = await fetch('/api/portfolio', {
           signal: controller.signal,
         });
         const data = await response.json();

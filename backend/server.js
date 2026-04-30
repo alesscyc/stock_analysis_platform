@@ -415,7 +415,26 @@ app.get('/api/stock/:symbol', async (req, res) => {
     const { symbol } = req.params;
     const { date_range = 'max', interval = '1d', auto_predict = 'false' } = req.query;
     
-    const cacheKey = `${symbol}-${date_range}-${interval}-${auto_predict}`;
+    // Input validation / whitelist
+    const ALLOWED_DATE_RANGES = new Set(['max', '1y', '2y', '5y']);
+    const ALLOWED_INTERVALS = new Set(['1d', '1wk', '1mo']);
+
+    const sanitizedSymbol = String(symbol).trim().toUpperCase();
+    if (!/^[A-Z0-9.\-]{1,20}$/.test(sanitizedSymbol)) {
+      return res.status(400).json({ error: 'Invalid symbol' });
+    }
+
+    if (!ALLOWED_DATE_RANGES.has(date_range)) {
+      return res.status(400).json({ error: 'Invalid date_range. Allowed: max, 1y, 2y, 5y' });
+    }
+
+    if (!ALLOWED_INTERVALS.has(interval)) {
+      return res.status(400).json({ error: 'Invalid interval. Allowed: 1d, 1wk, 1mo' });
+    }
+
+    const sanitizedAutoPredict = auto_predict === 'true' ? 'true' : 'false';
+    
+    const cacheKey = `${sanitizedSymbol}-${date_range}-${interval}-${sanitizedAutoPredict}`;
     const cachedData = cache.get(cacheKey);
 
     if (cachedData && (Date.now() - cachedData.timestamp < CACHE_TTL)) {
@@ -423,9 +442,9 @@ app.get('/api/stock/:symbol', async (req, res) => {
       return res.json(cachedData.data);
     }
     
-    const pythonArgs = [path.join(__dirname, '../analysis/stock_data.py'), 'get_stock_price_history', symbol, date_range, interval, auto_predict];
+    const pythonArgs = [path.join(__dirname, '../analysis/stock_data.py'), 'get_stock_price_history', sanitizedSymbol, date_range, interval, sanitizedAutoPredict];
   
-    execFile('python', pythonArgs,{maxBuffer:1024*1024*50}, (error, stdout, stderr) => {
+    execFile('python', ['-u', ...pythonArgs],{maxBuffer:1024*1024*50}, (error, stdout, stderr) => {
       if (error) {
         console.error('Error executing Python script:', error);
         return res.status(500).json({ error: 'Internal server error' });

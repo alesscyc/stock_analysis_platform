@@ -4,3 +4,4 @@ node_modules/
 .opencode.json
 stock_rf_model.pkl
 .opencode/*
+docs/roadmap/Council_Features_Roadmap.md
