@@ -57,8 +57,8 @@ SearchBar (typing) → debounced 300ms → GET /api/symbols?q=<term>
   → dropdown autocomplete; Enter/click selects
 
 SearchBar (Enter/select) → App.jsx fetchStockData → GET /api/stock/:symbol?date_range=max&interval=1d&auto_predict=true
-  → backend shells Python: execFile('python', ['analysis/stock_data.py', 'get_stock_price_history', ...])
-  → Python outputs JSON (OHLCV + 5 MAs + 16 ML features + prediction appended) to stdout
+  → backend POSTs to Python FastAPI service: POST http://127.0.0.1:8000/stock_history
+  → FastAPI calls get_stock_price_history(), returns JSON (OHLCV + 5 MAs + 16 ML features + prediction)
   → backend caches (5 min TTL) and returns to frontend
   → StockChart renders candlesticks, MAs, volume
   → App.jsx instruments header shows symbol, price, interval, AI signal
@@ -77,17 +77,18 @@ UI portfolio/orders queries → GET /api/portfolio or /api/orders/pending
 # Install all dependencies
 cd frontend && npm install
 cd ../backend && npm install
-cd ../analysis && pip install yfinance pandas numpy scikit-learn requests
+cd ../analysis && pip install yfinance pandas numpy scikit-learn fastapi "uvicorn[standard]"
 
 # Configure backend (required)
 # backend/.env must have:
 #   IB_HOST, IB_PORT, IB_CLIENT_ID
 #   IB_PORTFOLIO_SYNC_TIMEOUT_MS, IB_ORDER_ID_WAIT_TIMEOUT_MS
 #   FINNHUB_KEY  (optional — symbol search degrades gracefully without it)
+#   PYTHON_SERVICE_URL  (optional — defaults to http://127.0.0.1:8000)
 
-# Run (3 terminals)
+# Run (3 terminals — FastAPI is auto-started by Express)
 cd frontend && npm run dev                    # Dev server on port 5173 (Vite 7)
-cd backend && npm run dev                     # API on port 3001 (nodemon auto-restart)
+cd backend && npm run dev                     # API on port 3001 + auto-starts FastAPI on port 8000
 (use cmd.exe if run by pty)
 
 # Direct Python CLI (for testing analysis — only these two are CLI-accessible)

@@ -444,28 +444,77 @@ def predict_stock_recommendation(stock_data, model_file='stock_rf_model.pkl'):
         return {"error": f"Prediction failed: {str(e)}"}
 
 
+# ── FastAPI service ──────────────────────────────────────────────────────────
+# Run with: python stock_data.py serve
+# Exposes two endpoints used by the Express backend instead of execFile spawning.
+
+def _make_fastapi_app():
+    from fastapi import FastAPI, HTTPException
+    from pydantic import BaseModel
+
+    service = FastAPI(title="Stock Analysis Service")
+
+    class HistoryRequest(BaseModel):
+        symbol: str
+        date_range: str = 'max'
+        interval: str = '1d'
+        auto_predict: bool = False
+
+    class PriceRequest(BaseModel):
+        symbol: str
+
+    @service.get("/health")
+    def health():
+        return {"status": "ok"}
+
+    @service.post("/stock_history")
+    def stock_history(req: HistoryRequest):
+        result = get_stock_price_history(req.symbol, req.date_range, req.interval, req.auto_predict)
+        if isinstance(result, dict) and "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+        return result
+
+    @service.post("/current_price")
+    def current_price(req: PriceRequest):
+        result = get_current_stock_price(req.symbol)
+        if isinstance(result, dict) and "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+        return result
+
+    return service
+
+app = _make_fastapi_app()
+
 if __name__ == "__main__":
-    
-    function_name = sys.argv[1]
-    
-    if function_name == "get_stock_price_history":
+
+    function_name = sys.argv[1] if len(sys.argv) > 1 else ""
+
+    if function_name == "serve":
+        import uvicorn
+        host = sys.argv[2] if len(sys.argv) > 2 else "127.0.0.1"
+        port = int(sys.argv[3]) if len(sys.argv) > 3 else 8000
+        print(f"Starting Stock Analysis FastAPI service on {host}:{port}", file=sys.stderr)
+        uvicorn.run(app, host=host, port=port)
+
+    elif function_name == "get_stock_price_history":
         if len(sys.argv) < 3:
             result = {"error": "Symbol required for get_stock_price_history"}
         else:
             symbol = sys.argv[2]
-            # Optional parameters: date_range, interval, auto_predict
             date_range = sys.argv[3] if len(sys.argv) > 3 else '2y'
             interval = sys.argv[4] if len(sys.argv) > 4 else '1d'
             auto_predict = sys.argv[5].lower() == 'true' if len(sys.argv) > 5 else False
             result = get_stock_price_history(symbol, date_range, interval, auto_predict)
+        print(json.dumps(result, separators=(',', ':')))
+
     elif function_name == "get_current_stock_price":
         if len(sys.argv) < 3:
             result = {"error": "Symbol required for get_current_stock_price"}
         else:
             symbol = sys.argv[2]
             result = get_current_stock_price(symbol)
-    
+        print(json.dumps(result, separators=(',', ':')))
+
     else:
-        result = {"error": f"Unknown function: {function_name}"}
-    print(json.dumps(result, separators=(',', ':')))
+        print(json.dumps({"error": f"Unknown function: {function_name}"}, separators=(',', ':')))
 

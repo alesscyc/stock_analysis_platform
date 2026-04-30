@@ -1,24 +1,36 @@
 # ANALYSIS — Python ML Engine
 
 ## OVERVIEW
-Monolithic Python script: fetches OHLCV data via yfinance, computes 5 price MAs + volume MA, engineers 16 binary/numeric ML features, trains a RandomForest classifier, appends a prediction to the response. All in one 473-line file.
+Monolithic Python script: fetches OHLCV data via yfinance, computes 5 price MAs + volume MA, engineers 16 binary/numeric ML features, trains a RandomForest classifier, appends a prediction to the response. Also exposes a **FastAPI HTTP service** (port 8000) used by the Express backend instead of spawning a new process per request.
 
 ## STRUCTURE
 ```
 analysis/
-├── stock_data.py         # 473 lines — everything
+├── stock_data.py         # Everything: data fetch, features, ML, FastAPI app, CLI
 └── stock_rf_model.pkl    # Trained model (pickle, written to CWD)
 ```
 
 ## FUNCTIONS
-| Function | CLI? | Description |
-|----------|------|-------------|
-| `get_stock_price_history(symbol, date_range, interval, auto_predict)` | ✅ | Fetch OHLCV, compute MAs + features, optionally train + predict |
-| `get_current_stock_price(symbol)` | ✅ | Fetch latest closing price for a symbol |
-| `train_random_forest_model(stock_data)` | ❌ internal only | Train RF on pre-fetched data list; saves `.pkl` to CWD |
-| `predict_stock_recommendation(stock_data, model_file)` | ❌ internal only | Load `.pkl`, predict using most recent complete row |
+| Function | CLI? | HTTP? | Description |
+|----------|------|-------|-------------|
+| `get_stock_price_history(symbol, date_range, interval, auto_predict)` | ✅ | `POST /stock_history` | Fetch OHLCV, compute MAs + features, optionally train + predict |
+| `get_current_stock_price(symbol)` | ✅ | `POST /current_price` | Fetch latest closing price for a symbol |
+| `train_random_forest_model(stock_data)` | ❌ internal only | — | Train RF on pre-fetched data list; saves `.pkl` to CWD |
+| `predict_stock_recommendation(stock_data, model_file)` | ❌ internal only | — | Load `.pkl`, predict using most recent complete row |
 
-**⚠ `train_random_forest_model` and `predict_stock_recommendation` are NOT dispatched via `__main__`** — they are internal helpers called by `get_stock_price_history` when `auto_predict=true`. Do not attempt to call them from the CLI.
+**⚠ `train_random_forest_model` and `predict_stock_recommendation` are NOT dispatched via CLI or HTTP** — they are internal helpers called by `get_stock_price_history` when `auto_predict=true`.
+
+## FASTAPI SERVICE
+The preferred way to run the analysis engine. Express backend calls it via HTTP instead of spawning a Python process per request.
+
+| Endpoint | Method | Body | Description |
+|----------|--------|------|-------------|
+| `/health` | GET | — | Returns `{"status": "ok"}` |
+| `/stock_history` | POST | `{symbol, date_range, interval, auto_predict}` | Full OHLCV + MAs + ML features + optional prediction |
+| `/current_price` | POST | `{symbol}` | Latest closing price |
+
+Start with: `python stock_data.py serve` (defaults to `127.0.0.1:8000`)  
+Custom host/port: `python stock_data.py serve 0.0.0.0 8001`
 
 ## WHERE TO LOOK
 | Task | Location | Notes |
@@ -29,12 +41,13 @@ analysis/
 | Auto-predict flow | `stock_data.py:170-232` | Calls train then predict; appends `{"prediction": {...}}` to list |
 | RF training | `stock_data.py:255-379` | `train_random_forest_model(stock_data)` |
 | RF prediction | `stock_data.py:381-446` | `predict_stock_recommendation(stock_data, model_file)` |
-| CLI dispatch | `stock_data.py:449-472` | `__main__` — only `get_stock_price_history` and `get_current_stock_price` |
+| FastAPI app | `stock_data.py` (`_make_fastapi_app`) | Defines `/health`, `/stock_history`, `/current_price` |
+| CLI dispatch | `stock_data.py` (`__main__`) | `serve`, `get_stock_price_history`, `get_current_stock_price` |
 
 ## CONVENTIONS
-- **Pure JSON stdout**: ALL output must be valid JSON. Never use `print()` for debugging — breaks the backend `execFile` parser. Use `sys.stderr` exclusively for logging.
-- **CLI interface**: `python stock_data.py <function_name> <symbol> [date_range] [interval] [auto_predict]`.
-- **Model persistence**: `stock_rf_model.pkl` written to CWD via pickle. When called by Express, CWD is `backend/`, so model ends up at `backend/stock_rf_model.pkl`.
+- **FastAPI is primary**: Express calls `POST /stock_history` on the running service. The CLI still works for direct testing.
+- **Pure JSON stdout (CLI only)**: When using CLI mode, all output must be valid JSON. Use `sys.stderr` for logging.
+- **Model persistence**: `stock_rf_model.pkl` written to CWD via pickle. When the service runs from `analysis/`, model ends up at `analysis/stock_rf_model.pkl`.
 - **Training params**: `n_estimators=100, max_depth=10, min_samples_split=20, min_samples_leaf=10, class_weight='balanced'`, `random_state=42`.
 - **BUY label**: `future_return > 0.01` (22-day forward return > 1%).
 - **Min training data**: 50 complete records required. Randomly samples up to 300 with `random.seed(42)`.
@@ -64,20 +77,18 @@ All binary (0/1) unless noted:
 
 ## KEY ANTI-PATTERNS & RISKS
 - **Retrained every request**: `auto_predict=true` trains a fresh RF model each call — expensive, non-deterministic, race condition risk with `.pkl` writes.
-- **Pickle to CWD**: Model location depends on working directory — `backend/stock_rf_model.pkl` when run via Express, `analysis/stock_rf_model.pkl` when run directly.
-- **No requirements.txt**: Install manually: `pip install yfinance pandas numpy scikit-learn requests`.
-- **Monolithic**: Single file handles fetch, feature engineering, training, prediction, and CLI — no separation of concerns.
-- **JSON on stdout only**: Any stray debug `print()` breaks the backend parser. Use `sys.stderr` exclusively.
-- **`queue` import unused**: `import queue` exists at the top but is never used — harmless but misleading.
-- **`requests` import unused in main flow**: `import requests` is present but never called (yfinance handles HTTP internally).
+- **Pickle to CWD**: Model location depends on working directory — `analysis/stock_rf_model.pkl` when service runs from `analysis/`.
+- **Monolithic**: Single file handles fetch, feature engineering, training, prediction, FastAPI, and CLI — no separation of concerns.
 
 ## COMMANDS
 ```bash
-# Fetch OHLCV + MAs + ML features (+ AI prediction if auto_predict=true)
+# Start FastAPI service (used by Express backend)
+python stock_data.py serve                          # 127.0.0.1:8000
+python stock_data.py serve 0.0.0.0 8001            # custom host/port
+
+# Direct CLI (for testing only)
 python stock_data.py get_stock_price_history AAPL max 1d true
 python stock_data.py get_stock_price_history AAPL 1y 1wk false
-
-# Get current price only
 python stock_data.py get_current_stock_price AAPL
 ```
 
@@ -87,5 +98,6 @@ yfinance       # OHLCV data
 pandas         # DataFrame operations
 numpy          # Array operations for ML
 scikit-learn   # RandomForestClassifier (lazy import inside train function)
-requests       # Present in imports but not directly called
+fastapi        # HTTP service framework
+uvicorn        # ASGI server for FastAPI
 ```

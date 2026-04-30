@@ -2,8 +2,9 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { execFile } = require('child_process');
+const { spawn } = require('child_process');
 const path = require('path');
+
 const IB = require('ib');
 
 const app = express();
@@ -24,6 +25,9 @@ const IB_ORDER_ID_WAIT_TIMEOUT_MS = Number(process.env.IB_ORDER_ID_WAIT_TIMEOUT_
 
 // Finnhub API key for symbol search
 const FINNHUB_KEY = process.env.FINNHUB_KEY;
+
+// Python FastAPI microservice URL
+const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://127.0.0.1:8000';
 
 const ib = new IB({
   host: IB_HOST,
@@ -442,35 +446,34 @@ app.get('/api/stock/:symbol', async (req, res) => {
       return res.json(cachedData.data);
     }
     
-    const pythonArgs = [path.join(__dirname, '../analysis/stock_data.py'), 'get_stock_price_history', sanitizedSymbol, date_range, interval, sanitizedAutoPredict];
-  
-    execFile('python', ['-u', ...pythonArgs],{maxBuffer:1024*1024*50}, (error, stdout, stderr) => {
-      if (error) {
-        console.error('Error executing Python script:', error);
-        return res.status(500).json({ error: 'Internal server error' });
-      }
-
-      console.log('Python stdout length:', stdout.length);
-      console.log('Python stderr:', stderr);
-
-      try {
-        const result = JSON.parse(stdout);
-        
-        // Cache the result
-        cache.set(cacheKey, {
-          timestamp: Date.now(),
-          data: result
-        });
-
-        res.json(result);
-      } catch (parseError) {
-        console.error('Error parsing Python output:', parseError);
-        res.status(500).json({ error: 'Invalid data format from Python script' });
-      }
+    const pyRes = await fetch(`${PYTHON_SERVICE_URL}/stock_history`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol: sanitizedSymbol,
+        date_range,
+        interval,
+        auto_predict: sanitizedAutoPredict === 'true',
+      }),
     });
 
+    if (!pyRes.ok) {
+      const errBody = await pyRes.json().catch(() => ({}));
+      console.error('[python-service] Error response:', pyRes.status, errBody);
+      return res.status(502).json({ error: errBody.detail || 'Python service error' });
+    }
+
+    const result = await pyRes.json();
+    console.log('[python-service] Response received, items:', Array.isArray(result) ? result.length : 'N/A');
+
+    // Cache the result
+    cache.set(cacheKey, { timestamp: Date.now(), data: result });
+
+    res.json(result);
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('[python-service] Fetch failed:', error.message);
+    res.status(502).json({ error: 'Could not reach Python analysis service. Is it running?' });
   }
 });
 
@@ -638,6 +641,61 @@ app.get('/api/orders/pending', (req, res) => {
 });
 
 connectIbGateway();
+
+// ── Python FastAPI service manager ───────────────────────────────────────────
+const PYTHON_SCRIPT = path.join(__dirname, '../analysis/stock_data.py');
+let pythonProcess = null;
+let pythonExiting = false;
+
+function startPythonService() {
+  if (pythonExiting) return;
+
+  console.log('[python-service] Starting FastAPI service...');
+  pythonProcess = spawn('python', [PYTHON_SCRIPT, 'serve'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  pythonProcess.stdout.on('data', (data) => {
+    process.stdout.write(`[python-service] ${data}`);
+  });
+
+  pythonProcess.stderr.on('data', (data) => {
+    process.stderr.write(`[python-service] ${data}`);
+  });
+
+  pythonProcess.on('exit', (code, signal) => {
+    pythonProcess = null;
+    if (!pythonExiting) {
+      console.warn(`[python-service] Exited (code=${code} signal=${signal}), restarting in 2s...`);
+      setTimeout(startPythonService, 2000);
+    }
+  });
+
+  pythonProcess.on('error', (err) => {
+    console.error('[python-service] Failed to start:', err.message);
+  });
+}
+
+function stopPythonService() {
+  pythonExiting = true;
+  if (pythonProcess) {
+    console.log('[python-service] Stopping...');
+    pythonProcess.kill('SIGTERM');
+    pythonProcess = null;
+  }
+}
+
+function shutdown(signal) {
+  console.log(`\n[server] Received ${signal}, shutting down...`);
+  stopPythonService();
+  try { ib.disconnect(); } catch (_) {}
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
+
+startPythonService();
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
