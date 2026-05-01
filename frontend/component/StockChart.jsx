@@ -20,6 +20,8 @@ const MA_CONFIG = [
   { key:  '10MA', label:  '10 MA', color: '#ff5555' },
 ];
 
+const VOL_MA_CONFIG = [{ key: 'vol20MA', label: 'Vol 20 MA', color: '#ffaa00' }];
+
 // ── Swing Zones Primitive (custom canvas box drawing) ──────
 // lightweight-charts v5 uses ISeriesPrimitive for custom overlays.
 // This draws semi-transparent rectangles between consecutive swing points.
@@ -121,12 +123,14 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   const volumeSeriesRef  = useRef(null);
   const maSeriesRefs          = useRef({});
   const swingZonesPrimitiveRef = useRef(null);
+  const vol20maSeriesRef       = useRef(null);
 
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [maVisibility, setMaVisibility] = usePersistedState('chart-ma-visibility',
     () => Object.fromEntries(MA_CONFIG.map(m => [m.key, true]))
   );
   const [swingVisibility, setSwingVisibility] = usePersistedState('chart-swing-visible', true);
+  const [vol20maVisibility, setVol20maVisibility] = usePersistedState('chart-vol20ma-visibility', true);
 
   const intervals = [
     { value: '1d',  label: 'Daily'   },
@@ -142,9 +146,9 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   }, [stockData]);
 
   // ── Transform raw API data into series arrays ────────────
-  const { candleData, volumeData, maData } = useMemo(() => {
+  const { candleData, volumeData, maData, vol20maData } = useMemo(() => {
     if (!stockData || stockData.length === 0) {
-      return { candleData: [], volumeData: [], maData: {} };
+      return { candleData: [], volumeData: [], maData: {}, vol20maData: [] };
     }
 
     const candle  = [];
@@ -187,7 +191,17 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       }
     }
 
-    return { candleData: candle, volumeData: volume, maData: ma };
+    // Compute 20-period SMA of volume
+    const vol20ma = [];
+    const PERIOD = 20;
+    for (let i = 0; i < volume.length; i++) {
+      if (i < PERIOD - 1) continue;
+      let sum = 0;
+      for (let j = i - PERIOD + 1; j <= i; j++) sum += volume[j].value;
+      vol20ma.push({ time: volume[i].time, value: Math.round(sum / PERIOD) });
+    }
+
+    return { candleData: candle, volumeData: volume, maData: ma, vol20maData: vol20ma };
   }, [stockData]);
 
   // ── Swing boxes: pivot high → first candle that meets or exceeds that pivot high ──
@@ -362,6 +376,17 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       maSeriesRefs.current[key] = maSeries;
     }
 
+    // ── Vol 20 MA line series (on volume price scale) ───────
+    const vol20maSeries = chart.addSeries(LineSeries, {
+      color:        '#ffaa00',
+      lineWidth:    2,
+      priceScaleId: 'volume',
+      crosshairMarkerVisible: false,
+      lastValueVisible:       false,
+      priceLineVisible:       false,
+    });
+    vol20maSeriesRef.current = vol20maSeries;
+
     // ── Resize observer ─────────────────────────────────────
     const ro = new ResizeObserver(entries => {
       for (const entry of entries) {
@@ -379,6 +404,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       volumeSeriesRef.current      = null;
       maSeriesRefs.current         = {};
       swingZonesPrimitiveRef.current = null;
+      vol20maSeriesRef.current = null;
     };
   }, []); // only on mount/unmount
 
@@ -393,11 +419,13 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       maSeriesRefs.current[key]?.setData(maData[key] ?? []);
     }
 
+    vol20maSeriesRef.current?.setData(vol20maData ?? []);
+
     // Set initial visible range
     if (visibleRange) {
       chartRef.current?.timeScale().setVisibleRange(visibleRange);
     }
-  }, [candleData, volumeData, maData, latestClose, visibleRange]);
+  }, [candleData, volumeData, maData, vol20maData, latestClose, visibleRange]);
 
   // ── Sync MA visibility with series ───────────────────────
   useEffect(() => {
@@ -416,6 +444,11 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       swingVisibility ? swingZones : []
     );
   }, [swingZones, swingVisibility]);
+
+  // ── Sync Vol 20 MA visibility with series ─────────────────
+  useEffect(() => {
+    vol20maSeriesRef.current?.applyOptions({ visible: vol20maVisibility });
+  }, [vol20maVisibility]);
 
   // ── MA toggle handler ────────────────────────────────────
   const handleMAToggle = useCallback((key) => {
@@ -509,6 +542,19 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
             />
             <span className="swing-checkbox-text">Recent Volatility</span>
           </label>
+          <span id="ma-controls-divider" />
+          {VOL_MA_CONFIG.map(({ key, label, color }) => (
+            <label key={key} className="ma-checkbox-label">
+              <input
+                type="checkbox"
+                checked={vol20maVisibility}
+                onChange={() => setVol20maVisibility(prev => !prev)}
+              />
+              <span className="ma-checkbox-text" style={{ color }}>
+                {label}
+              </span>
+            </label>
+          ))}
         </div>
       </div>
 
