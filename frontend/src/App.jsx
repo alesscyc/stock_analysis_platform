@@ -5,6 +5,8 @@ import StockChart from '../component/StockChart';
 import PortfolioDialog from '../component/PortfolioDialog';
 import OrdersDialog from '../component/OrdersDialog';
 import WatchlistDialog from '../component/WatchlistDialog';
+import { isGitHubPages } from './environment';
+import { generateNvdaMockData } from './mockData';
 
 function App() {
   const [selectedStock, setSelectedStock] = useState(null);
@@ -15,10 +17,23 @@ function App() {
   const [isWatchlistOpen, setIsWatchlistOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [aiPrediction, setAiPrediction] = useState(null);
+  const [isMock, setIsMock] = useState(false);
 
   const fetchStockData = async (stock, interval = '1d', autoPredictEnabled = true) => {
     setLoading(true);
     try {
+      // On GitHub Pages: use mock NVDA data (ignores the searched symbol)
+      if (isGitHubPages()) {
+        const mockData = generateNvdaMockData();
+        setStockData(mockData);
+        setCurrentInterval(interval);
+        setIsMock(true);
+        const prediction = mockData.find(item => item.prediction)?.prediction;
+        if (prediction) setAiPrediction(prediction);
+        return;
+      }
+
+      // Normal API call (local dev)
       const autoPredictParam = autoPredictEnabled ? 'true' : 'false';
       const response = await fetch(
         `/api/stock/${stock.symbol}?date_range=max&interval=${interval}&auto_predict=${autoPredictParam}`
@@ -27,6 +42,7 @@ function App() {
       if (Array.isArray(data) && data.length > 0) {
         setStockData(data);
         setCurrentInterval(interval);
+        setIsMock(false);
         // Only update the prediction when the API actually returned one.
         // This keeps the last known prediction visible during interval changes.
         const prediction = data.find(item => item.prediction)?.prediction;
@@ -112,6 +128,9 @@ function App() {
       {/* ── Instrument header (shows once symbol is loaded) ── */}
       {selectedStock && (
         <div className="instrument-header">
+          {isMock && (
+            <span className="mock-badge">DEMO</span>
+          )}
           <span className="instrument-symbol">{selectedStock.symbol}</span>
 
           {latestClose != null && (
