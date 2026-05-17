@@ -111,8 +111,8 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
             # Calculate percentage change after 1 month
             hist['Future_Return'] = (hist['Future_Close'] - hist['Close']) / hist['Close']
             
-            # Create buy/sell label: 1 = buy (price up by more than 1%), 0 = sell (price up by 1% or less)
-            hist['Label'] = (hist['Future_Return'] > 0.01).astype(int)
+            # Create buy/sell label: 1 = buy (price up by more than 5%), 0 = sell (price up by 5% or less)
+            hist['Label'] = (hist['Future_Return'] > 0.05).astype(int)
 
 
         # Convert to list of dictionaries
@@ -257,7 +257,6 @@ def train_random_forest_model(stock_data):
     """
     try:
         from sklearn.ensemble import RandomForestClassifier
-        from sklearn.model_selection import train_test_split
         from sklearn.metrics import accuracy_score, classification_report
         import pickle
         import numpy as np
@@ -288,13 +287,9 @@ def train_random_forest_model(stock_data):
         if len(complete_data) < 50:  # Minimum data points
             return {"error": f"Insufficient training data. Only {len(complete_data)} complete records found. Need at least 50."}
         
-        # Randomly select 300 data points for training
-        import random
-        random.seed(42)  # For reproducible results
-        if len(complete_data) > 300:
-            complete_data = random.sample(complete_data, 300)
-        
-        print(f"Using {len(complete_data)} randomly selected data points for training", file=sys.stderr)
+        # Data stays sorted by date (ascending) — stock_data was sorted at line 166,
+        # so complete_data is also chronologically ordered.
+        print(f"Using {len(complete_data)} data points for training (time-series ordered)", file=sys.stderr)
         
         # Prepare features and labels
         feature_names = ['MA50_above_MA150', 'MA150_above_MA200', 'Price_above_MA50', 
@@ -315,16 +310,20 @@ def train_random_forest_model(stock_data):
         X = np.array(X)
         y = np.array(y)
         
-        # Split the data
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+        # Time-series split: train on first 80%, test on last 20%
+        # Data is sorted by date ascending, so this respects temporal order
+        # (no future data leaks into training)
+        split_idx = int(len(X) * 0.8)
+        X_train, X_test = X[:split_idx], X[split_idx:]
+        y_train, y_test = y[:split_idx], y[split_idx:]
         
         # Train Random Forest
         print("Training Random Forest...", file=sys.stderr)
         rf_model = RandomForestClassifier(
-            n_estimators=100,
-            max_depth=10,
-            min_samples_split=20,
-            min_samples_leaf=10,
+            n_estimators=200,
+            max_depth=15,
+            min_samples_split=10,
+            min_samples_leaf=5,
             random_state=42,
             class_weight='balanced'
         )
@@ -338,8 +337,16 @@ def train_random_forest_model(stock_data):
         print(f"Training Accuracy: {train_accuracy:.4f}", file=sys.stderr)
         print(f"Testing Accuracy: {test_accuracy:.4f}", file=sys.stderr)
         
-        # Feature importance
-        feature_importance = list(zip(feature_names, rf_model.feature_importances_))
+        # Feature importance (BaggingClassifier doesn't expose it directly,
+        # so average from individual tree estimators)
+        if hasattr(rf_model, 'feature_importances_'):
+            feature_importance = list(zip(feature_names, rf_model.feature_importances_))
+        elif hasattr(rf_model, 'estimators_'):
+            # Average importance across all base estimators
+            importances = np.mean([est.feature_importances_ for est in rf_model.estimators_], axis=0)
+            feature_importance = list(zip(feature_names, importances))
+        else:
+            feature_importance = list(zip(feature_names, [0]*len(feature_names)))
         feature_importance.sort(key=lambda x: x[1], reverse=True)
         
         print("\nTop 10 Most Important Features:", file=sys.stderr)
