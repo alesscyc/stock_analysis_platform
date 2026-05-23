@@ -1,4 +1,4 @@
-import { useRef, useMemo, useEffect, useCallback } from 'react';
+import { useRef, useMemo, useEffect, useCallback, useState } from 'react';
 import usePersistedState from '../src/hooks/usePersistedState';
 import {
   createChart,
@@ -129,6 +129,9 @@ function StockChart({ stockData, currentInterval, onIntervalChange, aiPrediction
   );
   const [swingVisibility, setSwingVisibility] = usePersistedState('chart-swing-visible', true);
   const [vol20maVisibility, setVol20maVisibility] = usePersistedState('chart-vol20ma-visibility', true);
+
+  const [indicatorsOpen, setIndicatorsOpen] = useState(false);
+  const indicatorsRef = useRef(null);
 
   const intervals = [
     { value: '1d',  label: 'Daily'   },
@@ -453,6 +456,18 @@ function StockChart({ stockData, currentInterval, onIntervalChange, aiPrediction
     setMaVisibility(prev => ({ ...prev, [key]: !prev[key] }));
   }, [setMaVisibility]);
 
+  // ── Click outside to close indicators dropdown ───────────
+  useEffect(() => {
+    if (!indicatorsOpen) return;
+    const handleClick = (e) => {
+      if (indicatorsRef.current && !indicatorsRef.current.contains(e.target)) {
+        setIndicatorsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [indicatorsOpen]);
+
   if (!stockData || stockData.length === 0) {
     return <div>No stock data available</div>;
   }
@@ -516,43 +531,77 @@ function StockChart({ stockData, currentInterval, onIntervalChange, aiPrediction
           </button>
         </div>
 
-        {/* Right side — MA toggles + Swing */}
-        <div id="ma-controls">
-          <span id="ma-controls-label">Moving Averages:</span>
-          {MA_CONFIG.map(({ key, label, color }) => (
-            <label key={key} className="ma-checkbox-label">
-              <input
-                type="checkbox"
-                checked={maVisibility[key]}
-                onChange={() => handleMAToggle(key)}
-              />
-              <span className="ma-checkbox-text" style={{ color }}>
-                {label}
-              </span>
-            </label>
-          ))}
-          <span id="ma-controls-divider" />
-          <label className="swing-checkbox-label">
-            <input
-              type="checkbox"
-              checked={swingVisibility}
-              onChange={() => setSwingVisibility(prev => !prev)}
-            />
-            <span className="swing-checkbox-text">Recent Volatility</span>
-          </label>
-          <span id="ma-controls-divider" />
-          {VOL_MA_CONFIG.map(({ key, label, color }) => (
-            <label key={key} className="ma-checkbox-label">
-              <input
-                type="checkbox"
-                checked={vol20maVisibility}
-                onChange={() => setVol20maVisibility(prev => !prev)}
-              />
-              <span className="ma-checkbox-text" style={{ color }}>
-                {label}
-              </span>
-            </label>
-          ))}
+        {/* Right side — Indicators toolbox dropdown */}
+        <div id="indicators-dropdown" ref={indicatorsRef}>
+          <button
+            id="indicators-dropdown-btn"
+            onClick={() => setIndicatorsOpen(prev => !prev)}
+            aria-expanded={indicatorsOpen}
+            aria-haspopup="true"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20V10M18 20V4M6 20v-4"/>
+            </svg>
+            Indicators
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: indicatorsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+
+          {indicatorsOpen && (
+            <div id="indicators-dropdown-panel">
+              <div id="indicators-dropdown-header">
+                <span id="indicators-dropdown-title">Technical Indicators</span>
+              </div>
+
+              <div id="indicators-dropdown-section">
+                <span id="indicators-dropdown-section-label">Moving Averages</span>
+                {MA_CONFIG.map(({ key, label, color }) => (
+                  <label key={key} className="indicator-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={maVisibility[key]}
+                      onChange={() => handleMAToggle(key)}
+                    />
+                    <span className="indicator-checkbox-color" style={{ backgroundColor: color }} />
+                    <span className="indicator-checkbox-text">{label}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="indicators-dropdown-divider" />
+
+              <div id="indicators-dropdown-section">
+                <span id="indicators-dropdown-section-label">Volume</span>
+                {VOL_MA_CONFIG.map(({ key, label, color }) => (
+                  <label key={key} className="indicator-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={vol20maVisibility}
+                      onChange={() => setVol20maVisibility(prev => !prev)}
+                    />
+                    <span className="indicator-checkbox-color" style={{ backgroundColor: color }} />
+                    <span className="indicator-checkbox-text">{label}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="indicators-dropdown-divider" />
+
+              <div id="indicators-dropdown-section">
+                <span id="indicators-dropdown-section-label">Patterns</span>
+                <label className="indicator-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={swingVisibility}
+                    onChange={() => setSwingVisibility(prev => !prev)}
+                  />
+                  <span className="indicator-checkbox-color" style={{ backgroundColor: '#f0b429' }} />
+                  <span className="indicator-checkbox-text">Recent Volatility</span>
+                </label>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

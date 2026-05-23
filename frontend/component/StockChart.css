@@ -156,29 +156,95 @@
   transform: translateY(0);
 }
 
-/* ── MA Controls ───────────────────────────────────────── */
-#ma-controls {
+/* ── Indicators Dropdown ───────────────────────────────── */
+#indicators-dropdown {
+  position: relative;
+}
+
+#indicators-dropdown-btn {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-#ma-controls-label {
-  font-size: 11px;
+  padding: 6px 12px;
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-right: var(--space-1);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  user-select: none;
 }
 
-.ma-checkbox-label {
+#indicators-dropdown-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-normal);
+}
+
+#indicators-dropdown-btn svg {
+  flex-shrink: 0;
+}
+
+#indicators-dropdown-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 520px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+#indicators-dropdown-header {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: space-between;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+#indicators-dropdown-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.3px;
+}
+
+#indicators-dropdown-section {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+}
+
+.indicators-dropdown-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: var(--space-1) 0;
+}
+
+#indicators-dropdown-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 2px;
+}
+
+.indicator-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   cursor: pointer;
-  padding: 3px 8px;
+  padding: 5px 8px;
   border-radius: var(--radius-sm);
   background: var(--bg-panel);
   border: 1px solid var(--border-subtle);
@@ -186,76 +252,35 @@
   user-select: none;
 }
 
-.ma-checkbox-label:hover {
+.indicator-checkbox-label:hover {
   background: var(--bg-hover);
   border-color: var(--border-normal);
 }
 
-.ma-checkbox-label input[type="checkbox"] {
-  width: 12px;
-  height: 12px;
+.indicator-checkbox-label input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
   accent-color: var(--accent);
   cursor: pointer;
   flex-shrink: 0;
 }
 
-.ma-checkbox-text {
-  font-size: 11px;
+.indicator-checkbox-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.indicator-checkbox-text {
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
   font-family: var(--font-mono);
   letter-spacing: 0.3px;
 }
 
-.ma-checkbox-label:has(input:checked) .ma-checkbox-text {
-  color: var(--text-primary);
-}
-
-/* ── Recent Volatility Toggle (formerly Swing Points) ───── */
-#ma-controls-divider {
-  display: inline-block;
-  width: 1px;
-  height: 20px;
-  background: var(--border-subtle);
-  margin: 0 var(--space-1);
-  flex-shrink: 0;
-}
-
-.swing-checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-panel);
-  border: 1px solid var(--border-subtle);
-  transition: background 0.12s, border-color 0.12s;
-  user-select: none;
-}
-
-.swing-checkbox-label:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-normal);
-}
-
-.swing-checkbox-label input[type="checkbox"] {
-  width: 12px;
-  height: 12px;
-  accent-color: var(--green);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.swing-checkbox-text {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  font-family: var(--font-ui);
-  letter-spacing: 0.3px;
-}
-
-.swing-checkbox-label:has(input:checked) .swing-checkbox-text {
+.indicator-checkbox-label:has(input:checked) .indicator-checkbox-text {
   color: var(--text-primary);
 }
 
@@ -284,11 +309,12 @@
     font-size: 11px;
   }
 
-  #ma-controls {
-    gap: var(--space-1);
+  #indicators-dropdown-panel {
+    width: 320px;
+    right: -8px;
   }
 
-  .ma-checkbox-label {
-    padding: 3px 6px;
+  #indicators-dropdown-section {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
