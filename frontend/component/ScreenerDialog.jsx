@@ -16,6 +16,7 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [screenedCount, setScreenedCount] = useState(0);
+  const [latestMatchedSymbol, setLatestMatchedSymbol] = useState(null);
   const abortRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -93,8 +94,8 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
     setError(null);
     setResults([]);
     setScreenedCount(0);
+    setLatestMatchedSymbol(null);
 
-    const passed = [];
     let processed = 0;
 
     for (const symbol of symbols) {
@@ -120,12 +121,15 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
           const weekChange = weekAgo ? ((close - parseFloat(weekAgo.Close)) / parseFloat(weekAgo.Close)) * 100 : null;
           const monthChange = monthAgo ? ((close - parseFloat(monthAgo.Close)) / parseFloat(monthAgo.Close)) * 100 : null;
 
-          passed.push({
+          const match = {
             symbol,
             close,
             weekChange,
             monthChange,
-          });
+          };
+
+          setResults(prev => [...prev, match]);
+          setLatestMatchedSymbol(symbol);
         }
       } catch {
         // ignore individual fetch failures
@@ -135,7 +139,6 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
       }
     }
 
-    setResults(passed);
     setLoading(false);
     abortRef.current = null;
   }, [symbolsText, enabledConditions, parseSymbols, checkConditions]);
@@ -157,6 +160,7 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
     setResults([]);
     setError(null);
     setScreenedCount(0);
+    setLatestMatchedSymbol(null);
   }, []);
 
   const handleFileImport = useCallback((e) => {
@@ -281,6 +285,12 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
           </button>
         )}
       </div>
+
+      {loading && latestMatchedSymbol && (
+        <div id="screener-latest-match" aria-live="polite">
+          Latest match: <span>{latestMatchedSymbol}</span>
+        </div>
+      )}
 
       {/* Error */}
       {error && (

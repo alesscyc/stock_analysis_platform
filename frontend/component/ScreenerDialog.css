@@ -322,6 +322,21 @@
   border-color: var(--border-strong);
 }
 
+#screener-latest-match {
+  padding: var(--space-2) var(--space-3);
+  background: var(--green-dim);
+  border: 1px solid rgba(38,166,154,0.3);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+#screener-latest-match span {
+  color: var(--green-bright);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
 /* Spinner */
 .screener-spinner {
   width: 14px;
