@@ -113,7 +113,31 @@ function toChartDate(raw) {
   return String(raw).slice(0, 10);
 }
 
-function StockChart({ stockData, currentInterval, onIntervalChange, aiPrediction, onTradeClick }) {
+const WATCHLIST_STORAGE_KEY = 'stockai-watchlist';
+
+function loadWatchlist() {
+  try {
+    const raw = localStorage.getItem(WATCHLIST_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    // Migrate old string format to object format
+    return parsed.map(item => {
+      if (typeof item === 'string') {
+        return { symbol: item, description: '' };
+      }
+      return item;
+    }).filter(item => item && item.symbol);
+  } catch {
+    return [];
+  }
+}
+
+function saveWatchlist(list) {
+  localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(list));
+}
+
+function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick }) {
   const containerRef = useRef(null);
   const chartRef     = useRef(null);
 
@@ -132,6 +156,21 @@ function StockChart({ stockData, currentInterval, onIntervalChange, aiPrediction
 
   const [indicatorsOpen, setIndicatorsOpen] = useState(false);
   const indicatorsRef = useRef(null);
+
+  const [watchlistAdded, setWatchlistAdded] = useState(false);
+
+  const handleAddToWatchlist = useCallback(() => {
+    if (!stockSymbol) return;
+    const list = loadWatchlist();
+    const upper = stockSymbol.toUpperCase();
+    if (!list.some(item => (item.symbol || item) === upper)) {
+      list.push({ symbol: upper });
+      saveWatchlist(list);
+      window.dispatchEvent(new Event('watchlist-updated'));
+    }
+    setWatchlistAdded(true);
+    setTimeout(() => setWatchlistAdded(false), 1500);
+  }, [stockSymbol]);
 
   const intervals = [
     { value: '1d',  label: 'Daily'   },
@@ -528,6 +567,31 @@ function StockChart({ stockData, currentInterval, onIntervalChange, aiPrediction
 
           <button id="trade-btn" onClick={onTradeClick}>
             Trade
+          </button>
+
+          <button
+            id="watchlist-add-btn"
+            onClick={handleAddToWatchlist}
+            disabled={watchlistAdded}
+            title="Add to watchlist"
+          >
+            {watchlistAdded ? (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Added
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/>
+                  <line x1="12" y1="8" x2="12" y2="16"/>
+                  <line x1="8" y1="12" x2="16" y2="12"/>
+                </svg>
+                Watchlist
+              </>
+            )}
           </button>
         </div>
 

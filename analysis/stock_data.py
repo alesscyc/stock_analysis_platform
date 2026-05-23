@@ -9,6 +9,13 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
         # Use yfinance to get stock data
         ticker = yf.Ticker(symbol)
         
+        # Fetch market cap from ticker info (static per symbol)
+        try:
+            info = ticker.info
+            market_cap = info.get('marketCap') if info else None
+        except Exception:
+            market_cap = None
+        
         # Map date range to yfinance periods or calculate dates
         if date_range == 'max':
             hist = ticker.history(period="max", interval=interval)
@@ -28,8 +35,15 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
         hist['20MA'] = hist['Close'].rolling(window=20, min_periods=20).mean()
         hist['10MA'] = hist['Close'].rolling(window=10, min_periods=10).mean()
         
-        # Volume moving average
+        # Volume moving averages
+        hist['Volume_10MA'] = hist['Volume'].rolling(window=10, min_periods=10).mean()
         hist['Volume_20MA'] = hist['Volume'].rolling(window=20, min_periods=20).mean()
+        hist['Volume_30MA'] = hist['Volume'].rolling(window=30, min_periods=30).mean()
+        hist['Volume_60MA'] = hist['Volume'].rolling(window=60, min_periods=60).mean()
+        hist['Volume_90MA'] = hist['Volume'].rolling(window=90, min_periods=90).mean()
+        
+        # Dollar volume (Close * Volume)
+        hist['Dollar_Volume'] = hist['Close'] * hist['Volume']
 
         if interval == '1d':
             
@@ -54,6 +68,10 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
             # Past month (22 trading days)
             hist['MA200_uptrend_count'] = hist['MA200_up_day'].rolling(window=22, min_periods=22).sum()
             hist['MA200_uptrend_past_month'] = (hist['MA200_uptrend_count'] >= 20).astype(int)  # 20/22 = ~90%
+            
+            # 200MA vs 1 month ago: current 200MA > 200MA 22 trading days ago
+            hist['MA200_month_ago'] = hist['200MA'].shift(22)
+            hist['MA200_above_month_ago'] = (hist['200MA'] > hist['MA200_month_ago']).astype(int)
             
             # Past 6 months (~132 trading days)
             hist['MA200_uptrend_count_6m'] = hist['MA200_up_day'].rolling(window=132, min_periods=132).sum()
@@ -133,12 +151,18 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
                 "Low": float(row['Low']),
                 "Close": float(row['Close']),
                 "Volume": int(row['Volume']),
+                "Volume_10MA": round(float(row['Volume_10MA']), 0) if pd.notna(row['Volume_10MA']) else None,
                 "Volume_20MA": round(float(row['Volume_20MA']), 0) if pd.notna(row['Volume_20MA']) else None,
+                "Volume_30MA": round(float(row['Volume_30MA']), 0) if pd.notna(row['Volume_30MA']) else None,
+                "Volume_60MA": round(float(row['Volume_60MA']), 0) if pd.notna(row['Volume_60MA']) else None,
+                "Volume_90MA": round(float(row['Volume_90MA']), 0) if pd.notna(row['Volume_90MA']) else None,
+                "Dollar_Volume": round(float(row['Dollar_Volume']), 2) if pd.notna(row['Dollar_Volume']) else None,
                 "200MA": round(float(row['200MA']), 2) if pd.notna(row['200MA']) else None,
                 "150MA": round(float(row['150MA']), 2) if pd.notna(row['150MA']) else None,
                 "50MA": round(float(row['50MA']), 2) if pd.notna(row['50MA']) else None,
                 "20MA": round(float(row['20MA']), 2) if pd.notna(row['20MA']) else None,
-                "10MA": round(float(row['10MA']), 2) if pd.notna(row['10MA']) else None
+                "10MA": round(float(row['10MA']), 2) if pd.notna(row['10MA']) else None,
+                "MarketCap": market_cap
             }
             if interval == '1d':
                 data_point["MA50_above_MA150"] = int(row['MA50_above_MA150']) if pd.notna(row['MA50_above_MA150']) else None
@@ -146,8 +170,11 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
                 data_point["Price_above_MA50"] = int(row['Price_above_MA50']) if pd.notna(row['Price_above_MA50']) else None
                 data_point["Volume_20MA_uptrend"] = int(row['Volume_20MA_uptrend']) if pd.notna(row['Volume_20MA_uptrend']) else None
                 data_point["MA200_uptrend_past_month"] = int(row['MA200_uptrend_past_month']) if pd.notna(row['MA200_uptrend_past_month']) else None
+                data_point["MA200_above_month_ago"] = int(row['MA200_above_month_ago']) if pd.notna(row['MA200_above_month_ago']) else None
                 data_point["MA200_uptrend_past_6months"] = int(row['MA200_uptrend_past_6months']) if pd.notna(row['MA200_uptrend_past_6months']) else None
                 data_point["MA200_uptrend_past_year"] = int(row['MA200_uptrend_past_year']) if pd.notna(row['MA200_uptrend_past_year']) else None
+                data_point["52week_low"] = round(float(row['52week_low']), 2) if pd.notna(row['52week_low']) else None
+                data_point["52week_high"] = round(float(row['52week_high']), 2) if pd.notna(row['52week_high']) else None
                 data_point["Price_above_52week_low_30pct"] = int(row['Price_above_52week_low_30pct']) if pd.notna(row['Price_above_52week_low_30pct']) else None
                 data_point["Price_within_25pct_of_52week_high"] = int(row['Price_within_25pct_of_52week_high']) if pd.notna(row['Price_within_25pct_of_52week_high']) else None
                 data_point["Week_Price_Range"] = round(float(row['Week_Price_Range']), 2) if pd.notna(row['Week_Price_Range']) else None

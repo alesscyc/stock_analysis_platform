@@ -6,7 +6,16 @@ const STORAGE_KEY = 'stockai-watchlist';
 function loadWatchlist() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    // Migrate old string format to object format
+    return parsed.map(item => {
+      if (typeof item === 'string') {
+        return { symbol: item, description: '' };
+      }
+      return item;
+    }).filter(item => item && item.symbol);
   } catch {
     return [];
   }
@@ -32,6 +41,23 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
   useEffect(() => {
     saveWatchlist(watchlist);
   }, [watchlist]);
+
+  // Reload from localStorage when dialog opens (external changes may have occurred)
+  useEffect(() => {
+    if (isOpen) {
+      setWatchlist(loadWatchlist());
+    }
+  }, [isOpen]);
+
+  // Listen for watchlist updates from other components while dialog is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleUpdate = () => {
+      setWatchlist(loadWatchlist());
+    };
+    window.addEventListener('watchlist-updated', handleUpdate);
+    return () => window.removeEventListener('watchlist-updated', handleUpdate);
+  }, [isOpen]);
 
   // Fetch prices for all watchlist items when dialog opens
   useEffect(() => {
@@ -143,8 +169,7 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
     if (onStockSelect) {
       onStockSelect({ symbol: item.symbol });
     }
-    onClose();
-  }, [onStockSelect, onClose]);
+  }, [onStockSelect]);
 
   const handleKeyDown = (e) => {
     if (!showSuggestions || suggestions.length === 0) {

@@ -6,6 +6,7 @@ import TradeDialog from '../component/TradeDialog';
 import PortfolioDialog from '../component/PortfolioDialog';
 import OrdersDialog from '../component/OrdersDialog';
 import WatchlistDialog from '../component/WatchlistDialog';
+import ScreenerDialog from '../component/ScreenerDialog';
 import { isGitHubPages } from './environment';
 import { generateNvdaMockData } from './mockData';
 
@@ -89,6 +90,16 @@ function App() {
         </div>
 
         <div className="topbar-actions">
+          <button
+            className="btn-screener"
+            onClick={() => setActiveSidebar(prev => prev === 'screener' ? null : 'screener')}
+            aria-label="Open screener"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18M3 12h18M3 18h18"/>
+            </svg>
+            Screener
+          </button>
           <button
             className="btn-watchlist"
             onClick={() => setActiveSidebar(prev => prev === 'watchlist' ? null : 'watchlist')}
@@ -202,18 +213,17 @@ function App() {
           </main>
         </div>
 
-        {activeSidebar && (
-          <aside className="app-sidebar">
-            <TradeDialog
-              isOpen={activeSidebar === 'trade'}
-              onClose={() => setActiveSidebar(null)}
-              stockSymbol={selectedStock?.symbol}
-            />
-            <PortfolioDialog isOpen={activeSidebar === 'portfolio'} onClose={() => setActiveSidebar(null)} />
-            <OrdersDialog isOpen={activeSidebar === 'orders'} onClose={() => setActiveSidebar(null)} />
-            <WatchlistDialog isOpen={activeSidebar === 'watchlist'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
-          </aside>
-        )}
+        <aside className={`app-sidebar${activeSidebar ? '' : ' app-sidebar-hidden'}`}>
+          <TradeDialog
+            isOpen={activeSidebar === 'trade'}
+            onClose={() => setActiveSidebar(null)}
+            stockSymbol={selectedStock?.symbol}
+          />
+          <PortfolioDialog isOpen={activeSidebar === 'portfolio'} onClose={() => setActiveSidebar(null)} />
+          <OrdersDialog isOpen={activeSidebar === 'orders'} onClose={() => setActiveSidebar(null)} />
+          <WatchlistDialog isOpen={activeSidebar === 'watchlist'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
+          <ScreenerDialog isOpen={activeSidebar === 'screener'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
+        </aside>
       </div>
     </div>
   );
