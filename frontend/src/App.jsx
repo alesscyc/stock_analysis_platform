@@ -2,6 +2,7 @@ import './App.css'
 import { useState, useMemo } from 'react';
 import SearchBar from '../component/SearchBar'
 import StockChart from '../component/StockChart';
+import TradeDialog from '../component/TradeDialog';
 import PortfolioDialog from '../component/PortfolioDialog';
 import OrdersDialog from '../component/OrdersDialog';
 import WatchlistDialog from '../component/WatchlistDialog';
@@ -12,6 +13,7 @@ function App() {
   const [selectedStock, setSelectedStock] = useState(null);
   const [stockData, setStockData] = useState([]);
   const [currentInterval, setCurrentInterval] = useState('1d');
+  const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
   const [isOrdersOpen, setIsOrdersOpen] = useState(false);
   const [isWatchlistOpen, setIsWatchlistOpen] = useState(false);
@@ -125,83 +127,95 @@ function App() {
         </div>
       </header>
 
-      {/* ── Instrument header (shows once symbol is loaded) ── */}
-      {selectedStock && (
-        <div className="instrument-header">
-          {isMock && (
-            <span className="mock-badge">DEMO</span>
-          )}
-          <span className="instrument-symbol">{selectedStock.symbol}</span>
+      <div className="app-body">
+        <div className="app-main">
+          {/* ── Instrument header (shows once symbol is loaded) ── */}
+          {selectedStock && (
+            <div className="instrument-header">
+              {isMock && (
+                <span className="mock-badge">DEMO</span>
+              )}
+              <span className="instrument-symbol">{selectedStock.symbol}</span>
 
-          {latestClose != null && (
-            <span className="instrument-price">
-              ${latestClose.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-          )}
+              {latestClose != null && (
+                <span className="instrument-price">
+                  ${latestClose.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              )}
 
-          <div className="instrument-stat">
-            <span className="instrument-label">Interval</span>
-            <span className="instrument-value">
-              {currentInterval === '1d' ? 'Daily' : currentInterval === '1wk' ? 'Weekly' : 'Monthly'}
-            </span>
-          </div>
+              <div className="instrument-stat">
+                <span className="instrument-label">Interval</span>
+                <span className="instrument-value">
+                  {currentInterval === '1d' ? 'Daily' : currentInterval === '1wk' ? 'Weekly' : 'Monthly'}
+                </span>
+              </div>
 
-          {aiPrediction && aiPrediction.status === 'success' && (
-            <div className="instrument-stat">
-              <span className="instrument-label">AI Signal</span>
-              <span
-                className="instrument-value"
-                style={{ color: aiPrediction.recommendation === 'BUY' ? 'var(--green-bright)' : 'var(--red-bright)' }}
-              >
-                {aiPrediction.recommendation} · {aiPrediction.confidence}%
-              </span>
+              {aiPrediction && aiPrediction.status === 'success' && (
+                <div className="instrument-stat">
+                  <span className="instrument-label">AI Signal</span>
+                  <span
+                    className="instrument-value"
+                    style={{ color: aiPrediction.recommendation === 'BUY' ? 'var(--green-bright)' : 'var(--red-bright)' }}
+                  >
+                    {aiPrediction.recommendation} · {aiPrediction.confidence}%
+                  </span>
+                </div>
+              )}
+
+              {stockData.length > 0 && (
+                <div className="instrument-stat">
+                  <span className="instrument-label">Data Points</span>
+                  <span className="instrument-value">{stockData.length.toLocaleString()}</span>
+                </div>
+              )}
             </div>
           )}
 
-          {stockData.length > 0 && (
-            <div className="instrument-stat">
-              <span className="instrument-label">Data Points</span>
-              <span className="instrument-value">{stockData.length.toLocaleString()}</span>
-            </div>
-          )}
+          {/* ── Main workspace ── */}
+          <main className="app-workspace">
+            {stockData.length === 0 && !loading && (
+              <div className="app-empty-state">
+                <div className="empty-state-icon">📈</div>
+                <div className="empty-state-title">No instrument selected</div>
+                <div className="empty-state-sub">
+                  Search for a ticker symbol above to load chart data, indicators, and AI analysis.
+                </div>
+              </div>
+            )}
+
+            {loading && stockData.length === 0 && (
+              <div className="app-empty-state">
+                <div className="empty-state-icon">⏳</div>
+                <div className="empty-state-title">Loading market data…</div>
+              </div>
+            )}
+
+            {stockData.length > 0 && (
+              <div className="chart-container">
+                <StockChart
+                  stockData={stockData}
+                  stockSymbol={selectedStock?.symbol}
+                  currentInterval={currentInterval}
+                  onIntervalChange={handleIntervalChange}
+                  aiPrediction={aiPrediction}
+                  onTradeClick={() => setIsTradeDialogOpen(true)}
+                />
+              </div>
+            )}
+          </main>
         </div>
-      )}
 
-      {/* ── Main workspace ── */}
-      <main className="app-workspace">
-        {stockData.length === 0 && !loading && (
-          <div className="app-empty-state">
-            <div className="empty-state-icon">📈</div>
-            <div className="empty-state-title">No instrument selected</div>
-            <div className="empty-state-sub">
-              Search for a ticker symbol above to load chart data, indicators, and AI analysis.
-            </div>
-          </div>
-        )}
-
-        {loading && stockData.length === 0 && (
-          <div className="app-empty-state">
-            <div className="empty-state-icon">⏳</div>
-            <div className="empty-state-title">Loading market data…</div>
-          </div>
-        )}
-
-        {stockData.length > 0 && (
-          <div className="chart-container">
-            <StockChart
-              stockData={stockData}
-              stockSymbol={selectedStock?.symbol}
-              currentInterval={currentInterval}
-              onIntervalChange={handleIntervalChange}
-              aiPrediction={aiPrediction}
-            />
-          </div>
-        )}
-      </main>
-
-      <PortfolioDialog isOpen={isPortfolioOpen} onClose={() => setIsPortfolioOpen(false)} />
-      <OrdersDialog isOpen={isOrdersOpen} onClose={() => setIsOrdersOpen(false)} />
-      <WatchlistDialog isOpen={isWatchlistOpen} onClose={() => setIsWatchlistOpen(false)} onStockSelect={handleStockSelect} />
+        <aside className="app-sidebar">
+          <TradeDialog
+            isOpen={isTradeDialogOpen}
+            onClose={() => setIsTradeDialogOpen(false)}
+            stockSymbol={selectedStock?.symbol}
+          />
+          <PortfolioDialog isOpen={isPortfolioOpen} onClose={() => setIsPortfolioOpen(false)} />
+          <OrdersDialog isOpen={isOrdersOpen} onClose={() => setIsOrdersOpen(false)} />
+          <WatchlistDialog isOpen={isWatchlistOpen} onClose={() => setIsWatchlistOpen(false)} onStockSelect={handleStockSelect} />
+        </aside>
+      </div>
     </div>
   );
 }

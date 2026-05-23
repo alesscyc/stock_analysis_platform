@@ -8,7 +8,6 @@ import {
   CrosshairMode,
   LineStyle,
 } from 'lightweight-charts';
-import TradeDialog from './TradeDialog';
 import './StockChart.css';
 
 // ── MA config: key → display label and colour ─────────────
@@ -114,7 +113,7 @@ function toChartDate(raw) {
   return String(raw).slice(0, 10);
 }
 
-function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction }) {
+function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick }) {
   const containerRef = useRef(null);
   const chartRef     = useRef(null);
 
@@ -125,7 +124,6 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   const swingZonesPrimitiveRef = useRef(null);
   const vol20maSeriesRef       = useRef(null);
 
-  const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [maVisibility, setMaVisibility] = usePersistedState('chart-ma-visibility',
     () => Object.fromEntries(MA_CONFIG.map(m => [m.key, true]))
   );
@@ -513,7 +511,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
             </div>
           )}
 
-          <button id="trade-btn" onClick={() => setIsTradeDialogOpen(true)}>
+          <button id="trade-btn" onClick={onTradeClick}>
             Trade
           </button>
         </div>
@@ -563,11 +561,6 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
         <div ref={containerRef} id="lw-chart-container" />
       </div>
 
-      <TradeDialog
-        isOpen={isTradeDialogOpen}
-        onClose={() => setIsTradeDialogOpen(false)}
-        stockSymbol={stockSymbol}
-      />
     </div>
   );
 }

@@ -59,10 +59,7 @@ function OrdersDialog({ isOpen, onClose }) {
   };
 
   return (
-    <>
-      <div id="orders-dialog-backdrop" onClick={onClose} />
-
-      <div id="orders-dialog-sidebar" role="dialog" aria-modal="true" aria-label="Pending Orders">
+    <div id="orders-dialog-sidebar" role="dialog" aria-modal="true" aria-label="Pending Orders">
 
         {/* Header */}
         <div id="orders-dialog-header">
@@ -158,7 +155,6 @@ function OrdersDialog({ isOpen, onClose }) {
           </>
         )}
       </div>
-    </>
   );
 }
 

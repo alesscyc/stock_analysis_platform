@@ -195,10 +195,7 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
   if (!isOpen) return null;
 
   return (
-    <>
-      <div id="watchlist-dialog-backdrop" onClick={handleClose} />
-
-      <div id="watchlist-dialog-sidebar" role="dialog" aria-modal="true" aria-label="Watchlist">
+    <div id="watchlist-dialog-sidebar" role="dialog" aria-modal="true" aria-label="Watchlist">
 
         {/* Header */}
         <div id="watchlist-dialog-header">
@@ -310,7 +307,6 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
           </div>
         )}
       </div>
-    </>
   );
 }
 

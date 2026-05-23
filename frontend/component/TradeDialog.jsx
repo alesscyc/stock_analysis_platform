@@ -82,10 +82,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
     : null;
 
   return (
-    <>
-      <div id="trade-dialog-backdrop" onClick={handleClose} />
-
-      <div id="trade-dialog-sidebar" role="dialog" aria-modal="true" aria-label={`Trade ${stockSymbol}`}>
+    <div id="trade-dialog-sidebar" role="dialog" aria-modal="true" aria-label={`Trade ${stockSymbol}`}>
 
         {/* Header */}
         <div id="trade-dialog-header">
@@ -216,7 +213,6 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
           Orders are routed through your connected IB Gateway using the entered limit price.
         </p>
       </div>
-    </>
   );
 }
 

@@ -203,6 +203,34 @@
   flex-direction: column;
 }
 
+/* ── Body: main content + sidebar row ──────────────────── */
+.app-body {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Sidebar panel container ──────────────────────────── */
+.app-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 380px;
+  flex-shrink: 0;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+  overflow-y: auto;
+}
+
 /* ── Main workspace ────────────────────────────────────── */
 .app-workspace {
   flex: 1;

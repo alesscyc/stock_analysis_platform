@@ -54,10 +54,7 @@ function PortfolioDialog({ isOpen, onClose }) {
   }, 0);
 
   return (
-    <>
-      <div id="portfolio-dialog-backdrop" onClick={onClose} />
-
-      <div id="portfolio-dialog-sidebar" role="dialog" aria-modal="true" aria-label="Portfolio">
+    <div id="portfolio-dialog-sidebar" role="dialog" aria-modal="true" aria-label="Portfolio">
 
         {/* Header */}
         <div id="portfolio-dialog-header">
@@ -155,7 +152,6 @@ function PortfolioDialog({ isOpen, onClose }) {
           </>
         )}
       </div>
-    </>
   );
 }
 
