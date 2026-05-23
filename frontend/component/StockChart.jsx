@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo, useEffect, useCallback } from 'react';
+import { useRef, useMemo, useEffect, useCallback } from 'react';
 import usePersistedState from '../src/hooks/usePersistedState';
 import {
   createChart,
@@ -113,7 +113,7 @@ function toChartDate(raw) {
   return String(raw).slice(0, 10);
 }
 
-function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick }) {
+function StockChart({ stockData, currentInterval, onIntervalChange, aiPrediction, onTradeClick }) {
   const containerRef = useRef(null);
   const chartRef     = useRef(null);
 
@@ -451,7 +451,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   // ── MA toggle handler ────────────────────────────────────
   const handleMAToggle = useCallback((key) => {
     setMaVisibility(prev => ({ ...prev, [key]: !prev[key] }));
-  }, []);
+  }, [setMaVisibility]);
 
   if (!stockData || stockData.length === 0) {
     return <div>No stock data available</div>;
