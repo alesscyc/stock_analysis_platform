@@ -13,10 +13,7 @@ function App() {
   const [selectedStock, setSelectedStock] = useState(null);
   const [stockData, setStockData] = useState([]);
   const [currentInterval, setCurrentInterval] = useState('1d');
-  const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
-  const [isPortfolioOpen, setIsPortfolioOpen] = useState(false);
-  const [isOrdersOpen, setIsOrdersOpen] = useState(false);
-  const [isWatchlistOpen, setIsWatchlistOpen] = useState(false);
+  const [activeSidebar, setActiveSidebar] = useState(null);
   const [loading, setLoading] = useState(false);
   const [aiPrediction, setAiPrediction] = useState(null);
   const [isMock, setIsMock] = useState(false);
@@ -94,7 +91,7 @@ function App() {
         <div className="topbar-actions">
           <button
             className="btn-watchlist"
-            onClick={() => setIsWatchlistOpen(true)}
+            onClick={() => setActiveSidebar(prev => prev === 'watchlist' ? null : 'watchlist')}
             aria-label="Open watchlist"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -104,7 +101,7 @@ function App() {
           </button>
           <button
             className="btn-portfolio"
-            onClick={() => setIsPortfolioOpen(true)}
+            onClick={() => setActiveSidebar(prev => prev === 'portfolio' ? null : 'portfolio')}
             aria-label="Open portfolio"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -115,7 +112,7 @@ function App() {
           </button>
           <button
             className="btn-orders"
-            onClick={() => setIsOrdersOpen(true)}
+            onClick={() => setActiveSidebar(prev => prev === 'orders' ? null : 'orders')}
             aria-label="Open pending orders"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -198,23 +195,25 @@ function App() {
                   currentInterval={currentInterval}
                   onIntervalChange={handleIntervalChange}
                   aiPrediction={aiPrediction}
-                  onTradeClick={() => setIsTradeDialogOpen(true)}
+                  onTradeClick={() => setActiveSidebar(prev => prev === 'trade' ? null : 'trade')}
                 />
               </div>
             )}
           </main>
         </div>
 
-        <aside className="app-sidebar">
-          <TradeDialog
-            isOpen={isTradeDialogOpen}
-            onClose={() => setIsTradeDialogOpen(false)}
-            stockSymbol={selectedStock?.symbol}
-          />
-          <PortfolioDialog isOpen={isPortfolioOpen} onClose={() => setIsPortfolioOpen(false)} />
-          <OrdersDialog isOpen={isOrdersOpen} onClose={() => setIsOrdersOpen(false)} />
-          <WatchlistDialog isOpen={isWatchlistOpen} onClose={() => setIsWatchlistOpen(false)} onStockSelect={handleStockSelect} />
-        </aside>
+        {activeSidebar && (
+          <aside className="app-sidebar">
+            <TradeDialog
+              isOpen={activeSidebar === 'trade'}
+              onClose={() => setActiveSidebar(null)}
+              stockSymbol={selectedStock?.symbol}
+            />
+            <PortfolioDialog isOpen={activeSidebar === 'portfolio'} onClose={() => setActiveSidebar(null)} />
+            <OrdersDialog isOpen={activeSidebar === 'orders'} onClose={() => setActiveSidebar(null)} />
+            <WatchlistDialog isOpen={activeSidebar === 'watchlist'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
+          </aside>
+        )}
       </div>
     </div>
   );
