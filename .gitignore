@@ -5,3 +5,5 @@ node_modules/
 stock_rf_model.pkl
 .opencode/*
 docs/roadmap/Council_Features_Roadmap.md
+__pycache__/
+*.pyc
