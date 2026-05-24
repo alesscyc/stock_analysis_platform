@@ -44,6 +44,8 @@ let requestingNextOrderId = false;
 const orderIdWaiters = new Set();
 let orderPlacementQueue = Promise.resolve();
 
+let ibAccount = null;
+
 let portfolioRowsByKey = new Map();
 let portfolioReady = false;
 let lastPortfolioError = null;
@@ -165,6 +167,8 @@ function serializeOpenOrder(orderId, contract, order, orderState, existingOrder)
     status: orderState?.status || 'UNKNOWN',
     filled: Number(orderState?.filled || 0),
     remaining: Number(orderState?.remaining || 0),
+    parentId: Number(order?.parentId || existingOrder?.parentId || 0),
+    bracketRole: existingOrder?.bracketRole,
   };
 }
 
@@ -229,10 +233,41 @@ function buildStockContract(symbol) {
   return ib.contract.stock(symbol, 'SMART', 'USD');
 }
 
-function buildLimitOrder(action, quantity, price, tif) {
-  const order = ib.order.limit(action, quantity, price, true);
+function buildLimitOrder(action, quantity, price, tif, transmit = true) {
+  const order = ib.order.limit(action, quantity, price, transmit);
   order.tif = tif;
+  order.transmit = transmit;
+  if (ibAccount) {
+    order.account = ibAccount;
+  }
   return order;
+}
+
+function getOppositeAction(action) {
+  return action === 'BUY' ? 'SELL' : 'BUY';
+}
+
+function buildBracketOrders(action, quantity, entryPrice, takeProfitPrice, stopLossPrice, tif, parentOrderId) {
+  const exitAction = getOppositeAction(action);
+  const parentOrder = buildLimitOrder(action, quantity, entryPrice, tif, false);
+  const takeProfitOrder = buildLimitOrder(exitAction, quantity, takeProfitPrice, tif, false);
+  const stopLossOrder = {
+    action: exitAction,
+    totalQuantity: quantity,
+    orderType: 'STP',
+    auxPrice: stopLossPrice,
+    parentId: parentOrderId,
+    tif,
+    transmit: true,
+  };
+
+  if (ibAccount) {
+    stopLossOrder.account = ibAccount;
+  }
+
+  takeProfitOrder.parentId = parentOrderId;
+
+  return [parentOrder, takeProfitOrder, stopLossOrder];
 }
 
 function scheduleReconnect() {
@@ -326,12 +361,26 @@ ib.on('connected', () => {
       ib.reqIds(1);
       ib.reqPositions();
       ib.reqAllOpenOrders();
+      ib.reqManagedAccts();
     } catch (error) {
       requestingNextOrderId = false;
       failPortfolioSnapshot(error.message);
       scheduleReconnect();
     }
   });
+});
+
+ib.on('managedAccounts', (accountsList) => {
+  if (accountsList) {
+    const accounts = String(accountsList).split(',').map(s => s.trim()).filter(Boolean);
+    if (accounts.length > 1) {
+      ibAccount = accounts[1];
+      console.log(`[ib] Multiple accounts detected. Using second account: ${ibAccount}`);
+    } else if (accounts.length === 1) {
+      ibAccount = accounts[0];
+      console.log(`[ib] Account resolved: ${ibAccount}`);
+    }
+  }
 });
 
 ib.on('nextValidId', (orderId) => {
@@ -548,6 +597,10 @@ app.post('/api/orders', async (req, res) => {
     const quantity = Number(body.quantity ?? body.amount);
     const price = Number(body.price);
     const tif = normalizeTimeInForce(body.tif);
+    const bracket = body.bracket && typeof body.bracket === 'object' ? body.bracket : null;
+    const isBracketOrder = Boolean(bracket);
+    const takeProfitPrice = Number(bracket?.takeProfitPrice ?? body.takeProfitPrice);
+    const stopLossPrice = Number(bracket?.stopLossPrice ?? body.stopLossPrice);
 
     if (!symbol) {
       return res.status(400).json({ error: 'Symbol is required' });
@@ -563,6 +616,32 @@ app.post('/api/orders', async (req, res) => {
 
     if (!Number.isFinite(price) || price <= 0) {
       return res.status(400).json({ error: 'Price must be a positive number' });
+    }
+
+    if (isBracketOrder) {
+      if (!Number.isFinite(takeProfitPrice) || takeProfitPrice <= 0) {
+        return res.status(400).json({ error: 'Take-profit price must be a positive number' });
+      }
+
+      if (!Number.isFinite(stopLossPrice) || stopLossPrice <= 0) {
+        return res.status(400).json({ error: 'Stop-loss price must be a positive number' });
+      }
+
+      if (action === 'BUY' && takeProfitPrice <= price) {
+        return res.status(400).json({ error: 'Take-profit price must be above entry price for buy brackets' });
+      }
+
+      if (action === 'BUY' && stopLossPrice >= price) {
+        return res.status(400).json({ error: 'Stop-loss price must be below entry price for buy brackets' });
+      }
+
+      if (action === 'SELL' && takeProfitPrice >= price) {
+        return res.status(400).json({ error: 'Take-profit price must be below entry price for sell brackets' });
+      }
+
+      if (action === 'SELL' && stopLossPrice <= price) {
+        return res.status(400).json({ error: 'Stop-loss price must be above entry price for sell brackets' });
+      }
     }
 
     if (!ibConnected) {
@@ -599,6 +678,87 @@ app.post('/api/orders', async (req, res) => {
       const orderId = nextOrderId;
       const contract = buildStockContract(symbol);
       const order = buildLimitOrder(action, quantity, price, tif);
+
+      if (isBracketOrder) {
+        const [parentOrder, takeProfitOrder, stopLossOrder] = buildBracketOrders(
+          action,
+          quantity,
+          price,
+          takeProfitPrice,
+          stopLossPrice,
+          tif,
+          orderId
+        );
+
+        const takeProfitOrderId = orderId + 1;
+        const stopLossOrderId = orderId + 2;
+
+        openOrdersById.set(orderId, {
+          orderId,
+          symbol,
+          action,
+          orderType: 'LMT',
+          quantity,
+          limitPrice: price,
+          status: 'Submitted',
+          filled: 0,
+          remaining: quantity,
+          parentId: 0,
+          bracketRole: 'parent',
+        });
+
+        openOrdersById.set(takeProfitOrderId, {
+          orderId: takeProfitOrderId,
+          symbol,
+          action: takeProfitOrder.action,
+          orderType: 'LMT',
+          quantity,
+          limitPrice: takeProfitPrice,
+          status: 'Submitted',
+          filled: 0,
+          remaining: quantity,
+          parentId: orderId,
+          bracketRole: 'takeProfit',
+        });
+
+        openOrdersById.set(stopLossOrderId, {
+          orderId: stopLossOrderId,
+          symbol,
+          action: stopLossOrder.action,
+          orderType: 'STP',
+          quantity,
+          limitPrice: stopLossPrice,
+          status: 'Submitted',
+          filled: 0,
+          remaining: quantity,
+          parentId: orderId,
+          bracketRole: 'stopLoss',
+        });
+
+        ib.placeOrder(orderId, contract, parentOrder);
+        ib.placeOrder(takeProfitOrderId, contract, takeProfitOrder);
+        ib.placeOrder(stopLossOrderId, contract, stopLossOrder);
+        nextOrderId = orderId + 3;
+
+        console.log(
+          `[ib] Submitted ${action} bracket ${orderId}/${takeProfitOrderId}/${stopLossOrderId} for ${symbol} quantity=${quantity} entry=${price} takeProfit=${takeProfitPrice} stopLoss=${stopLossPrice} tif=${tif}`
+        );
+
+        return {
+          success: true,
+          message: `Bracket order submitted to IB Gateway (parent orderId ${orderId})`,
+          orderId,
+          childOrderIds: [takeProfitOrderId, stopLossOrderId],
+          orderType: 'BRACKET',
+          symbol,
+          action,
+          quantity,
+          price,
+          takeProfitPrice,
+          stopLossPrice,
+          tif,
+        };
+      }
 
       openOrdersById.set(orderId, {
         orderId,
@@ -660,6 +820,41 @@ app.get('/api/orders/pending', (req, res) => {
   } catch (error) {
     console.error('Error fetching pending IB orders:', error);
     res.status(500).json({ error: error.message || 'Failed to fetch pending orders from IB Gateway' });
+  }
+});
+
+app.post('/api/orders/:orderId/cancel', async (req, res) => {
+  try {
+    const orderId = Number(req.params.orderId);
+
+    if (!Number.isInteger(orderId) || orderId < 0) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+
+    if (!ibConnected) {
+      return res.status(503).json({ error: 'IB Gateway is not connected' });
+    }
+
+    const order = openOrdersById.get(orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    if (['Filled', 'Cancelled', 'ApiCancelled', 'Rejected', 'Inactive'].includes(order.status)) {
+      return res.status(400).json({ error: `Order is already ${order.status.toLowerCase()}` });
+    }
+
+    ib.cancelOrder(orderId);
+    console.log(`[ib] Cancel request sent for order ${orderId}`);
+
+    res.json({
+      success: true,
+      message: `Cancel request sent for order ${orderId}`,
+      orderId,
+    });
+  } catch (error) {
+    console.error('Error cancelling IB order:', error);
+    res.status(500).json({ error: error.message || 'Failed to cancel order' });
   }
 });
 

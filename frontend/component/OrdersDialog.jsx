@@ -18,6 +18,7 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
   const [submittedPrices, setSubmittedPrices] = useState(loadSubmittedOrderPrices);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -95,6 +96,29 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
     handleRowClick(row);
   };
 
+  const handleCancelOrder = async (orderId) => {
+    setCancellingId(orderId);
+    try {
+      const response = await fetch(`/api/orders/${orderId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to cancel order');
+      }
+      setOrders((prev) => prev.filter((o) => o.orderId !== orderId));
+    } catch (err) {
+      setError(err.message || 'Failed to cancel order');
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const canCancel = (status) => {
+    return ['PreSubmitted', 'Submitted'].includes(status);
+  };
+
   return (
     <div id="orders-dialog-sidebar" role="dialog" aria-modal="true" aria-label="Pending Orders">
 
@@ -166,6 +190,7 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
                     <th className="align-center">Qty</th>
                     <th className="align-center">Type / Price</th>
                     <th className="align-center">Status</th>
+                    <th className="align-center"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -193,6 +218,29 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
                         <span className={`orders-status-badge ${getStatusBadgeClass(row.status)}`}>
                           {row.status}
                         </span>
+                      </td>
+                      <td className="align-center">
+                        {canCancel(row.status) && (
+                          <button
+                            className="orders-cancel-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCancelOrder(row.orderId);
+                            }}
+                            disabled={cancellingId === row.orderId}
+                            aria-label={`Cancel order ${row.orderId}`}
+                            title="Cancel order"
+                          >
+                            {cancellingId === row.orderId ? (
+                              <span className="orders-cancel-spinner" />
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                              </svg>
+                            )}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
