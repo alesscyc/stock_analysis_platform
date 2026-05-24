@@ -16,11 +16,13 @@ function App() {
   const [currentInterval, setCurrentInterval] = useState('1d');
   const [activeSidebar, setActiveSidebar] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [aiPrediction, setAiPrediction] = useState(null);
   const [isMock, setIsMock] = useState(false);
 
   const fetchStockData = async (stock, interval = '1d', autoPredictEnabled = true) => {
     setLoading(true);
+    setError(null);
     try {
       // On GitHub Pages: use mock NVDA data (ignores the searched symbol)
       if (isGitHubPages()) {
@@ -39,6 +41,9 @@ function App() {
         `/api/stock/${stock.symbol}?date_range=max&interval=${interval}&auto_predict=${autoPredictParam}`
       );
       const data = await response.json();
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Failed to load stock data');
+      }
       if (Array.isArray(data) && data.length > 0) {
         setStockData(data);
         setCurrentInterval(interval);
@@ -47,9 +52,13 @@ function App() {
         // This keeps the last known prediction visible during interval changes.
         const prediction = data.find(item => item.prediction)?.prediction;
         if (prediction) setAiPrediction(prediction);
+      } else {
+        throw new Error(`No data found for ${stock.symbol}`);
       }
-    } catch (error) {
-      console.error('Error fetching stock data:', error);
+    } catch (fetchError) {
+      console.error('Error fetching stock data:', fetchError);
+      setStockData([]);
+      setError(fetchError.message || 'Failed to load stock data');
     } finally {
       setLoading(false);
     }
@@ -57,6 +66,8 @@ function App() {
 
   const handleStockSelect = async (stock) => {
     setSelectedStock(stock);
+    setStockData([]);
+    setError(null);
     setAiPrediction(null);
     await fetchStockData(stock, currentInterval);
   };
@@ -181,13 +192,31 @@ function App() {
 
           {/* ── Main workspace ── */}
           <main className="app-workspace">
-            {stockData.length === 0 && !loading && (
+            {stockData.length === 0 && !loading && !error && !selectedStock && (
               <div className="app-empty-state">
                 <div className="empty-state-icon">📈</div>
                 <div className="empty-state-title">No instrument selected</div>
                 <div className="empty-state-sub">
                   Search for a ticker symbol above to load chart data, indicators, and AI analysis.
                 </div>
+              </div>
+            )}
+
+            {stockData.length === 0 && !loading && !error && selectedStock && (
+              <div className="app-empty-state">
+                <div className="empty-state-icon">📭</div>
+                <div className="empty-state-title">No data found for {selectedStock.symbol}</div>
+                <div className="empty-state-sub">
+                  Check the ticker symbol and try again.
+                </div>
+              </div>
+            )}
+
+            {stockData.length === 0 && !loading && error && (
+              <div className="app-empty-state">
+                <div className="empty-state-icon">⚠️</div>
+                <div className="empty-state-title">Unable to load {selectedStock?.symbol || 'stock data'}</div>
+                <div className="empty-state-sub">{error}</div>
               </div>
             )}
 

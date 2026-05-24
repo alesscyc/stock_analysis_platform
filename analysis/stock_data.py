@@ -195,9 +195,6 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
         # Auto-training and prediction feature
         if auto_predict and interval == '1d':
             try:
-                import os
-                model_file = 'stock_rf_model.pkl'
-                
                 # Always train a new model with the current symbol using already fetched data
                 print(f"Training new model with {symbol}...", file=sys.stderr)
                 train_result = train_random_forest_model(stock_data)
@@ -214,43 +211,31 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
                     })
                 else:
                     print(f"Model trained successfully with accuracy: {train_result['test_accuracy']:.2%}", file=sys.stderr)
-                    
-                    # Make prediction if model exists
-                    if os.path.exists(model_file):
-                        prediction_result = predict_stock_recommendation(stock_data, model_file)
-                        if 'error' not in prediction_result:
-                            # Add successful prediction to the response
-                            stock_data.append({
-                                "prediction": {
-                                    "symbol": symbol,
-                                    "status": "success",
-                                    "recommendation": prediction_result['recommendation'],
-                                    "confidence": prediction_result['confidence'],
-                                    "buy_probability": prediction_result['buy_probability'],
-                                    "sell_probability": prediction_result['sell_probability'],
-                                    "prediction_date": prediction_result['date'],
-                                    "current_price": prediction_result['current_price']
-                                }
-                            })
-                        else:
-                            print(f"Prediction failed: {prediction_result['error']}", file=sys.stderr)
-                            # Add prediction error to response
-                            stock_data.append({
-                                "prediction": {
-                                    "symbol": symbol,
-                                    "status": "prediction_error",
-                                    "error": prediction_result['error'],
-                                    "message": "Model trained successfully but prediction failed"
-                                }
-                            })
-                    else:
-                        # Model file doesn't exist (shouldn't happen after successful training)
+
+                    prediction_result = predict_stock_recommendation(stock_data, train_result['model_data'])
+                    if 'error' not in prediction_result:
+                        # Add successful prediction to the response
                         stock_data.append({
                             "prediction": {
                                 "symbol": symbol,
-                                "status": "model_error",
-                                "error": "Model file not found after training",
-                                "message": "Training completed but model file is missing"
+                                "status": "success",
+                                "recommendation": prediction_result['recommendation'],
+                                "confidence": prediction_result['confidence'],
+                                "buy_probability": prediction_result['buy_probability'],
+                                "sell_probability": prediction_result['sell_probability'],
+                                "prediction_date": prediction_result['date'],
+                                "current_price": prediction_result['current_price']
+                            }
+                        })
+                    else:
+                        print(f"Prediction failed: {prediction_result['error']}", file=sys.stderr)
+                        # Add prediction error to response
+                        stock_data.append({
+                            "prediction": {
+                                "symbol": symbol,
+                                "status": "prediction_error",
+                                "error": prediction_result['error'],
+                                "message": "Model trained successfully but prediction failed"
                             }
                         })
             except Exception as e:
@@ -285,7 +270,6 @@ def train_random_forest_model(stock_data):
     try:
         from sklearn.ensemble import RandomForestClassifier
         from sklearn.metrics import accuracy_score, classification_report
-        import pickle
         import numpy as np
         
         print("Training Random Forest model with single symbol data...", file=sys.stderr)
@@ -380,7 +364,6 @@ def train_random_forest_model(stock_data):
         for feature, importance in feature_importance[:10]:
             print(f"  {feature}: {importance:.4f}", file=sys.stderr)
         
-        # Save model
         model_data = {
             'model': rf_model,
             'feature_names': feature_names,
@@ -390,14 +373,12 @@ def train_random_forest_model(stock_data):
             'training_symbols': ["single_symbol"],
             'total_training_points': len(complete_data)
         }
-        
-        with open('stock_rf_model.pkl', 'wb') as f:
-            pickle.dump(model_data, f)
-        
-        print("\nModel saved as 'stock_rf_model.pkl'", file=sys.stderr)
+
+        print("\nModel trained in memory", file=sys.stderr)
         
         return {
             'status': 'success',
+            'model_data': model_data,
             'train_accuracy': train_accuracy,
             'test_accuracy': test_accuracy,
             'feature_importance': feature_importance,
@@ -410,18 +391,13 @@ def train_random_forest_model(stock_data):
     except Exception as e:
         return {"error": f"Training failed: {str(e)}"}
 
-def predict_stock_recommendation(stock_data, model_file='stock_rf_model.pkl'):
+def predict_stock_recommendation(stock_data, model_data):
     """
     Use trained Random Forest model to predict buy/sell recommendation for a stock.
     Uses the most recent complete data point from pre-fetched data.
     """
     try:
-        import pickle
         import numpy as np
-        
-        # Load the trained model
-        with open(model_file, 'rb') as f:
-            model_data = pickle.load(f)
         
         rf_model = model_data['model']
         feature_names = model_data['feature_names']
@@ -472,8 +448,6 @@ def predict_stock_recommendation(stock_data, model_file='stock_rf_model.pkl'):
             'features_used': dict(zip(feature_names, features))
         }
         
-    except FileNotFoundError:
-        return {"error": f"Model file '{model_file}' not found. Please train a model first."}
     except Exception as e:
         return {"error": f"Prediction failed: {str(e)}"}
 

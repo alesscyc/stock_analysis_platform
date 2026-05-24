@@ -20,8 +20,8 @@ const ALLOWED_TIME_IN_FORCE = new Set(['DAY', 'GTC', 'IOC', 'FOK']);
 const IB_HOST = process.env.IB_HOST;
 const IB_PORT = Number(process.env.IB_PORT);
 const IB_CLIENT_ID = Number(process.env.IB_CLIENT_ID);
-const IB_PORTFOLIO_SYNC_TIMEOUT_MS = Number(process.env.IB_PORTFOLIO_SYNC_TIMEOUT_MS);
-const IB_ORDER_ID_WAIT_TIMEOUT_MS = Number(process.env.IB_ORDER_ID_WAIT_TIMEOUT_MS);
+const IB_PORTFOLIO_SYNC_TIMEOUT_MS = Number(process.env.IB_PORTFOLIO_SYNC_TIMEOUT_MS) || 30000;
+const IB_ORDER_ID_WAIT_TIMEOUT_MS = Number(process.env.IB_ORDER_ID_WAIT_TIMEOUT_MS) || 15000;
 
 // Finnhub API key for symbol search
 const FINNHUB_KEY = process.env.FINNHUB_KEY;

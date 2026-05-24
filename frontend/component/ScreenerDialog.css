@@ -185,7 +185,20 @@
 #screener-conditions-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2);
+}
+
+.screener-condition-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.screener-condition-block:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 .screener-condition-item {
@@ -251,6 +264,37 @@
 
 .screener-condition-item input[type="checkbox"]:checked ~ .screener-condition-text {
   color: var(--text-primary);
+}
+
+.screener-condition-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-left: 32px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.screener-condition-control input[type="number"] {
+  width: 64px;
+  padding: 5px 7px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.screener-condition-control input[type="number"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.screener-condition-control input[type="number"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* ── Actions ───────────────────────────────────────────── */

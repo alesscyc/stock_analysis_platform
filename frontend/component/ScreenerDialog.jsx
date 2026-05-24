@@ -4,14 +4,27 @@ import './ScreenerDialog.css';
 const API_BASE = '';
 
 const DEFAULT_CONDITIONS = [
-  { id: 'price_above_52w_low_25pct', label: 'Price ≥ 25% above 52-week low', enabled: true },
-  { id: 'price_within_25pct_52w_high', label: 'Price within 25% of 52-week high', enabled: true },
-  { id: 'ma200_uptrend', label: '200MA uptrend 30d (90%) & > 1M ago', enabled: true },
+  { id: 'price_above_52w_low_25pct', label: 'Price above 52-week low', enabled: true },
+  { id: 'price_within_25pct_52w_high', label: 'Price near 52-week high', enabled: true },
+  { id: 'ma200_uptrend', label: '200MA uptrend', enabled: true },
 ];
+
+const DEFAULT_PARAMS = {
+  lowAbovePct: 25,
+  highWithinPct: 25,
+  ma200Months: 1,
+};
+
+function clampNumber(value, min, max, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.min(max, Math.max(min, num));
+}
 
 function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
   const [symbolsText, setSymbolsText] = useState('');
   const [conditions, setConditions] = useState(DEFAULT_CONDITIONS);
+  const [params, setParams] = useState(DEFAULT_PARAMS);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -33,6 +46,10 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
 
   const enabledConditions = conditions.filter(c => c.enabled);
 
+  const updateParam = useCallback((key, value) => {
+    setParams(prev => ({ ...prev, [key]: value }));
+  }, []);
+
   const checkConditions = useCallback((data) => {
     if (!Array.isArray(data) || data.length === 0) return { pass: false, reason: 'No data' };
 
@@ -40,29 +57,61 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
     const close = parseFloat(latest.Close);
     const weekLow = latest['52week_low'] != null ? parseFloat(latest['52week_low']) : null;
     const weekHigh = latest['52week_high'] != null ? parseFloat(latest['52week_high']) : null;
-    const ma200Uptrend30d = latest['MA200_uptrend_past_month'];
-    const ma200AboveMonthAgo = latest['MA200_above_month_ago'];
+    const lowAbovePct = clampNumber(params.lowAbovePct, 0, 500, DEFAULT_PARAMS.lowAbovePct);
+    const highWithinPct = clampNumber(params.highWithinPct, 0, 100, DEFAULT_PARAMS.highWithinPct);
+    const ma200Months = clampNumber(params.ma200Months, 1, 24, DEFAULT_PARAMS.ma200Months);
+    const ma200Days = Math.round(ma200Months * 22);
 
     for (const cond of enabledConditions) {
       switch (cond.id) {
         case 'price_above_52w_low_25pct': {
-          if (weekLow == null || close < weekLow * 1.25) {
-            return { pass: false, reason: `Price $${close.toFixed(2)} < 25% above 52W low $${weekLow.toFixed(2)}` };
+          if (!Number.isFinite(close) || !Number.isFinite(weekLow)) {
+            return { pass: false, reason: '52-week low data unavailable' };
+          }
+          const minPrice = weekLow * (1 + lowAbovePct / 100);
+          if (close < minPrice) {
+            return { pass: false, reason: `Price $${close.toFixed(2)} < ${lowAbovePct}% above 52W low $${weekLow.toFixed(2)}` };
           }
           break;
         }
         case 'price_within_25pct_52w_high': {
-          if (weekHigh == null || close < weekHigh * 0.75) {
-            return { pass: false, reason: `Price $${close.toFixed(2)} > 25% below 52W high $${weekHigh.toFixed(2)}` };
+          if (!Number.isFinite(close) || !Number.isFinite(weekHigh)) {
+            return { pass: false, reason: '52-week high data unavailable' };
+          }
+          const minPrice = weekHigh * (1 - highWithinPct / 100);
+          if (close < minPrice) {
+            return { pass: false, reason: `Price $${close.toFixed(2)} > ${highWithinPct}% below 52W high $${weekHigh.toFixed(2)}` };
           }
           break;
         }
         case 'ma200_uptrend': {
-          if (ma200Uptrend30d !== 1) {
-            return { pass: false, reason: '200MA not in 30-day uptrend (90% up days)' };
+          const latestMa200Index = [...data].reverse().findIndex(row => Number.isFinite(parseFloat(row['200MA'])));
+          const endIndex = latestMa200Index === -1 ? -1 : data.length - 1 - latestMa200Index;
+          const startIndex = endIndex - ma200Days;
+
+          if (startIndex < 0) {
+            return { pass: false, reason: `Not enough 200MA data for ${ma200Months} month(s)` };
           }
-          if (ma200AboveMonthAgo !== 1) {
-            return { pass: false, reason: '200MA not above 1 month ago' };
+
+          let upDays = 0;
+          for (let i = startIndex + 1; i <= endIndex; i++) {
+            const currentMa = parseFloat(data[i]['200MA']);
+            const previousMa = parseFloat(data[i - 1]['200MA']);
+            if (!Number.isFinite(currentMa) || !Number.isFinite(previousMa)) {
+              return { pass: false, reason: `Incomplete 200MA data for ${ma200Months} month(s)` };
+            }
+            if (currentMa > previousMa) upDays++;
+          }
+
+          const requiredUpDays = Math.ceil(ma200Days * 0.9);
+          if (upDays < requiredUpDays) {
+            return { pass: false, reason: `200MA is not in an uptrend over ${ma200Months} month(s)` };
+          }
+
+          const currentMa = parseFloat(data[endIndex]['200MA']);
+          const pastMa = parseFloat(data[startIndex]['200MA']);
+          if (currentMa <= pastMa) {
+            return { pass: false, reason: `200MA not above ${ma200Months} month(s) ago` };
           }
           break;
         }
@@ -72,7 +121,7 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
     }
 
     return { pass: true };
-  }, [enabledConditions]);
+  }, [enabledConditions, params]);
 
   const handleRun = useCallback(async () => {
     const symbols = parseSymbols(symbolsText);
@@ -244,16 +293,66 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
 
         <div id="screener-conditions-list">
           {conditions.map((cond) => (
-            <label key={cond.id} className="screener-condition-item">
-              <input
-                type="checkbox"
-                checked={cond.enabled}
-                onChange={() => toggleCondition(cond.id)}
-                disabled={loading}
-              />
-              <span className="screener-condition-check" />
-              <span className="screener-condition-text">{cond.label}</span>
-            </label>
+            <div key={cond.id} className="screener-condition-block">
+              <label className="screener-condition-item">
+                <input
+                  type="checkbox"
+                  checked={cond.enabled}
+                  onChange={() => toggleCondition(cond.id)}
+                  disabled={loading}
+                />
+                <span className="screener-condition-check" />
+                <span className="screener-condition-text">{cond.label}</span>
+              </label>
+
+              {cond.id === 'price_above_52w_low_25pct' && (
+                <label className="screener-condition-control">
+                  <span>At least</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="500"
+                    step="1"
+                    value={params.lowAbovePct}
+                    onChange={(e) => updateParam('lowAbovePct', e.target.value)}
+                    disabled={loading || !cond.enabled}
+                  />
+                  <span>% above low</span>
+                </label>
+              )}
+
+              {cond.id === 'price_within_25pct_52w_high' && (
+                <label className="screener-condition-control">
+                  <span>Within</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={params.highWithinPct}
+                    onChange={(e) => updateParam('highWithinPct', e.target.value)}
+                    disabled={loading || !cond.enabled}
+                  />
+                  <span>% of high</span>
+                </label>
+              )}
+
+              {cond.id === 'ma200_uptrend' && (
+                <label className="screener-condition-control">
+                  <span>Past</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="24"
+                    step="1"
+                    value={params.ma200Months}
+                    onChange={(e) => updateParam('ma200Months', e.target.value)}
+                    disabled={loading || !cond.enabled}
+                  />
+                  <span>month(s)</span>
+                </label>
+              )}
+            </div>
           ))}
         </div>
       </div>
