@@ -1,8 +1,21 @@
 import { useState, useEffect } from 'react';
 import './OrdersDialog.css';
 
-function OrdersDialog({ isOpen, onClose }) {
+const SUBMITTED_ORDER_PRICES_KEY = 'stockai-submitted-order-prices';
+
+function loadSubmittedOrderPrices() {
+  try {
+    const raw = localStorage.getItem(SUBMITTED_ORDER_PRICES_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function OrdersDialog({ isOpen, onClose, onStockSelect }) {
   const [orders, setOrders] = useState([]);
+  const [submittedPrices, setSubmittedPrices] = useState(loadSubmittedOrderPrices);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -14,6 +27,7 @@ function OrdersDialog({ isOpen, onClose }) {
 
     setLoading(true);
     setError(null);
+    setSubmittedPrices(loadSubmittedOrderPrices());
 
     (async () => {
       try {
@@ -56,6 +70,29 @@ function OrdersDialog({ isOpen, onClose }) {
       'Rejected': 'status-rejected',
     };
     return statusMap[status] || 'status-unknown';
+  };
+
+  const getOrderPrice = (row) => {
+    return row.limitPrice ?? row.price ?? row.lmtPrice ?? row.auxPrice ?? submittedPrices[String(row.orderId)];
+  };
+
+  const formatLimitPrice = (price) => {
+    const value = Number(price);
+    if (!Number.isFinite(value) || value <= 0 || Math.abs(value) > 1e10) {
+      return '—';
+    }
+    return `$${value.toFixed(2)}`;
+  };
+
+  const handleRowClick = (row) => {
+    if (!row.symbol || !onStockSelect) return;
+    onStockSelect({ symbol: row.symbol });
+  };
+
+  const handleRowKeyDown = (event, row) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    handleRowClick(row);
   };
 
   return (
@@ -124,25 +161,35 @@ function OrdersDialog({ isOpen, onClose }) {
               <table id="orders-table">
                 <thead>
                   <tr>
-                    <th>Symbol</th>
-                    <th>Action</th>
-                    <th className="align-right">Qty</th>
-                    <th className="align-right">Price</th>
-                    <th>Status</th>
+                    <th className="align-center">Symbol</th>
+                    <th className="align-center">Action</th>
+                    <th className="align-center">Qty</th>
+                    <th className="align-center">Type / Price</th>
+                    <th className="align-center">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orders.map((row) => (
-                    <tr key={row.orderId}>
-                      <td className="orders-symbol-cell">{row.symbol}</td>
-                      <td className="orders-action-cell">
+                    <tr
+                      key={row.orderId}
+                      className="orders-clickable-row"
+                      onClick={() => handleRowClick(row)}
+                      onKeyDown={(event) => handleRowKeyDown(event, row)}
+                      role="button"
+                      tabIndex={0}
+                      title={`Load ${row.symbol} chart`}
+                    >
+                      <td className="align-center orders-symbol-cell">{row.symbol}</td>
+                      <td className="align-center orders-action-cell">
                         <span className={`orders-action-badge ${row.action.toLowerCase()}`}>
                           {row.action}
                         </span>
                       </td>
-                      <td className="align-right orders-num">{Number(row.quantity).toLocaleString()}</td>
-                      <td className="align-right orders-num">${Number(row.limitPrice).toFixed(2)}</td>
-                      <td>
+                      <td className="align-center orders-num">{Number(row.quantity).toLocaleString()}</td>
+                      <td className="align-center orders-num">
+                        {row.orderType || '—'} / {formatLimitPrice(getOrderPrice(row))}
+                      </td>
+                      <td className="align-center">
                         <span className={`orders-status-badge ${getStatusBadgeClass(row.status)}`}>
                           {row.status}
                         </span>

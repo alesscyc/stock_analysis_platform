@@ -1,6 +1,21 @@
 import { useState } from 'react';
 import './TradeDialog.css';
 
+const SUBMITTED_ORDER_PRICES_KEY = 'stockai-submitted-order-prices';
+
+function rememberSubmittedOrderPrice(orderId, orderPrice) {
+  if (orderId == null) return;
+
+  try {
+    const raw = localStorage.getItem(SUBMITTED_ORDER_PRICES_KEY);
+    const prices = raw ? JSON.parse(raw) : {};
+    prices[String(orderId)] = Number(orderPrice);
+    localStorage.setItem(SUBMITTED_ORDER_PRICES_KEY, JSON.stringify(prices));
+  } catch {
+    // Ignore localStorage failures; backend still receives the order.
+  }
+}
+
 function TradeDialog({ isOpen, onClose, stockSymbol }) {
   const [action, setAction] = useState('BUY');
   const [price, setPrice] = useState('');
@@ -51,6 +66,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
 
       const data = await response.json();
       if (data.success) {
+        rememberSubmittedOrderPrice(data.orderId, data.price ?? price);
         setSuccessMsg(`Order submitted: ${action} ${amount} ${stockSymbol} @ $${data.price ?? price}`);
         setPrice('');
         setAmount('');

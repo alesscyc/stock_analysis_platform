@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import './PortfolioDialog.css';
 
-function PortfolioDialog({ isOpen, onClose }) {
+function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
   const [portfolio, setPortfolio] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -52,6 +52,17 @@ function PortfolioDialog({ isOpen, onClose }) {
     const costBasis = Number(row.costBasis ?? row.cost_basis ?? Math.abs(quantity) * avgCost);
     return sum + costBasis;
   }, 0);
+
+  const handleSymbolClick = (row) => {
+    if (!row.symbol || !onStockSelect) return;
+    onStockSelect({ symbol: row.symbol });
+  };
+
+  const handleRowKeyDown = (event, row) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    handleSymbolClick(row);
+  };
 
   return (
     <div id="portfolio-dialog-sidebar" role="dialog" aria-modal="true" aria-label="Portfolio">
@@ -134,7 +145,15 @@ function PortfolioDialog({ isOpen, onClose }) {
                 </thead>
                 <tbody>
                   {portfolio.map((row) => (
-                    <tr key={row.id}>
+                    <tr
+                      key={row.id ?? row.symbol}
+                      className="portfolio-clickable-row"
+                      onClick={() => handleSymbolClick(row)}
+                      onKeyDown={(event) => handleRowKeyDown(event, row)}
+                      role="button"
+                      tabIndex={0}
+                      title={`Load ${row.symbol} chart`}
+                    >
                       <td>{row.type}</td>
                       <td className="portfolio-symbol-cell">{row.symbol}</td>
                       <td className="align-right portfolio-num">{Math.abs(Number(row.quantity ?? 0)).toLocaleString()}</td>

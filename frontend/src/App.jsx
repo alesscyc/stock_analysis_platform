@@ -248,8 +248,8 @@ function App() {
             onClose={() => setActiveSidebar(null)}
             stockSymbol={selectedStock?.symbol}
           />
-          <PortfolioDialog isOpen={activeSidebar === 'portfolio'} onClose={() => setActiveSidebar(null)} />
-          <OrdersDialog isOpen={activeSidebar === 'orders'} onClose={() => setActiveSidebar(null)} />
+          <PortfolioDialog isOpen={activeSidebar === 'portfolio'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
+          <OrdersDialog isOpen={activeSidebar === 'orders'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
           <WatchlistDialog isOpen={activeSidebar === 'watchlist'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
           <ScreenerDialog isOpen={activeSidebar === 'screener'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
         </aside>

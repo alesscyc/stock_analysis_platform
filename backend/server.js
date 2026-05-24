@@ -145,13 +145,23 @@ function getOpenOrders() {
   return Array.from(openOrdersById.values()).sort((a, b) => a.orderId - b.orderId);
 }
 
-function serializeOpenOrder(orderId, contract, order, orderState) {
+function normalizeOrderPrice(price) {
+  const value = Number(price);
+  return Number.isFinite(value) && value > 0 && Math.abs(value) < 1e100 ? value : null;
+}
+
+function serializeOpenOrder(orderId, contract, order, orderState, existingOrder) {
+  const limitPrice = normalizeOrderPrice(order?.lmtPrice)
+    ?? normalizeOrderPrice(order?.auxPrice)
+    ?? normalizeOrderPrice(existingOrder?.limitPrice);
+
   return {
     orderId,
     symbol: contract?.symbol || 'UNKNOWN',
     action: order?.action || 'UNKNOWN',
+    orderType: order?.orderType || existingOrder?.orderType || 'UNKNOWN',
     quantity: Number(order?.totalQuantity || order?.qty || 0),
-    limitPrice: Number(order?.lmtPrice || 0),
+    limitPrice,
     status: orderState?.status || 'UNKNOWN',
     filled: Number(orderState?.filled || 0),
     remaining: Number(orderState?.remaining || 0),
@@ -399,9 +409,10 @@ ib.on('positionEnd', () => {
 
 ib.on('openOrder', (orderId, contract, order, orderState) => {
   if (!ibConnected) return;
-  const serialized = serializeOpenOrder(orderId, contract, order, orderState);
+  const serialized = serializeOpenOrder(orderId, contract, order, orderState, openOrdersById.get(orderId));
   openOrdersById.set(orderId, serialized);
-  console.log(`[ib] Open order ${orderId}: ${serialized.symbol} ${serialized.action} ${serialized.quantity} @ $${serialized.limitPrice} (status: ${serialized.status})`);
+  const priceLabel = serialized.limitPrice == null ? 'market' : `$${serialized.limitPrice}`;
+  console.log(`[ib] Open order ${orderId}: ${serialized.symbol} ${serialized.action} ${serialized.quantity} @ ${priceLabel} (status: ${serialized.status})`);
 });
 
 ib.on('openOrderEnd', () => {
@@ -588,6 +599,18 @@ app.post('/api/orders', async (req, res) => {
       const orderId = nextOrderId;
       const contract = buildStockContract(symbol);
       const order = buildLimitOrder(action, quantity, price, tif);
+
+      openOrdersById.set(orderId, {
+        orderId,
+        symbol,
+        action,
+        orderType: 'LMT',
+        quantity,
+        limitPrice: price,
+        status: 'Submitted',
+        filled: 0,
+        remaining: quantity,
+      });
 
       ib.placeOrder(orderId, contract, order);
       nextOrderId = orderId + 1;
