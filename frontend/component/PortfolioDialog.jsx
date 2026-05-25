@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from '../src/i18n/useTranslation';
 import './PortfolioDialog.css';
 
 function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
+  const { t } = useTranslation();
   const [portfolio, setPortfolio] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -25,13 +27,13 @@ function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
         if (!active) return;
 
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to load portfolio');
+          throw new Error(data.error || t('failedLoadPortfolio'));
         }
 
         setPortfolio(Array.isArray(data) ? data : []);
       } catch (fetchError) {
         if (active && fetchError.name !== 'AbortError') {
-          setError(fetchError.message || 'Failed to load portfolio');
+          setError(fetchError.message || t('failedLoadPortfolio'));
         }
       } finally {
         if (active) setLoading(false);
@@ -42,7 +44,7 @@ function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
       active = false;
       controller.abort();
     };
-  }, [isOpen]);
+  }, [isOpen, t]);
 
   if (!isOpen) return null;
 
@@ -65,15 +67,15 @@ function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
   };
 
   return (
-    <div id="portfolio-dialog-sidebar" role="dialog" aria-modal="true" aria-label="Portfolio">
+    <div id="portfolio-dialog-sidebar" role="dialog" aria-modal="true" aria-label={t('portfolio')}>
 
         {/* Header */}
         <div id="portfolio-dialog-header">
           <div id="portfolio-header-left">
-            <div id="portfolio-type-badge">HOLDINGS</div>
-            <h2 id="portfolio-dialog-title">Portfolio</h2>
+            <div id="portfolio-type-badge">{t('holdings')}</div>
+            <h2 id="portfolio-dialog-title">{t('portfolio')}</h2>
           </div>
-          <button id="portfolio-dialog-close-btn" onClick={onClose} aria-label="Close portfolio">
+          <button id="portfolio-dialog-close-btn" onClick={onClose} aria-label={t('closePortfolio')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
@@ -85,7 +87,7 @@ function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
         {loading && (
           <div id="portfolio-loading-state">
             <span className="portfolio-spinner" />
-            <span>Loading IB positions…</span>
+            <span>{t('loadingIBPositions')}</span>
           </div>
         )}
 
@@ -110,8 +112,8 @@ function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
                 <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
               </svg>
             </div>
-            <span className="portfolio-empty-title">No IB positions</span>
-            <span className="portfolio-empty-sub">Make sure IB Gateway is connected and your account has holdings.</span>
+            <span className="portfolio-empty-title">{t('noIBPositions')}</span>
+            <span className="portfolio-empty-sub">{t('makeSureIB')}</span>
           </div>
         )}
 
@@ -121,11 +123,11 @@ function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
             {/* Summary row */}
             <div id="portfolio-summary">
               <div className="portfolio-stat">
-                <span className="portfolio-stat-label">Positions</span>
+                <span className="portfolio-stat-label">{t('positions')}</span>
                 <span className="portfolio-stat-value">{portfolio.length}</span>
               </div>
               <div className="portfolio-stat">
-                <span className="portfolio-stat-label">Total Cost Basis</span>
+                <span className="portfolio-stat-label">{t('totalCostBasis')}</span>
                 <span className="portfolio-stat-value">
                   ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
@@ -136,11 +138,11 @@ function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
               <table id="portfolio-table">
                 <thead>
                   <tr>
-                    <th>Type</th>
-                    <th>Symbol</th>
-                    <th className="align-right">Qty</th>
-                    <th className="align-right">Avg Cost</th>
-                    <th className="align-right">Cost Basis</th>
+                    <th>{t('type')}</th>
+                    <th>{t('symbol')}</th>
+                    <th className="align-right">{t('qty')}</th>
+                    <th className="align-right">{t('avgCost')}</th>
+                    <th className="align-right">{t('costBasis')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -152,7 +154,7 @@ function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
                       onKeyDown={(event) => handleRowKeyDown(event, row)}
                       role="button"
                       tabIndex={0}
-                      title={`Load ${row.symbol} chart`}
+                      title={t('loadChart', { symbol: row.symbol })}
                     >
                       <td>{row.type}</td>
                       <td className="portfolio-symbol-cell">{row.symbol}</td>

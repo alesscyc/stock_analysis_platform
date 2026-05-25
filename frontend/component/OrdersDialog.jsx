@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from '../src/i18n/useTranslation';
 import './OrdersDialog.css';
 
 const SUBMITTED_ORDER_PRICES_KEY = 'stockai-submitted-order-prices';
@@ -19,6 +20,7 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [cancellingId, setCancellingId] = useState(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -40,13 +42,13 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
         if (!active) return;
 
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to load pending orders');
+          throw new Error(data.error || t('failedLoadPendingOrders'));
         }
 
         setOrders(Array.isArray(data) ? data : []);
       } catch (fetchError) {
         if (active && fetchError.name !== 'AbortError') {
-          setError(fetchError.message || 'Failed to load pending orders');
+          setError(fetchError.message || t('failedLoadPendingOrders'));
         }
       } finally {
         if (active) setLoading(false);
@@ -57,7 +59,7 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
       active = false;
       controller.abort();
     };
-  }, [isOpen]);
+  }, [isOpen, t]);
 
   if (!isOpen) return null;
 
@@ -105,11 +107,11 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to cancel order');
+        throw new Error(data.error || t('failedCancelOrder'));
       }
       setOrders((prev) => prev.filter((o) => o.orderId !== orderId));
     } catch (err) {
-      setError(err.message || 'Failed to cancel order');
+      setError(err.message || t('failedCancelOrder'));
     } finally {
       setCancellingId(null);
     }
@@ -120,15 +122,15 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
   };
 
   return (
-    <div id="orders-dialog-sidebar" role="dialog" aria-modal="true" aria-label="Pending Orders">
+    <div id="orders-dialog-sidebar" role="dialog" aria-modal="true" aria-label={t('pendingOrders')}>
 
         {/* Header */}
         <div id="orders-dialog-header">
           <div id="orders-header-left">
-            <div id="orders-type-badge">ORDERS</div>
-            <h2 id="orders-dialog-title">Pending Orders</h2>
+            <div id="orders-type-badge">{t('ordersBadge')}</div>
+            <h2 id="orders-dialog-title">{t('pendingOrders')}</h2>
           </div>
-          <button id="orders-dialog-close-btn" onClick={onClose} aria-label="Close orders">
+          <button id="orders-dialog-close-btn" onClick={onClose} aria-label={t('closeOrders')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
@@ -140,7 +142,7 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
         {loading && (
           <div id="orders-loading-state">
             <span className="orders-spinner" />
-            <span>Loading pending orders…</span>
+            <span>{t('loadingPendingOrders')}</span>
           </div>
         )}
 
@@ -165,8 +167,8 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
                 <circle cx="12" cy="7" r="4"/>
               </svg>
             </div>
-            <span className="orders-empty-title">No pending orders</span>
-            <span className="orders-empty-sub">You have no active orders at the moment.</span>
+            <span className="orders-empty-title">{t('noPendingOrders')}</span>
+            <span className="orders-empty-sub">{t('noActiveOrders')}</span>
           </div>
         )}
 
@@ -176,7 +178,7 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
             {/* Summary row */}
             <div id="orders-summary">
               <div className="orders-stat">
-                <span className="orders-stat-label">Total Orders</span>
+                <span className="orders-stat-label">{t('totalOrders')}</span>
                 <span className="orders-stat-value">{orders.length}</span>
               </div>
             </div>
@@ -185,11 +187,11 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
               <table id="orders-table">
                 <thead>
                   <tr>
-                    <th className="align-center">Symbol</th>
-                    <th className="align-center">Action</th>
-                    <th className="align-center">Qty</th>
-                    <th className="align-center">Type / Price</th>
-                    <th className="align-center">Status</th>
+                    <th className="align-center">{t('symbol')}</th>
+                    <th className="align-center">{t('action')}</th>
+                    <th className="align-center">{t('qty')}</th>
+                    <th className="align-center">{t('typePrice')}</th>
+                    <th className="align-center">{t('status')}</th>
                     <th className="align-center"></th>
                   </tr>
                 </thead>
@@ -202,7 +204,7 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
                       onKeyDown={(event) => handleRowKeyDown(event, row)}
                       role="button"
                       tabIndex={0}
-                      title={`Load ${row.symbol} chart`}
+                      title={t('loadChart', { symbol: row.symbol })}
                     >
                       <td className="align-center orders-symbol-cell">{row.symbol}</td>
                       <td className="align-center orders-action-cell">
@@ -228,8 +230,8 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
                               handleCancelOrder(row.orderId);
                             }}
                             disabled={cancellingId === row.orderId}
-                            aria-label={`Cancel order ${row.orderId}`}
-                            title="Cancel order"
+                            aria-label={t('cancelOrder')}
+                            title={t('cancelOrder')}
                           >
                             {cancellingId === row.orderId ? (
                               <span className="orders-cancel-spinner" />

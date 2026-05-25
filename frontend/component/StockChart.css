@@ -156,6 +156,14 @@
   transform: translateY(0);
 }
 
+#trade-btn:disabled {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* ── Watchlist add button ──────────────────────────────── */
 #watchlist-add-btn {
   display: flex;

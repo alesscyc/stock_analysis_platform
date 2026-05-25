@@ -1,8 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import './searchBar.css';
+import { useTranslation } from '../src/i18n/useTranslation';
 
 function SearchBar({ onStockSelect, loading }) {
+    const { t } = useTranslation();
     const [searchTerm, setSearchTerm] = useState('');
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -133,7 +135,7 @@ function SearchBar({ onStockSelect, loading }) {
 
                 <input
                     type="text"
-                    placeholder="Search ticker (AAPL, TSLA…)"
+                    placeholder={t('searchTickerPlaceholder')}
                     value={searchTerm}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
@@ -145,16 +147,16 @@ function SearchBar({ onStockSelect, loading }) {
                 />
 
                 {loading ? (
-                    <span className="search-spinner" aria-label="Loading" />
+                    <span className="search-spinner" aria-label={t('loading')} />
                 ) : (
                     searchTerm.length > 0 && (
                         <button
                             className="search-submit-btn"
                             onClick={submit}
                             tabIndex={0}
-                            aria-label="Search"
+                            aria-label={t('search')}
                         >
-                            GO
+                            {t('go')}
                         </button>
                     )
                 )}

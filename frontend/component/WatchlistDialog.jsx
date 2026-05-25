@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from '../src/i18n/useTranslation';
 import './WatchlistDialog.css';
 
 const STORAGE_KEY = 'stockai-watchlist';
@@ -36,6 +37,7 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
   const debounceTimer = useRef(null);
   const suggestionsRef = useRef(null);
   const inputRef = useRef(null);
+  const { t } = useTranslation();
 
   // Persist watchlist changes
   useEffect(() => {
@@ -220,15 +222,15 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
   if (!isOpen) return null;
 
   return (
-    <div id="watchlist-dialog-sidebar" role="dialog" aria-modal="true" aria-label="Watchlist">
+    <div id="watchlist-dialog-sidebar" role="dialog" aria-modal="true" aria-label={t('watchlist')}>
 
         {/* Header */}
         <div id="watchlist-dialog-header">
           <div id="watchlist-header-left">
-            <div id="watchlist-type-badge">WATCHLIST</div>
-            <h2 id="watchlist-dialog-title">Watchlist</h2>
+            <div id="watchlist-type-badge">{t('watchlistBadge')}</div>
+            <h2 id="watchlist-dialog-title">{t('watchlist')}</h2>
           </div>
-          <button id="watchlist-dialog-close-btn" onClick={handleClose} aria-label="Close watchlist">
+          <button id="watchlist-dialog-close-btn" onClick={handleClose} aria-label={t('closeWatchlist')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
@@ -247,14 +249,14 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
             <input
               ref={inputRef}
               type="text"
-              placeholder="Add symbol to watchlist…"
+              placeholder={t('addSymbolPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
               onKeyDown={handleKeyDown}
               onFocus={() => searchTerm.trim().length > 0 && suggestions.length > 0 && setShowSuggestions(true)}
               autoComplete="off"
               spellCheck={false}
-              aria-label="Search symbol to add to watchlist"
+              aria-label={t('searchSymbolWatchlist')}
             />
           </div>
 
@@ -271,7 +273,7 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
                   <div className="watchlist-suggestion-symbol">{item.symbol}</div>
                   <div className="watchlist-suggestion-description">{item.description}</div>
                   {watchlist.some(w => w.symbol === item.symbol) && (
-                    <span className="watchlist-suggestion-badge">Added</span>
+                    <span className="watchlist-suggestion-badge">{t('added')}</span>
                   )}
                 </div>
               ))}
@@ -287,15 +289,15 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
                 <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/>
               </svg>
             </div>
-            <span className="watchlist-empty-title">No symbols watched</span>
-            <span className="watchlist-empty-sub">Search for a ticker above and click a result to add it to your watchlist.</span>
+            <span className="watchlist-empty-title">{t('noSymbolsWatched')}</span>
+            <span className="watchlist-empty-sub">{t('searchForTickerWatchlist')}</span>
           </div>
         ) : (
           <div id="watchlist-list">
             {pricesLoading && (
               <div id="watchlist-prices-loading">
                 <span className="watchlist-spinner" />
-                <span>Loading prices…</span>
+                <span>{t('loadingPrices')}</span>
               </div>
             )}
             {watchlist.map((item) => (
@@ -303,7 +305,7 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
                 key={item.symbol}
                 className="watchlist-item"
                 onClick={() => handleWatchlistItemClick(item)}
-                title={`Load ${item.symbol} chart`}
+                title={t('loadChart', { symbol: item.symbol })}
               >
                 <div className="watchlist-item-info">
                   <span className="watchlist-item-symbol">{item.symbol}</span>
@@ -318,8 +320,8 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
                   <button
                     className="watchlist-item-remove"
                     onClick={(e) => { e.stopPropagation(); removeFromWatchlist(item.symbol); }}
-                    aria-label={`Remove ${item.symbol}`}
-                    title={`Remove ${item.symbol}`}
+                    aria-label={t('removeSymbol', { symbol: item.symbol })}
+                    title={t('removeSymbol', { symbol: item.symbol })}
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                       <line x1="18" y1="6" x2="6" y2="18"/>

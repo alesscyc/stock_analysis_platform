@@ -9,6 +9,7 @@ import {
   LineStyle,
 } from 'lightweight-charts';
 import './StockChart.css';
+import { useTranslation } from '../src/i18n/useTranslation';
 
 // ── MA config: key → display label and colour ─────────────
 const MA_CONFIG = [
@@ -19,7 +20,7 @@ const MA_CONFIG = [
   { key:  '10MA', label:  '10 MA', color: '#ff5555' },
 ];
 
-const VOL_MA_CONFIG = [{ key: 'vol20MA', label: 'Vol 20 MA', color: '#ffaa00' }];
+const VOL_MA_CONFIG = [{ key: 'vol20MA', color: '#ffaa00' }];
 
 // ── Swing Zones Primitive (custom canvas box drawing) ──────
 // lightweight-charts v5 uses ISeriesPrimitive for custom overlays.
@@ -137,7 +138,7 @@ function saveWatchlist(list) {
   localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(list));
 }
 
-function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick }) {
+function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick, ibConnected }) {
   const containerRef = useRef(null);
   const chartRef     = useRef(null);
 
@@ -158,6 +159,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   const indicatorsRef = useRef(null);
 
   const [watchlistAdded, setWatchlistAdded] = useState(false);
+  const { t } = useTranslation();
 
   const handleAddToWatchlist = useCallback(() => {
     if (!stockSymbol) return;
@@ -173,9 +175,9 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   }, [stockSymbol]);
 
   const intervals = [
-    { value: '1d',  label: 'Daily'   },
-    { value: '1wk', label: 'Weekly'  },
-    { value: '1mo', label: 'Monthly' },
+    { value: '1d',  label: t('daily')   },
+    { value: '1wk', label: t('weekly')  },
+    { value: '1mo', label: t('monthly') },
   ];
 
   // ── Derived values used outside the chart ────────────────
@@ -508,7 +510,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   }, [indicatorsOpen]);
 
   if (!stockData || stockData.length === 0) {
-    return <div>No stock data available</div>;
+    return <div>{t('noStockData')}</div>;
   }
 
   return (
@@ -540,7 +542,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
                   : 'ai-warning'
               }
             >
-              <span id="ai-recommendation-label">AI:</span>
+              <span id="ai-recommendation-label">{t('ai')}</span>
               {aiPrediction.status === 'success' ? (
                 <>
                   <span
@@ -550,37 +552,42 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
                     {aiPrediction.recommendation}
                   </span>
                   <span id="ai-recommendation-confidence">
-                    ({aiPrediction.confidence}% confidence)
+                    ({aiPrediction.confidence}% {t('confidence')})
                   </span>
                 </>
               ) : (
                 <span id="ai-recommendation-unavailable">
                   {aiPrediction.status === 'insufficient_data'
-                    ? 'Insufficient data for prediction'
+                    ? t('insufficientData')
                     : aiPrediction.status === 'prediction_error'
-                    ? 'Prediction failed'
-                    : 'AI unavailable'}
+                    ? t('predictionFailed')
+                    : t('aiUnavailable')}
                 </span>
               )}
             </div>
           )}
 
-          <button id="trade-btn" onClick={onTradeClick}>
-            Trade
+          <button
+            id="trade-btn"
+            onClick={onTradeClick}
+            disabled={!ibConnected}
+            title={ibConnected ? t('trade') : t('ibNotConnected')}
+          >
+            {t('trade')}
           </button>
 
           <button
             id="watchlist-add-btn"
             onClick={handleAddToWatchlist}
             disabled={watchlistAdded}
-            title="Add to watchlist"
+            title={t('addToWatchlist')}
           >
             {watchlistAdded ? (
               <>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12"/>
                 </svg>
-                Added
+                {t('added')}
               </>
             ) : (
               <>
@@ -589,7 +596,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
                   <line x1="12" y1="8" x2="12" y2="16"/>
                   <line x1="8" y1="12" x2="16" y2="12"/>
                 </svg>
-                Watchlist
+                {t('watchlist')}
               </>
             )}
           </button>
@@ -606,7 +613,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 20V10M18 20V4M6 20v-4"/>
             </svg>
-            Indicators
+            {t('indicators')}
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: indicatorsOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
               <polyline points="6 9 12 15 18 9"/>
             </svg>
@@ -615,11 +622,11 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
           {indicatorsOpen && (
             <div id="indicators-dropdown-panel">
               <div id="indicators-dropdown-header">
-                <span id="indicators-dropdown-title">Technical Indicators</span>
+                <span id="indicators-dropdown-title">{t('technicalIndicators')}</span>
               </div>
 
               <div id="indicators-dropdown-section">
-                <span id="indicators-dropdown-section-label">Moving Averages</span>
+                <span id="indicators-dropdown-section-label">{t('movingAverages')}</span>
                 {MA_CONFIG.map(({ key, label, color }) => (
                   <label key={key} className="indicator-checkbox-label">
                     <input
@@ -636,8 +643,8 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
               <div className="indicators-dropdown-divider" />
 
               <div id="indicators-dropdown-section">
-                <span id="indicators-dropdown-section-label">Volume</span>
-                {VOL_MA_CONFIG.map(({ key, label, color }) => (
+                <span id="indicators-dropdown-section-label">{t('volume')}</span>
+                {VOL_MA_CONFIG.map(({ key, color }) => (
                   <label key={key} className="indicator-checkbox-label">
                     <input
                       type="checkbox"
@@ -645,7 +652,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
                       onChange={() => setVol20maVisibility(prev => !prev)}
                     />
                     <span className="indicator-checkbox-color" style={{ backgroundColor: color }} />
-                    <span className="indicator-checkbox-text">{label}</span>
+                    <span className="indicator-checkbox-text">{t('vol20MA')}</span>
                   </label>
                 ))}
               </div>
@@ -653,7 +660,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
               <div className="indicators-dropdown-divider" />
 
               <div id="indicators-dropdown-section">
-                <span id="indicators-dropdown-section-label">Patterns</span>
+                <span id="indicators-dropdown-section-label">{t('patterns')}</span>
                 <label className="indicator-checkbox-label">
                   <input
                     type="checkbox"
@@ -661,7 +668,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
                     onChange={() => setSwingVisibility(prev => !prev)}
                   />
                   <span className="indicator-checkbox-color" style={{ backgroundColor: '#f0b429' }} />
-                  <span className="indicator-checkbox-text">Recent Volatility</span>
+                  <span className="indicator-checkbox-text">{t('recentVolatility')}</span>
                 </label>
               </div>
             </div>

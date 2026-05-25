@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from '../src/i18n/useTranslation';
 import './TradeDialog.css';
 
 const SUBMITTED_ORDER_PRICES_KEY = 'stockai-submitted-order-prices';
@@ -16,7 +17,8 @@ function rememberSubmittedOrderPrice(orderId, orderPrice) {
   }
 }
 
-function TradeDialog({ isOpen, onClose, stockSymbol }) {
+function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
+  const { t } = useTranslation();
   const [action, setAction] = useState('BUY');
   const [price, setPrice] = useState('');
   const [amount, setAmount] = useState('');
@@ -48,28 +50,28 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
     const lossPrice = parseFloat(stopLossPrice);
 
     if (!price || isNaN(price) || entryPrice <= 0) {
-      setPriceError('Enter a valid price greater than 0');
+      setPriceError(t('enterValidPrice'));
       valid = false;
     }
     if (!amount || isNaN(amount) || parseInt(amount) <= 0) {
-      setAmountError('Enter a valid number of shares');
+      setAmountError(t('enterValidShares'));
       valid = false;
     }
 
     if (isBracketOrder) {
       if (!takeProfitPrice || isNaN(takeProfitPrice) || profitPrice <= 0) {
-        setTakeProfitError('Enter a valid take-profit price');
+        setTakeProfitError(t('enterValidTakeProfit'));
         valid = false;
       } else if (Number.isFinite(entryPrice) && (action === 'BUY' ? profitPrice <= entryPrice : profitPrice >= entryPrice)) {
-        setTakeProfitError(action === 'BUY' ? 'Take profit must be above entry' : 'Take profit must be below entry');
+        setTakeProfitError(action === 'BUY' ? t('takeProfitAboveEntry') : t('takeProfitBelowEntry'));
         valid = false;
       }
 
       if (!stopLossPrice || isNaN(stopLossPrice) || lossPrice <= 0) {
-        setStopLossError('Enter a valid stop-loss price');
+        setStopLossError(t('enterValidStopLoss'));
         valid = false;
       } else if (Number.isFinite(entryPrice) && (action === 'BUY' ? lossPrice >= entryPrice : lossPrice <= entryPrice)) {
-        setStopLossError(action === 'BUY' ? 'Stop loss must be below entry' : 'Stop loss must be above entry');
+        setStopLossError(action === 'BUY' ? t('stopLossBelowEntry') : t('stopLossAboveEntry'));
         valid = false;
       }
     }
@@ -106,7 +108,13 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
       const data = await response.json();
       if (data.success) {
         rememberSubmittedOrderPrice(data.orderId, data.price ?? price);
-        setSuccessMsg(`${data.orderType === 'BRACKET' ? 'Bracket order' : 'Order'} submitted: ${action} ${amount} ${stockSymbol} @ $${data.price ?? price}`);
+        setSuccessMsg(t('orderSubmitted', {
+          type: data.orderType === 'BRACKET' ? t('bracketOrder') : t('order'),
+          action: action === 'BUY' ? t('buyAction') : t('sellAction'),
+          amount,
+          symbol: stockSymbol,
+          price: data.price ?? price
+        }));
         setPrice('');
         setAmount('');
         setTif('DAY');
@@ -114,10 +122,10 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
         setTakeProfitPrice('');
         setStopLossPrice('');
       } else {
-        setErrorMsg('Failed to submit order: ' + (data.error || 'Unknown error'));
+        setErrorMsg(t('failedSubmitOrder', { error: data.error || 'Unknown error' }));
       }
     } catch {
-      setErrorMsg('Network error. Please try again.');
+      setErrorMsg(t('networkError'));
     } finally {
       setLoading(false);
     }
@@ -145,17 +153,17 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
     : null;
 
   return (
-    <div id="trade-dialog-sidebar" role="dialog" aria-modal="true" aria-label={`Trade ${stockSymbol}`}>
+    <div id="trade-dialog-sidebar" role="dialog" aria-modal="true" aria-label={t('tradeSymbol', { symbol: stockSymbol })}>
 
         {/* Header */}
         <div id="trade-dialog-header">
           <div id="trade-dialog-header-left">
-            <div id="trade-dialog-type-badge">ORDER TICKET</div>
+            <div id="trade-dialog-type-badge">{t('orderTicket')}</div>
             <h2 id="trade-dialog-title">
               <span id="trade-dialog-symbol">{stockSymbol}</span>
             </h2>
           </div>
-          <button id="trade-dialog-close-btn" onClick={handleClose} aria-label="Close">
+          <button id="trade-dialog-close-btn" onClick={handleClose} aria-label={t('close')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
@@ -170,14 +178,14 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
             onClick={() => setAction('BUY')}
             type="button"
           >
-            BUY
+            {t('buy')}
           </button>
           <button
             className={`order-type-btn ${action === 'SELL' ? 'active sell' : ''}`}
             onClick={() => setAction('SELL')}
             type="button"
           >
-            SELL
+            {t('sell')}
           </button>
         </div>
 
@@ -185,7 +193,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
           {/* Price */}
           <div className="trade-field-group">
             <label htmlFor="trade-price-input" className="trade-label">
-              Price (USD)
+              {t('priceUSD')}
             </label>
             <div className={`trade-input-wrapper${priceError ? ' has-error' : ''}`}>
               <span className="trade-input-prefix">$</span>
@@ -205,7 +213,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
           {/* Amount */}
           <div className="trade-field-group">
             <label htmlFor="trade-amount-input" className="trade-label">
-              Shares
+              {t('shares')}
             </label>
             <div className={`trade-input-wrapper${amountError ? ' has-error' : ''}`}>
               <span className="trade-input-prefix">#</span>
@@ -224,7 +232,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
 
           <div className="trade-field-group">
             <label htmlFor="trade-tif-select" className="trade-label">
-              Time in Force
+              {t('timeInForce')}
             </label>
             <div className="trade-select-wrapper">
               <select
@@ -232,18 +240,18 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
                 value={tif}
                 onChange={(e) => setTif(e.target.value)}
               >
-                <option value="DAY">Day</option>
-                <option value="GTC">Good Till Cancelled</option>
-                <option value="IOC">Immediate or Cancel</option>
-                <option value="FOK">Fill or Kill</option>
+                <option value="DAY">{t('day')}</option>
+                <option value="GTC">{t('goodTillCancelled')}</option>
+                <option value="IOC">{t('immediateOrCancel')}</option>
+                <option value="FOK">{t('fillOrKill')}</option>
               </select>
             </div>
           </div>
 
           <div className="trade-bracket-toggle">
             <div>
-              <span className="trade-bracket-title">Bracket exits</span>
-              <span className="trade-bracket-copy">Attach take-profit and stop-loss child orders.</span>
+              <span className="trade-bracket-title">{t('bracketExits')}</span>
+              <span className="trade-bracket-copy">{t('bracketExitsDesc')}</span>
             </div>
             <label className="trade-switch" htmlFor="trade-bracket-toggle-input">
               <input
@@ -264,14 +272,14 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
             <div className="trade-bracket-fields">
               <div className="trade-field-group">
                 <label htmlFor="trade-take-profit-input" className="trade-label">
-                  Take Profit (USD)
+                  {t('takeProfitUSD')}
                 </label>
                 <div className={`trade-input-wrapper${takeProfitError ? ' has-error' : ''}`}>
                   <span className="trade-input-prefix">$</span>
                   <input
                     id="trade-take-profit-input"
                     type="number"
-                    placeholder={action === 'BUY' ? 'Above entry' : 'Below entry'}
+                    placeholder={action === 'BUY' ? t('aboveEntry') : t('belowEntry')}
                     value={takeProfitPrice}
                     onChange={(e) => { setTakeProfitPrice(e.target.value); setTakeProfitError(''); }}
                     min="0"
@@ -283,14 +291,14 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
 
               <div className="trade-field-group">
                 <label htmlFor="trade-stop-loss-input" className="trade-label">
-                  Stop Loss (USD)
+                  {t('stopLossUSD')}
                 </label>
                 <div className={`trade-input-wrapper${stopLossError ? ' has-error' : ''}`}>
                   <span className="trade-input-prefix">$</span>
                   <input
                     id="trade-stop-loss-input"
                     type="number"
-                    placeholder={action === 'BUY' ? 'Below entry' : 'Above entry'}
+                    placeholder={action === 'BUY' ? t('belowEntry') : t('aboveEntry')}
                     value={stopLossPrice}
                     onChange={(e) => { setStopLossPrice(e.target.value); setStopLossError(''); }}
                     min="0"
@@ -306,7 +314,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
         {/* Order summary */}
         {totalValue && (
           <div id="trade-order-summary">
-            <span className="summary-label">Estimated Total</span>
+            <span className="summary-label">{t('estimatedTotal')}</span>
             <span className="summary-value">${parseFloat(totalValue).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           </div>
         )}
@@ -314,12 +322,15 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
         {/* Inline feedback */}
         {successMsg && <div className="trade-feedback trade-feedback-success">{successMsg}</div>}
         {errorMsg && <div className="trade-feedback trade-feedback-error">{errorMsg}</div>}
+        {!ibConnected && (
+          <div className="trade-feedback trade-feedback-error">{t('ibNotConnected')}</div>
+        )}
 
         {/* Submit order CTA */}
         <button
           id="trade-buy-btn"
           onClick={handleSubmitOrder}
-          disabled={loading}
+          disabled={loading || !ibConnected}
         >
           {loading ? (
             <span className="btn-spinner" />
@@ -329,13 +340,13 @@ function TradeDialog({ isOpen, onClose, stockSymbol }) {
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
                 <polyline points="17 6 23 6 23 12"/>
               </svg>
-              {`Place ${isBracketOrder ? 'Bracket ' : ''}${action === 'SELL' ? 'Sell' : 'Buy'} Order`}
+              {t('placeOrder', { type: isBracketOrder ? t('bracket') : '' })}
             </>
           )}
         </button>
 
         <p id="trade-disclaimer">
-          Orders are routed through your connected IB Gateway using the entered limit price{isBracketOrder ? ' with attached bracket exits.' : '.'}
+          {t('orderDisclaimer', { bracket: isBracketOrder ? t('withBracket') : '' })}
         </p>
       </div>
   );

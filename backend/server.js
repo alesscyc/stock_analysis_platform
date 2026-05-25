@@ -589,6 +589,10 @@ app.get('/api/symbols', async (req, res) => {
   }
 });
 
+app.get('/api/ib/status', (req, res) => {
+  res.json({ connected: ibConnected });
+});
+
 app.post('/api/orders', async (req, res) => {
   try {
     const body = req.body ?? {};

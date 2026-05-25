@@ -1,5 +1,5 @@
 import './App.css'
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import SearchBar from '../component/SearchBar'
 import StockChart from '../component/StockChart';
 import TradeDialog from '../component/TradeDialog';
@@ -9,8 +9,11 @@ import WatchlistDialog from '../component/WatchlistDialog';
 import ScreenerDialog from '../component/ScreenerDialog';
 import { isGitHubPages } from './environment';
 import { generateNvdaMockData } from './mockData';
+import { useTranslation } from './i18n/useTranslation';
 
 function App() {
+  const { t, language, setLanguage } = useTranslation();
+
   const [selectedStock, setSelectedStock] = useState(null);
   const [stockData, setStockData] = useState([]);
   const [currentInterval, setCurrentInterval] = useState('1d');
@@ -19,6 +22,7 @@ function App() {
   const [error, setError] = useState(null);
   const [aiPrediction, setAiPrediction] = useState(null);
   const [isMock, setIsMock] = useState(false);
+  const [ibConnected, setIbConnected] = useState(false);
 
   const fetchStockData = async (stock, interval = '1d', autoPredictEnabled = true) => {
     setLoading(true);
@@ -42,7 +46,7 @@ function App() {
       );
       const data = await response.json();
       if (!response.ok || data.error) {
-        throw new Error(data.error || 'Failed to load stock data');
+        throw new Error(data.error || t('failedToLoadStockData'));
       }
       if (Array.isArray(data) && data.length > 0) {
         setStockData(data);
@@ -58,7 +62,7 @@ function App() {
     } catch (fetchError) {
       console.error('Error fetching stock data:', fetchError);
       setStockData([]);
-      setError(fetchError.message || 'Failed to load stock data');
+      setError(fetchError.message || t('failedToLoadStockData'));
     } finally {
       setLoading(false);
     }
@@ -85,13 +89,32 @@ function App() {
     return item ? (Math.round(parseFloat(item.Close) * 100) / 100) : null;
   }, [stockData]);
 
+  // Poll IB Gateway connection status
+  useEffect(() => {
+    if (isGitHubPages()) return;
+
+    const checkStatus = async () => {
+      try {
+        const res = await fetch('/api/ib/status');
+        const data = await res.json();
+        setIbConnected(data.connected === true);
+      } catch {
+        setIbConnected(false);
+      }
+    };
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div id="root">
       {/* ── Top nav bar ── */}
       <header className="app-topbar">
         <div className="app-brand">
            <div className="app-brand-icon">S</div>
-           <span className="app-brand-name">StockAI</span>
+           <span className="app-brand-name">{t('brandName')}</span>
          </div>
 
         <div className="topbar-divider" />
@@ -104,44 +127,55 @@ function App() {
           <button
             className="btn-screener"
             onClick={() => setActiveSidebar(prev => prev === 'screener' ? null : 'screener')}
-            aria-label="Open screener"
+            aria-label={t('screener')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 6h18M3 12h18M3 18h18"/>
             </svg>
-            Screener
+            {t('screener')}
           </button>
           <button
             className="btn-watchlist"
             onClick={() => setActiveSidebar(prev => prev === 'watchlist' ? null : 'watchlist')}
-            aria-label="Open watchlist"
+            aria-label={t('watchlist')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/>
             </svg>
-            Watchlist
+            {t('watchlist')}
           </button>
           <button
             className="btn-portfolio"
             onClick={() => setActiveSidebar(prev => prev === 'portfolio' ? null : 'portfolio')}
-            aria-label="Open portfolio"
+            aria-label={t('portfolio')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="7" width="20" height="14" rx="2"/>
               <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
             </svg>
-            Portfolio
+            {t('portfolio')}
           </button>
           <button
             className="btn-orders"
             onClick={() => setActiveSidebar(prev => prev === 'orders' ? null : 'orders')}
-            aria-label="Open pending orders"
+            aria-label={t('orders')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 11l3 3L22 4"/>
               <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
-            Orders
+            {t('orders')}
+          </button>
+
+          <div className="topbar-divider" />
+
+          <button
+            className="btn-language"
+            onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
+            aria-label={t('language')}
+            title={language === 'en' ? t('traditionalChinese') : t('english')}
+          >
+            {language === 'en' ? 'EN' : '繁'}
           </button>
         </div>
       </header>
@@ -152,7 +186,7 @@ function App() {
           {selectedStock && (
             <div className="instrument-header">
               {isMock && (
-                <span className="mock-badge">DEMO</span>
+                <span className="mock-badge">{t('demo')}</span>
               )}
               <span className="instrument-symbol">{selectedStock.symbol}</span>
 
@@ -163,15 +197,15 @@ function App() {
               )}
 
               <div className="instrument-stat">
-                <span className="instrument-label">Interval</span>
+                <span className="instrument-label">{t('interval')}</span>
                 <span className="instrument-value">
-                  {currentInterval === '1d' ? 'Daily' : currentInterval === '1wk' ? 'Weekly' : 'Monthly'}
+                  {currentInterval === '1d' ? t('daily') : currentInterval === '1wk' ? t('weekly') : t('monthly')}
                 </span>
               </div>
 
               {aiPrediction && aiPrediction.status === 'success' && (
                 <div className="instrument-stat">
-                  <span className="instrument-label">AI Signal</span>
+                  <span className="instrument-label">{t('aiSignal')}</span>
                   <span
                     className="instrument-value"
                     style={{ color: aiPrediction.recommendation === 'BUY' ? 'var(--green-bright)' : 'var(--red-bright)' }}
@@ -183,7 +217,7 @@ function App() {
 
               {stockData.length > 0 && (
                 <div className="instrument-stat">
-                  <span className="instrument-label">Data Points</span>
+                  <span className="instrument-label">{t('dataPoints')}</span>
                   <span className="instrument-value">{stockData.length.toLocaleString()}</span>
                 </div>
               )}
@@ -195,9 +229,9 @@ function App() {
             {stockData.length === 0 && !loading && !error && !selectedStock && (
               <div className="app-empty-state">
                 <div className="empty-state-icon">📈</div>
-                <div className="empty-state-title">No instrument selected</div>
+                <div className="empty-state-title">{t('noInstrumentSelected')}</div>
                 <div className="empty-state-sub">
-                  Search for a ticker symbol above to load chart data, indicators, and AI analysis.
+                  {t('searchForTicker')}
                 </div>
               </div>
             )}
@@ -205,9 +239,9 @@ function App() {
             {stockData.length === 0 && !loading && !error && selectedStock && (
               <div className="app-empty-state">
                 <div className="empty-state-icon">📭</div>
-                <div className="empty-state-title">No data found for {selectedStock.symbol}</div>
+                <div className="empty-state-title">{t('noDataFound', { symbol: selectedStock.symbol })}</div>
                 <div className="empty-state-sub">
-                  Check the ticker symbol and try again.
+                  {t('checkTicker')}
                 </div>
               </div>
             )}
@@ -215,7 +249,7 @@ function App() {
             {stockData.length === 0 && !loading && error && (
               <div className="app-empty-state">
                 <div className="empty-state-icon">⚠️</div>
-                <div className="empty-state-title">Unable to load {selectedStock?.symbol || 'stock data'}</div>
+                <div className="empty-state-title">{t('unableToLoad', { symbol: selectedStock?.symbol || t('failedToLoadStockData') })}</div>
                 <div className="empty-state-sub">{error}</div>
               </div>
             )}
@@ -223,7 +257,7 @@ function App() {
             {loading && stockData.length === 0 && (
               <div className="app-empty-state">
                 <div className="empty-state-icon">⏳</div>
-                <div className="empty-state-title">Loading market data…</div>
+                <div className="empty-state-title">{t('loadingMarketData')}</div>
               </div>
             )}
 
@@ -236,6 +270,7 @@ function App() {
                   onIntervalChange={handleIntervalChange}
                   aiPrediction={aiPrediction}
                   onTradeClick={() => setActiveSidebar(prev => prev === 'trade' ? null : 'trade')}
+                  ibConnected={ibConnected}
                 />
               </div>
             )}
@@ -247,6 +282,7 @@ function App() {
             isOpen={activeSidebar === 'trade'}
             onClose={() => setActiveSidebar(null)}
             stockSymbol={selectedStock?.symbol}
+            ibConnected={ibConnected}
           />
           <PortfolioDialog isOpen={activeSidebar === 'portfolio'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
           <OrdersDialog isOpen={activeSidebar === 'orders'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
