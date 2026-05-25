@@ -161,6 +161,29 @@ export const translations = {
     noMatches: 'No matches',
     adjustConditions: 'Adjust conditions and run again.',
 
+    // Watchlist live prices
+    lastUpdated: 'Last updated',
+    priceChangeToday: 'Change',
+
+    // Fundamentals panel
+    fundamentals: 'Fundamentals',
+    marketCap: 'Market Cap',
+    peRatio: 'P/E',
+    forwardPE: 'Fwd P/E',
+    eps: 'EPS',
+    dividendYield: 'Div Yield',
+    sector: 'Sector',
+    industry: 'Industry',
+    beta: 'Beta',
+    week52Range: '52W Range',
+    avgVolume: 'Avg Vol',
+    showFundamentals: 'Show fundamentals',
+    hideFundamentals: 'Hide fundamentals',
+
+    // Model cache
+    modelCache: 'Model Cache',
+    aiRefreshed: 'AI refreshed',
+
     // Language toggle
     language: 'Language',
     english: 'English',
@@ -328,6 +351,29 @@ export const translations = {
     clickToViewChart: '點擊查看 {{symbol}} 圖表',
     noMatches: '無匹配結果',
     adjustConditions: '調整條件後重新執行。',
+
+    // Watchlist live prices
+    lastUpdated: '最後更新',
+    priceChangeToday: '漲跌',
+
+    // Fundamentals panel
+    fundamentals: '基本面',
+    marketCap: '市值',
+    peRatio: '市盈率',
+    forwardPE: '遠期市盈率',
+    eps: '每股收益',
+    dividendYield: '股息率',
+    sector: '行業',
+    industry: '產業',
+    beta: '貝塔',
+    week52Range: '52週區間',
+    avgVolume: '平均成交量',
+    showFundamentals: '顯示基本面',
+    hideFundamentals: '隱藏基本面',
+
+    // Model cache
+    modelCache: '模型快取',
+    aiRefreshed: 'AI 已更新',
 
     // Language toggle
     language: '語言',

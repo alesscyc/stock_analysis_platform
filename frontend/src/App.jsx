@@ -23,6 +23,8 @@ function App() {
   const [aiPrediction, setAiPrediction] = useState(null);
   const [isMock, setIsMock] = useState(false);
   const [ibConnected, setIbConnected] = useState(false);
+  const [fundamentals, setFundamentals] = useState(null);
+  const [showFundamentals, setShowFundamentals] = useState(false);
 
   const fetchStockData = async (stock, interval = '1d', autoPredictEnabled = true) => {
     setLoading(true);
@@ -68,12 +70,30 @@ function App() {
     }
   };
 
+  const fetchFundamentals = async (stock) => {
+    if (isGitHubPages()) return;
+    try {
+      const res = await fetch(`/api/fundamentals/${stock.symbol}`);
+      const data = await res.json();
+      if (res.ok && !data.error) {
+        setFundamentals(data);
+      } else {
+        setFundamentals(null);
+      }
+    } catch {
+      setFundamentals(null);
+    }
+  };
+
   const handleStockSelect = async (stock) => {
     setSelectedStock(stock);
     setStockData([]);
     setError(null);
     setAiPrediction(null);
+    setFundamentals(null);
+    setShowFundamentals(false);
     await fetchStockData(stock, currentInterval);
+    await fetchFundamentals(stock);
   };
 
   const handleIntervalChange = async (interval) => {
@@ -221,6 +241,81 @@ function App() {
                   <span className="instrument-value">{stockData.length.toLocaleString()}</span>
                 </div>
               )}
+
+              {fundamentals && (
+                <button
+                  className="btn-fundamentals-toggle"
+                  onClick={() => setShowFundamentals((p) => !p)}
+                  aria-label={showFundamentals ? t('hideFundamentals') : t('showFundamentals')}
+                >
+                  {t('fundamentals')}
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showFundamentals ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ── Fundamentals panel ── */}
+          {selectedStock && showFundamentals && fundamentals && (
+            <div className="fundamentals-panel">
+              <div className="fundamentals-grid">
+                {fundamentals.marketCap != null && (
+                  <div className="fundamentals-item">
+                    <span className="fundamentals-label">{t('marketCap')}</span>
+                    <span className="fundamentals-value">{fundamentals.marketCap}</span>
+                  </div>
+                )}
+                {fundamentals.trailingPE != null && (
+                  <div className="fundamentals-item">
+                    <span className="fundamentals-label">{t('peRatio')}</span>
+                    <span className="fundamentals-value">{fundamentals.trailingPE}</span>
+                  </div>
+                )}
+                {fundamentals.forwardPE != null && (
+                  <div className="fundamentals-item">
+                    <span className="fundamentals-label">{t('forwardPE')}</span>
+                    <span className="fundamentals-value">{fundamentals.forwardPE}</span>
+                  </div>
+                )}
+                {fundamentals.trailingEps != null && (
+                  <div className="fundamentals-item">
+                    <span className="fundamentals-label">{t('eps')}</span>
+                    <span className="fundamentals-value">{fundamentals.trailingEps}</span>
+                  </div>
+                )}
+                {fundamentals.dividendYield != null && (
+                  <div className="fundamentals-item">
+                    <span className="fundamentals-label">{t('dividendYield')}</span>
+                    <span className="fundamentals-value">{fundamentals.dividendYield}</span>
+                  </div>
+                )}
+                {fundamentals.sector != null && (
+                  <div className="fundamentals-item">
+                    <span className="fundamentals-label">{t('sector')}</span>
+                    <span className="fundamentals-value">{fundamentals.sector}</span>
+                  </div>
+                )}
+                {fundamentals.beta != null && (
+                  <div className="fundamentals-item">
+                    <span className="fundamentals-label">{t('beta')}</span>
+                    <span className="fundamentals-value">{fundamentals.beta}</span>
+                  </div>
+                )}
+                {fundamentals.week52Range != null && (
+                  <div className="fundamentals-item">
+                    <span className="fundamentals-label">{t('week52Range')}</span>
+                    <span className="fundamentals-value">{fundamentals.week52Range}</span>
+                  </div>
+                )}
+                {fundamentals.averageVolume != null && (
+                  <div className="fundamentals-item">
+                    <span className="fundamentals-label">{t('avgVolume')}</span>
+                    <span className="fundamentals-value">{fundamentals.averageVolume}</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

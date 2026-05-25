@@ -252,6 +252,66 @@
   flex-direction: column;
 }
 
+/* Fundamentals toggle button */
+.btn-fundamentals-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 5px 12px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 500;
+  margin-left: auto;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btn-fundamentals-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.btn-fundamentals-toggle svg {
+  flex-shrink: 0;
+}
+
+/* ── Fundamentals panel ────────────────────────────────── */
+.fundamentals-panel {
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-5);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.fundamentals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+
+.fundamentals-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fundamentals-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+
+.fundamentals-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
 /* ── Body: main content + sidebar row ──────────────────── */
 .app-body {
   display: flex;

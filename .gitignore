@@ -7,3 +7,4 @@ stock_rf_model.pkl
 docs/roadmap/Council_Features_Roadmap.md
 __pycache__/
 *.pyc
+analysis/model_cache/

@@ -33,7 +33,10 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [prices, setPrices] = useState({});
+  const [priceChanges, setPriceChanges] = useState({});
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [pricesLoading, setPricesLoading] = useState(false);
+  const pollIntervalRef = useRef(null);
   const debounceTimer = useRef(null);
   const suggestionsRef = useRef(null);
   const inputRef = useRef(null);
@@ -48,6 +51,7 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
   useEffect(() => {
     if (isOpen) {
       setWatchlist(loadWatchlist());
+      setPriceChanges({});
     }
   }, [isOpen]);
 
@@ -61,26 +65,26 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
     return () => window.removeEventListener('watchlist-updated', handleUpdate);
   }, [isOpen]);
 
-  // Fetch prices for all watchlist items when dialog opens
+  // Fetch prices for all watchlist items when dialog opens, then poll every 30s
   useEffect(() => {
     if (!isOpen || watchlist.length === 0) return;
 
     let active = true;
-    setPricesLoading(true);
 
     const fetchPrices = async () => {
+      if (!active) return;
+      setPricesLoading(true);
       const results = {};
+      const changes = {};
       await Promise.all(
         watchlist.map(async (item) => {
           try {
-            const res = await fetch(
-              `/api/stock/${item.symbol}?date_range=1d&interval=1d&auto_predict=false`
-            );
+            const res = await fetch(`/api/price/${item.symbol}`);
             const data = await res.json();
-            if (Array.isArray(data) && data.length > 0) {
-              const last = [...data].reverse().find((d) => d.Close != null);
-              if (last) {
-                results[item.symbol] = Math.round(parseFloat(last.Close) * 100) / 100;
+            if (data.price != null) {
+              results[item.symbol] = Math.round(parseFloat(data.price) * 100) / 100;
+              if (data.changePercent != null) {
+                changes[item.symbol] = Math.round(parseFloat(data.changePercent) * 100) / 100;
               }
             }
           } catch {
@@ -90,12 +94,22 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
       );
       if (active) {
         setPrices(results);
+        setPriceChanges(changes);
+        setLastUpdated(new Date());
         setPricesLoading(false);
       }
     };
 
     fetchPrices();
-    return () => { active = false; };
+    pollIntervalRef.current = setInterval(fetchPrices, 30000);
+
+    return () => {
+      active = false;
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
   }, [isOpen, watchlist]);
 
   // Debounced symbol search
@@ -312,11 +326,18 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
                   <span className="watchlist-item-desc">{item.description}</span>
                 </div>
                 <div className="watchlist-item-right">
-                  {prices[item.symbol] != null && (
-                    <span className="watchlist-item-price">
-                      ${prices[item.symbol].toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  )}
+                  <div className="watchlist-item-price-col">
+                    {prices[item.symbol] != null && (
+                      <span className="watchlist-item-price">
+                        ${prices[item.symbol].toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    )}
+                    {priceChanges[item.symbol] != null && (
+                      <span className={`watchlist-item-change ${priceChanges[item.symbol] >= 0 ? 'up' : 'down'}`}>
+                        {priceChanges[item.symbol] >= 0 ? '+' : ''}{priceChanges[item.symbol]}%
+                      </span>
+                    )}
+                  </div>
                   <button
                     className="watchlist-item-remove"
                     onClick={(e) => { e.stopPropagation(); removeFromWatchlist(item.symbol); }}
@@ -331,6 +352,11 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
                 </div>
               </div>
             ))}
+            {lastUpdated && (
+              <div className="watchlist-last-updated">
+                {t('lastUpdated')}: {lastUpdated.toLocaleTimeString()}
+              </div>
+            )}
           </div>
         )}
       </div>

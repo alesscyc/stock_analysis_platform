@@ -593,6 +593,117 @@ app.get('/api/ib/status', (req, res) => {
   res.json({ connected: ibConnected });
 });
 
+// ── Lightweight current price endpoint (for watchlist polling) ──────────────
+app.get('/api/price/:symbol', async (req, res) => {
+  try {
+    const symbol = String(req.params.symbol).trim().toUpperCase();
+    if (!/^[A-Z0-9.\-]{1,20}$/.test(symbol)) {
+      return res.status(400).json({ error: 'Invalid symbol' });
+    }
+
+    const cacheKey = `price-${symbol}`;
+    const cachedData = cache.get(cacheKey);
+    if (cachedData && (Date.now() - cachedData.timestamp < 30000)) {
+      return res.json(cachedData.data);
+    }
+
+    const pyRes = await fetch(`${PYTHON_SERVICE_URL}/current_price`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol }),
+    });
+
+    if (!pyRes.ok) {
+      const errBody = await pyRes.json().catch(() => ({}));
+      return res.status(502).json({ error: errBody.detail || 'Python service error' });
+    }
+
+    const result = await pyRes.json();
+    cache.set(cacheKey, { timestamp: Date.now(), data: result });
+    res.json(result);
+  } catch (error) {
+    console.error('[python-service] Price fetch failed:', error.message);
+    res.status(502).json({ error: 'Could not reach Python analysis service' });
+  }
+});
+
+// ── Fundamental data endpoint ───────────────────────────────────────────────
+app.get('/api/fundamentals/:symbol', async (req, res) => {
+  try {
+    const symbol = String(req.params.symbol).trim().toUpperCase();
+    if (!/^[A-Z0-9.\-]{1,20}$/.test(symbol)) {
+      return res.status(400).json({ error: 'Invalid symbol' });
+    }
+
+    const cacheKey = `fundamentals-${symbol}`;
+    const cachedData = cache.get(cacheKey);
+    if (cachedData && (Date.now() - cachedData.timestamp < 24 * 60 * 60 * 1000)) {
+      console.log('Returning cached fundamentals for:', symbol);
+      return res.json(cachedData.data);
+    }
+
+    const pyRes = await fetch(`${PYTHON_SERVICE_URL}/fundamentals`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol }),
+    });
+
+    if (!pyRes.ok) {
+      const errBody = await pyRes.json().catch(() => ({}));
+      return res.status(502).json({ error: errBody.detail || 'Python service error' });
+    }
+
+    const result = await pyRes.json();
+    cache.set(cacheKey, { timestamp: Date.now(), data: result });
+    res.json(result);
+  } catch (error) {
+    console.error('[python-service] Fundamentals fetch failed:', error.message);
+    res.status(502).json({ error: 'Could not reach Python analysis service' });
+  }
+});
+
+// ── Model cache status / retrain endpoints ──────────────────────────────────
+app.get('/api/model/status/:symbol', async (req, res) => {
+  try {
+    const symbol = String(req.params.symbol).trim().toUpperCase();
+    if (!/^[A-Z0-9.\-]{1,20}$/.test(symbol)) {
+      return res.status(400).json({ error: 'Invalid symbol' });
+    }
+
+    const pyRes = await fetch(`${PYTHON_SERVICE_URL}/model/status/${encodeURIComponent(symbol)}`);
+    const result = await pyRes.json();
+    res.json(result);
+  } catch (error) {
+    console.error('[python-service] Model status failed:', error.message);
+    res.status(502).json({ error: 'Could not reach Python analysis service' });
+  }
+});
+
+app.post('/api/model/retrain/:symbol', async (req, res) => {
+  try {
+    const symbol = String(req.params.symbol).trim().toUpperCase();
+    if (!/^[A-Z0-9.\-]{1,20}$/.test(symbol)) {
+      return res.status(400).json({ error: 'Invalid symbol' });
+    }
+
+    // Also clear any cached stock data so next request retrains
+    for (const key of cache.keys()) {
+      if (key.startsWith(`${symbol}-`) && key.includes('-true')) {
+        cache.delete(key);
+      }
+    }
+
+    const pyRes = await fetch(`${PYTHON_SERVICE_URL}/model/retrain/${encodeURIComponent(symbol)}`, {
+      method: 'POST',
+    });
+    const result = await pyRes.json();
+    res.json(result);
+  } catch (error) {
+    console.error('[python-service] Model retrain failed:', error.message);
+    res.status(502).json({ error: 'Could not reach Python analysis service' });
+  }
+});
+
 app.post('/api/orders', async (req, res) => {
   try {
     const body = req.body ?? {};

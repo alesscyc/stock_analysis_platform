@@ -2,7 +2,76 @@ import yfinance as yf
 import pandas as pd
 import sys
 import json
-from datetime import datetime
+import os
+import pickle
+from datetime import datetime, timedelta
+
+# ── Model cache ──────────────────────────────────────────────────────────────
+MODEL_CACHE_TTL_HOURS = 4
+_model_cache = {}  # symbol -> {'model_data': ..., 'trained_at': datetime}
+
+# Optional disk persistence directory (created on first use)
+MODEL_CACHE_DIR = os.path.join(os.path.dirname(__file__), 'model_cache')
+
+
+def _get_cache_path(symbol):
+    safe = ''.join(c for c in symbol.upper() if c.isalnum())
+    return os.path.join(MODEL_CACHE_DIR, f'{safe}.pkl')
+
+
+def _load_model_from_disk(symbol):
+    path = _get_cache_path(symbol)
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, 'rb') as f:
+            return pickle.load(f)
+    except Exception:
+        return None
+
+
+def _save_model_to_disk(symbol, cache_entry):
+    os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
+    path = _get_cache_path(symbol)
+    try:
+        with open(path, 'wb') as f:
+            pickle.dump(cache_entry, f)
+    except Exception:
+        pass
+
+
+def _get_cached_model(symbol):
+    """Return cached model_data if present and not stale, else None."""
+    symbol = symbol.upper()
+    now = datetime.now()
+
+    # Check in-memory cache first
+    entry = _model_cache.get(symbol)
+    if entry:
+        age = now - entry['trained_at']
+        if age < timedelta(hours=MODEL_CACHE_TTL_HOURS):
+            return entry['model_data']
+        # Stale — evict
+        del _model_cache[symbol]
+
+    # Try disk cache
+    entry = _load_model_from_disk(symbol)
+    if entry:
+        age = now - entry['trained_at']
+        if age < timedelta(hours=MODEL_CACHE_TTL_HOURS):
+            _model_cache[symbol] = entry
+            return entry['model_data']
+
+    return None
+
+
+def _set_cached_model(symbol, model_data):
+    """Store model_data in memory and optionally on disk."""
+    symbol = symbol.upper()
+    entry = {'model_data': model_data, 'trained_at': datetime.now()}
+    _model_cache[symbol] = entry
+    _save_model_to_disk(symbol, entry)
+
 
 def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predict=False): 
     try:
@@ -195,9 +264,15 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
         # Auto-training and prediction feature
         if auto_predict and interval == '1d':
             try:
-                # Always train a new model with the current symbol using already fetched data
-                print(f"Training new model with {symbol}...", file=sys.stderr)
-                train_result = train_random_forest_model(stock_data)
+                cached = _get_cached_model(symbol)
+                if cached:
+                    print(f"Using cached model for {symbol}", file=sys.stderr)
+                    train_result = cached
+                else:
+                    print(f"Training new model with {symbol}...", file=sys.stderr)
+                    train_result = train_random_forest_model(stock_data)
+                    if 'error' not in train_result:
+                        _set_cached_model(symbol, train_result)
                 if 'error' in train_result:
                     print(f"Training failed: {train_result['error']}", file=sys.stderr)
                     # Add error status to response for insufficient data
@@ -249,18 +324,95 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
 
 def get_current_stock_price(symbol):
     """
-    Get the most recent current price for a stock symbol.
+    Get the most recent current price and day change for a stock symbol.
     """
     try:
         ticker = yf.Ticker(symbol)
-        hist = ticker.history(period="1d")
+        # Fetch 2 days to get previous close for day-change calculation
+        hist = ticker.history(period="5d")
         if hist.empty:
             return {"error": f"No price data found for symbol: {symbol}"}
-        
+
         current_price = float(hist["Close"].iloc[-1])
-        return {"symbol": symbol, "price": round(current_price, 2), "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        result = {
+            "symbol": symbol,
+            "price": round(current_price, 2),
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        # Add previous close and day change if we have at least 2 data points
+        if len(hist) >= 2:
+            previous_close = float(hist["Close"].iloc[-2])
+            change = current_price - previous_close
+            change_percent = (change / previous_close) * 100 if previous_close != 0 else 0
+            result["previousClose"] = round(previous_close, 2)
+            result["change"] = round(change, 2)
+            result["changePercent"] = round(change_percent, 2)
+
+        return result
     except Exception as e:
         return {"error": f"Error fetching current price: {str(e)}"}
+
+
+def get_fundamentals(symbol):
+    """
+    Fetch key fundamental data for a stock symbol from yfinance.
+    """
+    try:
+        ticker = yf.Ticker(symbol)
+        info = ticker.info or {}
+
+        def fmt_mcap(value):
+            if value is None or not isinstance(value, (int, float)):
+                return None
+            if value >= 1e12:
+                return f"${value / 1e12:.2f}T"
+            if value >= 1e9:
+                return f"${value / 1e9:.2f}B"
+            if value >= 1e6:
+                return f"${value / 1e6:.2f}M"
+            return f"${value:,.0f}"
+
+        def fmt_num(value, decimals=2):
+            if value is None or not isinstance(value, (int, float)):
+                return None
+            return round(float(value), decimals)
+
+        def fmt_pct(value):
+            if value is None or not isinstance(value, (int, float)):
+                return None
+            return f"{value * 100:.2f}%"
+
+        def fmt_vol(value):
+            if value is None or not isinstance(value, (int, float)):
+                return None
+            if value >= 1e6:
+                return f"{value / 1e6:.1f}M"
+            if value >= 1e3:
+                return f"{value / 1e3:.1f}K"
+            return f"{value:,.0f}"
+
+        fifty_two_week_low = fmt_num(info.get('fiftyTwoWeekLow'))
+        fifty_two_week_high = fmt_num(info.get('fiftyTwoWeekHigh'))
+        week_range = None
+        if fifty_two_week_low is not None and fifty_two_week_high is not None:
+            week_range = f"${fifty_two_week_low} – ${fifty_two_week_high}"
+
+        return {
+            "symbol": symbol.upper(),
+            "marketCap": fmt_mcap(info.get('marketCap')),
+            "trailingPE": fmt_num(info.get('trailingPE')),
+            "forwardPE": fmt_num(info.get('forwardPE')),
+            "trailingEps": fmt_num(info.get('trailingEps')),
+            "dividendYield": fmt_pct(info.get('dividendYield')),
+            "sector": info.get('sector') or None,
+            "industry": info.get('industry') or None,
+            "beta": fmt_num(info.get('beta')),
+            "week52Range": week_range,
+            "averageVolume": fmt_vol(info.get('averageVolume') or info.get('averageDailyVolume10Day')),
+        }
+    except Exception as e:
+        return {"error": f"Error fetching fundamentals: {str(e)}"}
 
 def train_random_forest_model(stock_data):
     """
@@ -488,6 +640,42 @@ def _make_fastapi_app():
         if isinstance(result, dict) and "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
         return result
+
+    @service.post("/fundamentals")
+    def fundamentals(req: PriceRequest):
+        result = get_fundamentals(req.symbol)
+        if isinstance(result, dict) and "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+        return result
+
+    @service.get("/model/status/{symbol}")
+    def model_status(symbol: str):
+        sym = symbol.upper()
+        entry = _model_cache.get(sym)
+        if entry:
+            cached = entry['model_data']
+            return {
+                "symbol": sym,
+                "cached": True,
+                "trainedAt": entry['trained_at'].isoformat() if entry.get('trained_at') else None,
+                "testAccuracy": cached.get('test_accuracy'),
+                "featureImportance": cached.get('feature_importance', []),
+            }
+        return {"symbol": sym, "cached": False}
+
+    @service.post("/model/retrain/{symbol}")
+    def model_retrain(symbol: str):
+        # Evict cache and force a retrain on next stock_history call
+        sym = symbol.upper()
+        if sym in _model_cache:
+            del _model_cache[sym]
+        path = _get_cache_path(sym)
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+        return {"symbol": sym, "message": "Cache cleared. Model will be retrained on next prediction request."}
 
     return service
 
