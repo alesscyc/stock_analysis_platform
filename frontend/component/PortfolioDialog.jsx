@@ -60,10 +60,20 @@ function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
     onStockSelect({ symbol: row.symbol });
   };
 
-  const handleRowKeyDown = (event, row) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
+  const handleRowKeyDown = (event, row, index) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleSymbolClick(row);
+      return;
+    }
+
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+
     event.preventDefault();
-    handleSymbolClick(row);
+    const direction = event.key === 'ArrowDown' ? 1 : -1;
+    const nextIndex = Math.min(portfolio.length - 1, Math.max(0, index + direction));
+    event.currentTarget.parentElement?.children[nextIndex]?.focus();
+    handleSymbolClick(portfolio[nextIndex]);
   };
 
   return (
@@ -146,12 +156,12 @@ function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {portfolio.map((row) => (
+                  {portfolio.map((row, index) => (
                     <tr
                       key={row.id ?? row.symbol}
                       className="portfolio-clickable-row"
                       onClick={() => handleSymbolClick(row)}
-                      onKeyDown={(event) => handleRowKeyDown(event, row)}
+                      onKeyDown={(event) => handleRowKeyDown(event, row, index)}
                       role="button"
                       tabIndex={0}
                       title={t('loadChart', { symbol: row.symbol })}

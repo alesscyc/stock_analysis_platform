@@ -1,5 +1,5 @@
 import './App.css'
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import SearchBar from '../component/SearchBar'
 import StockChart from '../component/StockChart';
 import TradeDialog from '../component/TradeDialog';
@@ -25,6 +25,21 @@ function App() {
   const [ibConnected, setIbConnected] = useState(false);
   const [fundamentals, setFundamentals] = useState(null);
   const [showFundamentals, setShowFundamentals] = useState(false);
+  const stockDataCacheRef = useRef(new Map());
+
+  const getStockDataCacheKey = useCallback((symbol, interval = '1d', autoPredict = false) => {
+    return `${String(symbol || '').trim().toUpperCase()}-max-${interval}-${autoPredict ? 'true' : 'false'}`;
+  }, []);
+
+  const rememberStockData = useCallback((symbol, data, meta = {}) => {
+    if (!symbol || !Array.isArray(data) || data.length === 0) return;
+
+    const key = getStockDataCacheKey(symbol, meta.interval || '1d', meta.autoPredict === true);
+    stockDataCacheRef.current.set(key, {
+      data,
+      timestamp: Date.now(),
+    });
+  }, [getStockDataCacheKey]);
 
   const fetchStockData = async (stock, interval = '1d', autoPredictEnabled = true) => {
     setLoading(true);
@@ -37,6 +52,33 @@ function App() {
         setCurrentInterval(interval);
         setIsMock(true);
         const prediction = mockData.find(item => item.prediction)?.prediction;
+        if (prediction) setAiPrediction(prediction);
+        return;
+      }
+
+      if (
+        Array.isArray(stock?.chartData) &&
+        stock.chartData.length > 0 &&
+        stock.chartDataMeta?.interval === interval
+      ) {
+        setStockData(stock.chartData);
+        setCurrentInterval(interval);
+        setIsMock(false);
+        rememberStockData(stock.symbol, stock.chartData, stock.chartDataMeta);
+        const prediction = stock.chartData.find(item => item.prediction)?.prediction;
+        if (prediction) setAiPrediction(prediction);
+        return;
+      }
+
+      const cached = !autoPredictEnabled
+        ? stockDataCacheRef.current.get(getStockDataCacheKey(stock.symbol, interval, false))
+        : null;
+
+      if (cached?.data?.length > 0) {
+        setStockData(cached.data);
+        setCurrentInterval(interval);
+        setIsMock(false);
+        const prediction = cached.data.find(item => item.prediction)?.prediction;
         if (prediction) setAiPrediction(prediction);
         return;
       }
@@ -54,6 +96,7 @@ function App() {
         setStockData(data);
         setCurrentInterval(interval);
         setIsMock(false);
+        rememberStockData(stock.symbol, data, { interval, autoPredict: autoPredictEnabled });
         // Only update the prediction when the API actually returned one.
         // This keeps the last known prediction visible during interval changes.
         const prediction = data.find(item => item.prediction)?.prediction;
@@ -382,7 +425,12 @@ function App() {
           <PortfolioDialog isOpen={activeSidebar === 'portfolio'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
           <OrdersDialog isOpen={activeSidebar === 'orders'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
           <WatchlistDialog isOpen={activeSidebar === 'watchlist'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
-          <ScreenerDialog isOpen={activeSidebar === 'screener'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
+          <ScreenerDialog
+            isOpen={activeSidebar === 'screener'}
+            onClose={() => setActiveSidebar(null)}
+            onStockSelect={handleStockSelect}
+            onStockDataScanned={rememberStockData}
+          />
         </aside>
       </div>
     </div>

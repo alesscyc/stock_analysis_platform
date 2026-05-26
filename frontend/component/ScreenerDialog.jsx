@@ -22,7 +22,7 @@ function clampNumber(value, min, max, fallback) {
   return Math.min(max, Math.max(min, num));
 }
 
-function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
+function ScreenerDialog({ isOpen, onClose, onStockSelect, onStockDataScanned }) {
   const { t } = useTranslation();
   const [symbolsText, setSymbolsText] = useState('');
   const [conditions, setConditions] = useState(DEFAULT_CONDITIONS);
@@ -161,6 +161,12 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
         const data = await response.json();
         if (!Array.isArray(data) || data.length === 0) continue;
 
+        onStockDataScanned?.(symbol, data, {
+          dateRange: 'max',
+          interval: '1d',
+          autoPredict: false,
+        });
+
         const check = checkConditions(data);
         if (check.pass) {
           const latest = data[data.length - 1];
@@ -177,6 +183,7 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
             close,
             weekChange,
             monthChange,
+            chartData: data,
           };
 
           setResults(prev => [...prev, match]);
@@ -192,7 +199,7 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
 
     setLoading(false);
     abortRef.current = null;
-  }, [symbolsText, enabledConditions, parseSymbols, checkConditions, t]);
+  }, [symbolsText, enabledConditions, parseSymbols, checkConditions, onStockDataScanned, t]);
 
   const handleCancel = useCallback(() => {
     if (abortRef.current) {
@@ -202,9 +209,33 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
     setLoading(false);
   }, []);
 
-  const handleRowClick = useCallback((symbol) => {
-    onStockSelect({ symbol });
+  const handleRowClick = useCallback((row) => {
+    onStockSelect({
+      symbol: row.symbol,
+      chartData: row.chartData,
+      chartDataMeta: {
+        dateRange: 'max',
+        interval: '1d',
+        autoPredict: false,
+      },
+    });
   }, [onStockSelect]);
+
+  const handleResultRowKeyDown = useCallback((event, row, index) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleRowClick(row);
+      return;
+    }
+
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+
+    event.preventDefault();
+    const direction = event.key === 'ArrowDown' ? 1 : -1;
+    const nextIndex = Math.min(results.length - 1, Math.max(0, index + direction));
+    event.currentTarget.parentElement?.children[nextIndex]?.focus();
+    handleRowClick(results[nextIndex]);
+  }, [handleRowClick, results]);
 
   const handleClear = useCallback(() => {
     setSymbolsText('');
@@ -424,11 +455,14 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect }) {
                 </tr>
               </thead>
               <tbody>
-                {results.map((row) => (
+                {results.map((row, index) => (
                   <tr
                     key={row.symbol}
                     className="screener-result-row"
-                    onClick={() => handleRowClick(row.symbol)}
+                    onClick={() => handleRowClick(row)}
+                    onKeyDown={(event) => handleResultRowKeyDown(event, row, index)}
+                    role="button"
+                    tabIndex={0}
                     title={t('clickToViewChart', { symbol: row.symbol })}
                   >
                     <td className="screener-symbol-cell">{row.symbol}</td>

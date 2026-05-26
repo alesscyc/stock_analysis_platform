@@ -264,9 +264,15 @@
   transition: background 0.1s, border-color 0.1s;
 }
 
-.watchlist-item:hover {
+.watchlist-item:hover,
+.watchlist-item:focus-visible {
   background: var(--bg-hover);
   border-color: var(--border-normal);
+}
+
+.watchlist-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .watchlist-item-info {

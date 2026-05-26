@@ -187,6 +187,22 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
     }
   }, [onStockSelect]);
 
+  const handleWatchlistItemKeyDown = useCallback((event, item, index) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleWatchlistItemClick(item);
+      return;
+    }
+
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+
+    event.preventDefault();
+    const direction = event.key === 'ArrowDown' ? 1 : -1;
+    const nextIndex = Math.min(watchlist.length - 1, Math.max(0, index + direction));
+    event.currentTarget.parentElement?.children[nextIndex]?.focus();
+    handleWatchlistItemClick(watchlist[nextIndex]);
+  }, [handleWatchlistItemClick, watchlist]);
+
   const handleKeyDown = (e) => {
     if (!showSuggestions || suggestions.length === 0) {
       if (e.key === 'Escape') {
@@ -314,11 +330,14 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
                 <span>{t('loadingPrices')}</span>
               </div>
             )}
-            {watchlist.map((item) => (
+            {watchlist.map((item, index) => (
               <div
                 key={item.symbol}
                 className="watchlist-item"
                 onClick={() => handleWatchlistItemClick(item)}
+                onKeyDown={(event) => handleWatchlistItemKeyDown(event, item, index)}
+                role="button"
+                tabIndex={0}
                 title={t('loadChart', { symbol: item.symbol })}
               >
                 <div className="watchlist-item-info">

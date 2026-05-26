@@ -92,10 +92,20 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
     onStockSelect({ symbol: row.symbol });
   };
 
-  const handleRowKeyDown = (event, row) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
+  const handleRowKeyDown = (event, row, index) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleRowClick(row);
+      return;
+    }
+
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+
     event.preventDefault();
-    handleRowClick(row);
+    const direction = event.key === 'ArrowDown' ? 1 : -1;
+    const nextIndex = Math.min(orders.length - 1, Math.max(0, index + direction));
+    event.currentTarget.parentElement?.children[nextIndex]?.focus();
+    handleRowClick(orders[nextIndex]);
   };
 
   const handleCancelOrder = async (orderId) => {
@@ -196,12 +206,12 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((row) => (
+                  {orders.map((row, index) => (
                     <tr
                       key={row.orderId}
                       className="orders-clickable-row"
                       onClick={() => handleRowClick(row)}
-                      onKeyDown={(event) => handleRowKeyDown(event, row)}
+                      onKeyDown={(event) => handleRowKeyDown(event, row, index)}
                       role="button"
                       tabIndex={0}
                       title={t('loadChart', { symbol: row.symbol })}
