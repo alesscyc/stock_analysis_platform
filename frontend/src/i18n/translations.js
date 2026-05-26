@@ -45,6 +45,8 @@ export const translations = {
     recentVolatility: 'Recent Volatility',
     noStockData: 'No stock data available',
     ibNotConnected: 'IB Gateway not connected',
+    position: 'Position',
+    sharesAt: 'shares @',
 
     // TradeDialog.jsx
     orderTicket: 'ORDER TICKET',
@@ -236,6 +238,8 @@ export const translations = {
     recentVolatility: '近期波動',
     noStockData: '無股票數據',
     ibNotConnected: 'IB Gateway 未連接',
+    position: '持倉',
+    sharesAt: '股 @',
 
     // TradeDialog.jsx
     orderTicket: '交易單',

@@ -71,10 +71,13 @@ IB_PORT=4001
 IB_CLIENT_ID=1
 IB_PORTFOLIO_SYNC_TIMEOUT_MS=30000
 IB_ORDER_ID_WAIT_TIMEOUT_MS=15000
+IB_OPEN_ORDERS_SYNC_TIMEOUT_MS=15000
 FINNHUB_KEY=your_finnhub_api_key   # optional — symbol search degrades without it
 ```
 
 **Account selection:** when IB returns multiple accounts, the backend automatically uses the **second** account (`accounts[1]`). If only one account exists, it uses that one.
+
+**Pending orders:** API orders refresh live from IB. To include manual TWS/IBKR open orders too, set `IB_CLIENT_ID=0` so the backend can enable IB's auto-open-order binding.
 
 ---
 

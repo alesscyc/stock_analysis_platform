@@ -108,10 +108,13 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
     handleRowClick(orders[nextIndex]);
   };
 
-  const handleCancelOrder = async (orderId) => {
-    setCancellingId(orderId);
+  const getOrderRef = (row) => row.id ?? row.permId ?? row.orderId;
+
+  const handleCancelOrder = async (row) => {
+    const orderRef = getOrderRef(row);
+    setCancellingId(orderRef);
     try {
-      const response = await fetch(`/api/orders/${orderId}/cancel`, {
+      const response = await fetch(`/api/orders/${encodeURIComponent(orderRef)}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -119,7 +122,7 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
       if (!response.ok) {
         throw new Error(data.error || t('failedCancelOrder'));
       }
-      setOrders((prev) => prev.filter((o) => o.orderId !== orderId));
+      setOrders((prev) => prev.filter((o) => getOrderRef(o) !== orderRef));
     } catch (err) {
       setError(err.message || t('failedCancelOrder'));
     } finally {
@@ -208,7 +211,7 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
                 <tbody>
                   {orders.map((row, index) => (
                     <tr
-                      key={row.orderId}
+                      key={row.id ?? row.permId ?? `${row.orderId}-${index}`}
                       className="orders-clickable-row"
                       onClick={() => handleRowClick(row)}
                       onKeyDown={(event) => handleRowKeyDown(event, row, index)}
@@ -237,13 +240,13 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
                             className="orders-cancel-btn"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleCancelOrder(row.orderId);
+                              handleCancelOrder(row);
                             }}
-                            disabled={cancellingId === row.orderId}
+                            disabled={cancellingId === getOrderRef(row)}
                             aria-label={t('cancelOrder')}
                             title={t('cancelOrder')}
                           >
-                            {cancellingId === row.orderId ? (
+                            {cancellingId === getOrderRef(row) ? (
                               <span className="orders-cancel-spinner" />
                             ) : (
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">

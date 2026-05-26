@@ -15,6 +15,7 @@ const cache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const ALLOWED_ORDER_ACTIONS = new Set(['BUY', 'SELL']);
 const ALLOWED_TIME_IN_FORCE = new Set(['DAY', 'GTC', 'IOC', 'FOK']);
+const TERMINAL_ORDER_STATUSES = new Set(['Filled', 'Cancelled', 'ApiCancelled', 'Rejected']);
 
 // Interactive Brokers Gateway portfolio cache
 const IB_HOST = process.env.IB_HOST;
@@ -22,6 +23,7 @@ const IB_PORT = Number(process.env.IB_PORT);
 const IB_CLIENT_ID = Number(process.env.IB_CLIENT_ID);
 const IB_PORTFOLIO_SYNC_TIMEOUT_MS = Number(process.env.IB_PORTFOLIO_SYNC_TIMEOUT_MS) || 30000;
 const IB_ORDER_ID_WAIT_TIMEOUT_MS = Number(process.env.IB_ORDER_ID_WAIT_TIMEOUT_MS) || 15000;
+const IB_OPEN_ORDERS_SYNC_TIMEOUT_MS = Number(process.env.IB_OPEN_ORDERS_SYNC_TIMEOUT_MS) || 15000;
 
 // Finnhub API key for symbol search
 const FINNHUB_KEY = process.env.FINNHUB_KEY;
@@ -55,6 +57,11 @@ const portfolioWaiters = new Set();
 // Open orders tracking
 let openOrdersById = new Map();
 let openOrdersReady = false;
+let openOrdersSnapshotInFlight = false;
+let lastOpenOrdersError = null;
+let lastOpenOrdersUpdatedAt = null;
+let autoOpenOrdersWarningShown = false;
+const openOrdersWaiters = new Set();
 
 function resetPortfolioSnapshot() {
   portfolioRowsByKey = new Map();
@@ -147,6 +154,161 @@ function getOpenOrders() {
   return Array.from(openOrdersById.values()).sort((a, b) => a.orderId - b.orderId);
 }
 
+function getOpenOrderKey(orderId, order) {
+  const permId = Number(order?.permId);
+  return Number.isFinite(permId) && permId > 0 ? `perm:${permId}` : `order:${orderId}`;
+}
+
+function getOpenOrderKeyFromValues(orderId, permId) {
+  const normalizedPermId = Number(permId);
+  return Number.isFinite(normalizedPermId) && normalizedPermId > 0 ? `perm:${normalizedPermId}` : `order:${orderId}`;
+}
+
+function findOpenOrderEntry(orderRef) {
+  const normalizedRef = String(orderRef ?? '').trim();
+  if (!normalizedRef) return null;
+
+  const exactOrder = openOrdersById.get(normalizedRef);
+  if (exactOrder) return [normalizedRef, exactOrder];
+
+  const numericRef = Number(normalizedRef);
+  if (Number.isInteger(numericRef)) {
+    const numericKeyOrder = openOrdersById.get(numericRef);
+    if (numericKeyOrder) return [numericRef, numericKeyOrder];
+
+    const matchingEntries = Array.from(openOrdersById.entries())
+      .filter(([, order]) => order.orderId === numericRef || order.permId === numericRef);
+
+    if (matchingEntries.length === 1) {
+      return matchingEntries[0];
+    }
+  }
+
+  return null;
+}
+
+function findOpenOrderEntryByStatus(orderId, permId) {
+  const orderKey = getOpenOrderKeyFromValues(orderId, permId);
+  const exactOrder = openOrdersById.get(orderKey);
+  if (exactOrder) return [orderKey, exactOrder];
+
+  const matches = Array.from(openOrdersById.entries()).filter(([, order]) => {
+    if (Number.isFinite(Number(permId)) && Number(permId) > 0) {
+      return order.permId === Number(permId) || order.orderId === orderId;
+    }
+    return order.orderId === orderId;
+  });
+
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function hasAmbiguousIbOrderId(order) {
+  return Array.from(openOrdersById.values())
+    .filter((candidate) => candidate.orderId === order.orderId)
+    .length > 1;
+}
+
+function trackSubmittedOpenOrder(orderId, order) {
+  const orderKey = getOpenOrderKeyFromValues(orderId, order.permId);
+  openOrdersById.set(orderKey, {
+    id: orderKey,
+    permId: null,
+    ...order,
+    orderId,
+  });
+}
+
+function resolveOpenOrdersWaiters() {
+  const orders = getOpenOrders();
+
+  for (const waiter of openOrdersWaiters) {
+    clearTimeout(waiter.timer);
+    waiter.resolve(orders);
+  }
+
+  openOrdersWaiters.clear();
+}
+
+function rejectOpenOrdersWaiters(message) {
+  for (const waiter of openOrdersWaiters) {
+    clearTimeout(waiter.timer);
+    waiter.reject(new Error(message));
+  }
+
+  openOrdersWaiters.clear();
+}
+
+function finalizeOpenOrdersSnapshot() {
+  openOrdersReady = true;
+  openOrdersSnapshotInFlight = false;
+  lastOpenOrdersError = null;
+  lastOpenOrdersUpdatedAt = Date.now();
+
+  resolveOpenOrdersWaiters();
+}
+
+function failOpenOrdersSnapshot(message) {
+  openOrdersReady = false;
+  openOrdersSnapshotInFlight = false;
+  lastOpenOrdersError = message;
+  lastOpenOrdersUpdatedAt = null;
+
+  rejectOpenOrdersWaiters(message);
+}
+
+function requestOpenOrdersSnapshot() {
+  if (!ibConnected) {
+    failOpenOrdersSnapshot('IB Gateway is not connected');
+    return;
+  }
+
+  if (openOrdersSnapshotInFlight) return;
+
+  openOrdersById = new Map();
+  openOrdersReady = false;
+  openOrdersSnapshotInFlight = true;
+  lastOpenOrdersError = null;
+
+  if (IB_CLIENT_ID === 0) {
+    ib.reqAutoOpenOrders(true);
+  } else if (!autoOpenOrdersWarningShown) {
+    autoOpenOrdersWarningShown = true;
+    console.warn('[ib] To include manual TWS/IBKR open orders, connect with IB_CLIENT_ID=0 so reqAutoOpenOrders(true) can bind them');
+  }
+
+  ib.reqAllOpenOrders();
+}
+
+function waitForOpenOrdersSnapshot(timeoutMs = IB_OPEN_ORDERS_SYNC_TIMEOUT_MS, forceRefresh = false) {
+  if (openOrdersReady && !forceRefresh) {
+    return Promise.resolve(getOpenOrders());
+  }
+
+  return new Promise((resolve, reject) => {
+    const waiter = {
+      resolve,
+      reject,
+      timer: null,
+    };
+
+    waiter.timer = setTimeout(() => {
+      openOrdersWaiters.delete(waiter);
+      reject(new Error(`Timed out waiting for IB open orders on ${IB_HOST}:${IB_PORT}`));
+    }, timeoutMs);
+
+    openOrdersWaiters.add(waiter);
+
+    try {
+      requestOpenOrdersSnapshot();
+    } catch (error) {
+      openOrdersWaiters.delete(waiter);
+      clearTimeout(waiter.timer);
+      failOpenOrdersSnapshot(error.message);
+      reject(error);
+    }
+  });
+}
+
 function normalizeOrderPrice(price) {
   const value = Number(price);
   return Number.isFinite(value) && value > 0 && Math.abs(value) < 1e100 ? value : null;
@@ -156,9 +318,12 @@ function serializeOpenOrder(orderId, contract, order, orderState, existingOrder)
   const limitPrice = normalizeOrderPrice(order?.lmtPrice)
     ?? normalizeOrderPrice(order?.auxPrice)
     ?? normalizeOrderPrice(existingOrder?.limitPrice);
+  const permId = Number(order?.permId || existingOrder?.permId || 0);
 
   return {
+    id: getOpenOrderKey(orderId, order),
     orderId,
+    permId: Number.isFinite(permId) && permId > 0 ? permId : null,
     symbol: contract?.symbol || 'UNKNOWN',
     action: order?.action || 'UNKNOWN',
     orderType: order?.orderType || existingOrder?.orderType || 'UNKNOWN',
@@ -175,6 +340,9 @@ function serializeOpenOrder(orderId, contract, order, orderState, existingOrder)
 function resetOpenOrders() {
   openOrdersById = new Map();
   openOrdersReady = false;
+  openOrdersSnapshotInFlight = false;
+  lastOpenOrdersError = null;
+  lastOpenOrdersUpdatedAt = null;
 }
 
 
@@ -360,11 +528,12 @@ ib.on('connected', () => {
       requestingNextOrderId = true;
       ib.reqIds(1);
       ib.reqPositions();
-      ib.reqAllOpenOrders();
       ib.reqManagedAccts();
+      requestOpenOrdersSnapshot();
     } catch (error) {
       requestingNextOrderId = false;
       failPortfolioSnapshot(error.message);
+      failOpenOrdersSnapshot(error.message);
       scheduleReconnect();
     }
   });
@@ -408,6 +577,7 @@ ib.on('disconnected', () => {
   if (wasConnected) {
     console.warn('[ib] Disconnected from IB Gateway');
     failPortfolioSnapshot('IB Gateway disconnected');
+    failOpenOrdersSnapshot('IB Gateway disconnected');
     scheduleReconnect();
   }
 });
@@ -421,6 +591,10 @@ ib.on('error', (error) => {
     failPortfolioSnapshot(message);
   }
 
+  if (openOrdersSnapshotInFlight) {
+    failOpenOrdersSnapshot(message);
+  }
+
   if (!ibConnected) {
     ibConnecting = false;
     nextOrderId = null;
@@ -430,14 +604,30 @@ ib.on('error', (error) => {
   }
 });
 
-ib.on('orderStatus', (id, status, filled, remaining, avgFillPrice) => {
+ib.on('orderStatus', (id, status, filled, remaining, avgFillPrice, permId) => {
   console.log(
     `[ib] Order ${id} status=${status} filled=${filled} remaining=${remaining} avgFillPrice=${avgFillPrice}`
   );
+
+  const orderEntry = findOpenOrderEntryByStatus(id, permId);
   
-  // Remove order from tracking if it's filled, cancelled, or rejected
-  if (['Filled', 'Cancelled', 'ApiCancelled', 'Rejected','Inactive'].includes(status)) {
-    openOrdersById.delete(id);
+  // Inactive bracket children are still active orders in IB, so keep them visible.
+  if (TERMINAL_ORDER_STATUSES.has(status)) {
+    if (orderEntry) {
+      openOrdersById.delete(orderEntry[0]);
+    }
+    return;
+  }
+
+  const existingOrder = orderEntry?.[1];
+  if (existingOrder) {
+    openOrdersById.set(orderEntry[0], {
+      ...existingOrder,
+      status,
+      filled: Number(filled || 0),
+      remaining: Number(remaining || existingOrder.remaining || 0),
+      avgFillPrice: Number(avgFillPrice || 0),
+    });
   }
 });
 
@@ -458,16 +648,21 @@ ib.on('positionEnd', () => {
 
 ib.on('openOrder', (orderId, contract, order, orderState) => {
   if (!ibConnected) return;
-  const serialized = serializeOpenOrder(orderId, contract, order, orderState, openOrdersById.get(orderId));
-  openOrdersById.set(orderId, serialized);
+  const orderKey = getOpenOrderKey(orderId, order);
+  const serialized = serializeOpenOrder(orderId, contract, order, orderState, openOrdersById.get(orderKey));
+  openOrdersById.set(orderKey, serialized);
   const priceLabel = serialized.limitPrice == null ? 'market' : `$${serialized.limitPrice}`;
-  console.log(`[ib] Open order ${orderId}: ${serialized.symbol} ${serialized.action} ${serialized.quantity} @ ${priceLabel} (status: ${serialized.status})`);
+  const permIdLabel = serialized.permId ? ` permId=${serialized.permId}` : '';
+  console.log(`[ib] Open order ${orderId}${permIdLabel}: ${serialized.symbol} ${serialized.action} ${serialized.orderType} ${serialized.quantity} @ ${priceLabel} (status: ${serialized.status})`);
 });
 
 ib.on('openOrderEnd', () => {
   if (!ibConnected) return;
-  openOrdersReady = true;
-  console.log(`[ib] Open orders snapshot complete with ${getOpenOrders().length} order(s)`);
+  finalizeOpenOrdersSnapshot();
+  const updatedAt = lastOpenOrdersUpdatedAt
+    ? new Date(lastOpenOrdersUpdatedAt).toISOString()
+    : 'unknown';
+  console.log(`[ib] Open orders snapshot complete with ${getOpenOrders().length} order(s) at ${updatedAt}`);
 });
 
 app.use(cors());
@@ -808,7 +1003,7 @@ app.post('/api/orders', async (req, res) => {
         const takeProfitOrderId = orderId + 1;
         const stopLossOrderId = orderId + 2;
 
-        openOrdersById.set(orderId, {
+        trackSubmittedOpenOrder(orderId, {
           orderId,
           symbol,
           action,
@@ -822,7 +1017,7 @@ app.post('/api/orders', async (req, res) => {
           bracketRole: 'parent',
         });
 
-        openOrdersById.set(takeProfitOrderId, {
+        trackSubmittedOpenOrder(takeProfitOrderId, {
           orderId: takeProfitOrderId,
           symbol,
           action: takeProfitOrder.action,
@@ -836,7 +1031,7 @@ app.post('/api/orders', async (req, res) => {
           bracketRole: 'takeProfit',
         });
 
-        openOrdersById.set(stopLossOrderId, {
+        trackSubmittedOpenOrder(stopLossOrderId, {
           orderId: stopLossOrderId,
           symbol,
           action: stopLossOrder.action,
@@ -875,7 +1070,7 @@ app.post('/api/orders', async (req, res) => {
         };
       }
 
-      openOrdersById.set(orderId, {
+      trackSubmittedOpenOrder(orderId, {
         orderId,
         symbol,
         action,
@@ -924,25 +1119,25 @@ app.get('/api/portfolio', async (req, res) => {
   }
 });
 
-app.get('/api/orders/pending', (req, res) => {
+app.get('/api/orders/pending', async (req, res) => {
   try {
     if (!ibConnected) {
       return res.status(503).json({ error: 'IB Gateway is not connected' });
     }
     
-    const orders = getOpenOrders();
+    const orders = await waitForOpenOrdersSnapshot(IB_OPEN_ORDERS_SYNC_TIMEOUT_MS, true);
     res.json(orders);
   } catch (error) {
     console.error('Error fetching pending IB orders:', error);
-    res.status(500).json({ error: error.message || 'Failed to fetch pending orders from IB Gateway' });
+    res.status(503).json({ error: lastOpenOrdersError || error.message || 'Failed to fetch pending orders from IB Gateway' });
   }
 });
 
-app.post('/api/orders/:orderId/cancel', async (req, res) => {
+app.post('/api/orders/:orderRef/cancel', async (req, res) => {
   try {
-    const orderId = Number(req.params.orderId);
+    const orderRef = decodeURIComponent(String(req.params.orderRef ?? '').trim());
 
-    if (!Number.isInteger(orderId) || orderId < 0) {
+    if (!orderRef) {
       return res.status(400).json({ error: 'Invalid order ID' });
     }
 
@@ -950,13 +1145,25 @@ app.post('/api/orders/:orderId/cancel', async (req, res) => {
       return res.status(503).json({ error: 'IB Gateway is not connected' });
     }
 
-    const order = openOrdersById.get(orderId);
+    const orderEntry = findOpenOrderEntry(orderRef);
+    const order = orderEntry?.[1];
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    if (['Filled', 'Cancelled', 'ApiCancelled', 'Rejected', 'Inactive'].includes(order.status)) {
+    const orderId = Number(order.orderId);
+    if (!Number.isInteger(orderId) || orderId < 0) {
+      return res.status(400).json({ error: 'Invalid IB order ID' });
+    }
+
+    if (TERMINAL_ORDER_STATUSES.has(order.status)) {
       return res.status(400).json({ error: `Order is already ${order.status.toLowerCase()}` });
+    }
+
+    if (hasAmbiguousIbOrderId(order)) {
+      return res.status(409).json({
+        error: 'IB returned duplicate order IDs for open orders; cancel this order in IB Gateway/TWS to avoid cancelling the wrong order',
+      });
     }
 
     ib.cancelOrder(orderId);
@@ -966,6 +1173,8 @@ app.post('/api/orders/:orderId/cancel', async (req, res) => {
       success: true,
       message: `Cancel request sent for order ${orderId}`,
       orderId,
+      id: order.id,
+      permId: order.permId,
     });
   } catch (error) {
     console.error('Error cancelling IB order:', error);
