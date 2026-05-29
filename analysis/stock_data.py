@@ -114,7 +114,11 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
         # Dollar volume (Close * Volume)
         hist['Dollar_Volume'] = hist['Close'] * hist['Volume']
 
-        if interval == '1d':
+        # ── ML feature computation (only when auto_predict is requested) ──
+        # The chart does NOT display these 16 features — they are only used for
+        # RandomForest training and prediction. Skipping them when auto_predict=false
+        # saves ~100 lines of rolling-window pandas operations per symbol load.
+        if auto_predict and interval == '1d':
             
             # Technical indicator features (binary: 1 = True, 0 = False)
             hist['MA50_above_MA150'] = (hist['50MA'] > hist['150MA']).astype(int)
@@ -233,7 +237,7 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
                 "10MA": round(float(row['10MA']), 2) if pd.notna(row['10MA']) else None,
                 "MarketCap": market_cap
             }
-            if interval == '1d':
+            if auto_predict and interval == '1d':
                 data_point["MA50_above_MA150"] = int(row['MA50_above_MA150']) if pd.notna(row['MA50_above_MA150']) else None
                 data_point["MA150_above_MA200"] = int(row['MA150_above_MA200']) if pd.notna(row['MA150_above_MA200']) else None
                 data_point["Price_above_MA50"] = int(row['Price_above_MA50']) if pd.notna(row['Price_above_MA50']) else None

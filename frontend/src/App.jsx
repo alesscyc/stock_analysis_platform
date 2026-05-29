@@ -30,8 +30,15 @@ function App() {
   const stockDataCacheRef = useRef(new Map());
   const orderModificationCommittedRef = useRef(false);
 
+  // Use '2y' as the default date_range — 'max' can return 40+ years of data
+  // for popular symbols (10,000+ rows), which dramatically slows down yfinance
+  // download, feature computation, serialization, transfer, and chart rendering.
+  // 2 years (~500 trading days) is more than sufficient for chart display and
+  // still provides ample data for ML feature computation (200MA needs ~200 days).
+  const DEFAULT_DATE_RANGE = '2y';
+
   const getStockDataCacheKey = useCallback((symbol, interval = '1d', autoPredict = false) => {
-    return `${String(symbol || '').trim().toUpperCase()}-max-${interval}-${autoPredict ? 'true' : 'false'}`;
+    return `${String(symbol || '').trim().toUpperCase()}-${DEFAULT_DATE_RANGE}-${interval}-${autoPredict ? 'true' : 'false'}`;
   }, []);
 
   const rememberStockData = useCallback((symbol, data, meta = {}) => {
@@ -89,7 +96,7 @@ function App() {
       // Normal API call (local dev)
       const autoPredictParam = autoPredictEnabled ? 'true' : 'false';
       const response = await fetch(
-        `/api/stock/${stock.symbol}?date_range=max&interval=${interval}&auto_predict=${autoPredictParam}`
+        `/api/stock/${stock.symbol}?date_range=${DEFAULT_DATE_RANGE}&interval=${interval}&auto_predict=${autoPredictParam}`
       );
       const data = await response.json();
       if (!response.ok || data.error) {
@@ -138,8 +145,11 @@ function App() {
     setAiPrediction(null);
     setFundamentals(null);
     setShowFundamentals(false);
-    await fetchStockData(stock, currentInterval);
-    await fetchFundamentals(stock);
+    // Fire both requests in parallel — fundamentals don't depend on stock data
+    await Promise.all([
+      fetchStockData(stock, currentInterval),
+      fetchFundamentals(stock),
+    ]);
   };
 
   const handleIntervalChange = async (interval) => {

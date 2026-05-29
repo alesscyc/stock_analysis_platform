@@ -409,13 +409,6 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     };
   }, [ibConnected, stockSymbol, ordersRefreshToken]);
 
-  // ── Derived values used outside the chart ────────────────
-  const latestClose = useMemo(() => {
-    if (!stockData || stockData.length === 0) return null;
-    const item = [...stockData].reverse().find(d => d.Close != null);
-    return item ? Math.round(parseFloat(item.Close) * 100) / 100 : null;
-  }, [stockData]);
-
   // ── Transform raw API data into series arrays ────────────
   const { candleData, volumeData, maData, vol20maData } = useMemo(() => {
     if (!stockData || stockData.length === 0) {
@@ -772,7 +765,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     if (visibleRange) {
       chartRef.current?.timeScale().setVisibleRange(visibleRange);
     }
-  }, [candleData, volumeData, maData, vol20maData, latestClose, visibleRange]);
+  }, [candleData, volumeData, maData, vol20maData, visibleRange]);
 
   // ── Draw / update IB horizontal lines on candlestick series ──
   useEffect(() => {
