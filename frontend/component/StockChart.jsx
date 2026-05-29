@@ -6,6 +6,7 @@ import {
   HistogramSeries,
   LineSeries,
   CrosshairMode,
+  LineStyle,
 } from 'lightweight-charts';
 import './StockChart.css';
 import { useTranslation } from '../src/i18n/useTranslation';
@@ -44,6 +45,10 @@ function createHorizontalLinesPrimitive() {
       requestUpdate?.();
     },
 
+    getLine(index) {
+      return lines[index] || null;
+    },
+
     hitTest(mouseX, mouseY) {
       if (!chart || !series || !lines || lines.length === 0) return -1;
       const mediaWidth = chart.timeScale().width();
@@ -54,9 +59,12 @@ function createHorizontalLinesPrimitive() {
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        if (!line.title) continue;
         const y = series.priceToCoordinate(line.price);
         if (y === null) continue;
+        if (line.draggable && Math.abs(mouseY - y) <= 6) {
+          return i;
+        }
+        if (!line.title) continue;
         const textW = line.title.length * 7; // rough width estimate (px)
         const boxW = textW + padX * 2;
         const boxH = fontSize + padY * 2;
@@ -105,7 +113,9 @@ function createHorizontalLinesPrimitive() {
                 ctx.beginPath();
                 ctx.strokeStyle = line.color;
                 ctx.lineWidth = (line.lineWidth || 1) * (isHovered ? 1.5 : 1);
-                if (line.dashed) {
+                if (line.dotted) {
+                  ctx.setLineDash([2 * hr, 4 * hr]);
+                } else if (line.dashed) {
                   ctx.setLineDash([6 * hr, 4 * hr]);
                 } else {
                   ctx.setLineDash([]);
@@ -115,22 +125,18 @@ function createHorizontalLinesPrimitive() {
                 ctx.stroke();
                 ctx.setLineDash([]);
 
-                // Draw centered label
                 if (line.title) {
                   const fontSize = Math.round(11 * hr);
                   ctx.font = `600 ${fontSize}px 'Inter', 'Helvetica Neue', Arial, sans-serif`;
                   const metrics = ctx.measureText(line.title);
                   const padX = 6 * hr;
                   const padY = 3 * vr;
-                  const textW = metrics.width;
-                  const textH = fontSize;
-                  const boxW = textW + padX * 2;
-                  const boxH = textH + padY * 2;
+                  const boxW = metrics.width + padX * 2;
+                  const boxH = fontSize + padY * 2;
                   const cx = (left + right) / 2;
                   const boxX = cx - boxW / 2;
                   const boxY = yPx - boxH / 2;
 
-                  // Rounded pill background (opaque)
                   ctx.fillStyle = isHovered ? line.color : '#1c2030';
                   ctx.strokeStyle = line.color;
                   ctx.lineWidth = isHovered ? 2 : 1;
@@ -145,12 +151,12 @@ function createHorizontalLinesPrimitive() {
                   ctx.fill();
                   ctx.stroke();
 
-                  // Text
                   ctx.fillStyle = isHovered ? '#ffffff' : line.color;
                   ctx.textAlign = 'center';
                   ctx.textBaseline = 'middle';
                   ctx.fillText(line.title, cx, yPx + 1 * vr);
                 }
+
               };
 
               // Draw non-hovered first
@@ -286,9 +292,11 @@ function saveWatchlist(list) {
   localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(list));
 }
 
-function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick, ibConnected }) {
+function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick, onOrderPriceDrag, orderModification, ibConnected, ordersRefreshToken }) {
   const containerRef = useRef(null);
   const chartRef     = useRef(null);
+  const onOrderPriceDragRef = useRef(onOrderPriceDrag);
+  const dragOrderRef = useRef(null);
 
   // series refs — held outside React state so we don't trigger re-renders
   const candleSeriesRef  = useRef(null);
@@ -297,6 +305,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   const swingZonesPrimitiveRef = useRef(null);
   const vol20maSeriesRef       = useRef(null);
   const ibLinesPrimitiveRef    = useRef(null);
+  const ibPriceLinesRef        = useRef([]);
 
   const [maVisibility, setMaVisibility] = usePersistedState('chart-ma-visibility',
     () => Object.fromEntries(MA_CONFIG.map(m => [m.key, true]))
@@ -311,6 +320,25 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   const [ibPosition, setIbPosition] = useState(null);
   const [symbolOrders, setSymbolOrders] = useState([]);
   const { t } = useTranslation();
+
+  useEffect(() => {
+    onOrderPriceDragRef.current = onOrderPriceDrag;
+  }, [onOrderPriceDrag]);
+
+  useEffect(() => {
+    if (!orderModification?.order) return;
+    const nextPrice = Number(orderModification.price);
+    if (!Number.isFinite(nextPrice) || nextPrice <= 0) return;
+
+    const orderRef = orderModification.order.id
+      ?? orderModification.order.permId
+      ?? orderModification.order.orderId;
+
+    setSymbolOrders(prev => prev.map(order => {
+      const candidateRef = order.id ?? order.permId ?? order.orderId;
+      return candidateRef === orderRef ? { ...order, limitPrice: nextPrice } : order;
+    }));
+  }, [orderModification]);
 
   const handleAddToWatchlist = useCallback(() => {
     if (!stockSymbol) return;
@@ -376,8 +404,10 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     }
 
     fetchIBData();
-    return () => { cancelled = true; };
-  }, [ibConnected, stockSymbol]);
+    return () => {
+      cancelled = true;
+    };
+  }, [ibConnected, stockSymbol, ordersRefreshToken]);
 
   // ── Derived values used outside the chart ────────────────
   const latestClose = useMemo(() => {
@@ -643,19 +673,75 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     const containerEl = containerRef.current;
     ro.observe(containerEl);
 
-    // ── Mouse move for IB label hover-to-front ───────────────
+    // ── Mouse drag for pending IB order price lines ──────────
+    const getMousePoint = (e) => {
+      const rect = containerEl.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+    };
+
+    const getPriceFromY = (y) => {
+      const series = candleSeriesRef.current;
+      if (!series || typeof series.coordinateToPrice !== 'function') return null;
+      const price = series.coordinateToPrice(y);
+      if (!Number.isFinite(price) || price <= 0) return null;
+      return Math.round(price * 100) / 100;
+    };
+
+    const handleMouseDown = (e) => {
+      if (!ibLinesPrimitiveRef.current) return;
+      const point = getMousePoint(e);
+      const hit = ibLinesPrimitiveRef.current.hitTest(point.x, point.y);
+      const line = ibLinesPrimitiveRef.current.getLine(hit);
+      if (!line?.draggable || !line.order) return;
+
+      e.preventDefault();
+      dragOrderRef.current = line.order;
+      chart.applyOptions({ handleScroll: false });
+      containerEl.classList.add('dragging-order-line');
+    };
+
+    const handleMouseUp = () => {
+      if (dragOrderRef.current) {
+        const finalOrder = dragOrderRef.current;
+        chart.applyOptions({ handleScroll: true });
+        onOrderPriceDragRef.current?.(finalOrder, finalOrder.limitPrice);
+      }
+      dragOrderRef.current = null;
+      containerEl.classList.remove('dragging-order-line');
+    };
+
     const handleMouseMove = (e) => {
       if (!ibLinesPrimitiveRef.current) return;
-      const rect = containerEl.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const hit = ibLinesPrimitiveRef.current.hitTest(x, y);
+      const point = getMousePoint(e);
+
+      if (dragOrderRef.current) {
+        const nextPrice = getPriceFromY(point.y);
+        if (nextPrice == null) return;
+        const orderRef = dragOrderRef.current.id ?? dragOrderRef.current.permId ?? dragOrderRef.current.orderId;
+        setSymbolOrders(prev => prev.map(order => {
+          const candidateRef = order.id ?? order.permId ?? order.orderId;
+          return candidateRef === orderRef ? { ...order, limitPrice: nextPrice } : order;
+        }));
+        dragOrderRef.current = { ...dragOrderRef.current, limitPrice: nextPrice };
+        return;
+      }
+
+      const hit = ibLinesPrimitiveRef.current.hitTest(point.x, point.y);
       ibLinesPrimitiveRef.current.setHoveredIndex(hit >= 0 ? hit : null);
+      const line = ibLinesPrimitiveRef.current.getLine(hit);
+      containerEl.classList.toggle('hovering-order-line', Boolean(line?.draggable));
     };
+    containerEl.addEventListener('mousedown', handleMouseDown);
     containerEl.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
 
     return () => {
+      containerEl.removeEventListener('mousedown', handleMouseDown);
       containerEl.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
       ro.disconnect();
       chart.remove();
       chartRef.current = null;
@@ -665,6 +751,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       swingZonesPrimitiveRef.current = null;
       vol20maSeriesRef.current = null;
       ibLinesPrimitiveRef.current = null;
+      ibPriceLinesRef.current = [];
     };
   }, []); // only on mount/unmount
 
@@ -689,7 +776,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
 
   // ── Draw / update IB horizontal lines on candlestick series ──
   useEffect(() => {
-    if (!ibLinesPrimitiveRef.current) return;
+    if (!ibLinesPrimitiveRef.current || !candleSeriesRef.current) return;
 
     const lines = [];
 
@@ -698,8 +785,8 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
         price: ibPosition.avgCost,
         color: '#4488ff',
         lineWidth: 1,
-        dashed: true,
-        title: `Position ${ibPosition.quantity}`,
+        dashed: false,
+        title: `Cost ${ibPosition.quantity}`,
       });
     }
 
@@ -707,16 +794,32 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       const price = order.limitPrice != null ? Number(order.limitPrice) : null;
       if (price == null || isNaN(price)) continue;
       const isBuy = order.action === 'BUY';
+      const canModify = order.canModify !== false && Number(order.orderId) !== 0;
       lines.push({
         price,
         color: isBuy ? '#00e5c8' : '#ef5350',
         lineWidth: 1,
-        dashed: false,
+        dotted: true,
+        draggable: canModify,
+        order,
         title: `${order.action} ${order.quantity}`,
       });
     }
 
     ibLinesPrimitiveRef.current.setLines(lines);
+
+    for (const priceLine of ibPriceLinesRef.current) {
+      candleSeriesRef.current.removePriceLine(priceLine);
+    }
+
+    ibPriceLinesRef.current = lines.map(line => candleSeriesRef.current.createPriceLine({
+      price: line.price,
+      color: line.color,
+      lineWidth: 1,
+      lineStyle: line.dotted ? LineStyle.Dotted : LineStyle.Solid,
+      axisLabelVisible: true,
+      title: '',
+    }));
   }, [ibPosition, symbolOrders]);
 
   // ── Sync MA visibility with series ───────────────────────

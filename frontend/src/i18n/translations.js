@@ -50,6 +50,7 @@ export const translations = {
 
     // TradeDialog.jsx
     orderTicket: 'ORDER TICKET',
+    modifyOrder: 'MODIFY ORDER',
     tradeSymbol: 'Trade {{symbol}}',
     close: 'Close',
     buy: 'BUY',
@@ -76,6 +77,9 @@ export const translations = {
     bracketOrder: 'Bracket order',
     order: 'Order',
     failedSubmitOrder: 'Failed to submit order: {{error}}',
+    orderModified: 'Change submitted: {{action}} {{amount}} {{symbol}} @ ${{price}}',
+    failedModifyOrder: 'Failed to modify order: {{error}}',
+    confirmChange: 'Confirm Change',
     networkError: 'Network error. Please try again.',
     enterValidPrice: 'Enter a valid price greater than 0',
     enterValidShares: 'Enter a valid number of shares',
@@ -86,6 +90,7 @@ export const translations = {
     stopLossBelowEntry: 'Stop loss must be below entry',
     stopLossAboveEntry: 'Stop loss must be above entry',
     orderDisclaimer: 'Orders are routed through your connected IB Gateway using the entered limit price{{bracket}}.',
+    modifyOrderDisclaimer: 'Drag the dotted chart line or edit the price, then confirm to send the change to IB Gateway.',
     withBracket: ' with attached bracket exits',
 
     // PortfolioDialog.jsx

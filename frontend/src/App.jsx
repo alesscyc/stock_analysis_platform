@@ -25,7 +25,10 @@ function App() {
   const [ibConnected, setIbConnected] = useState(false);
   const [fundamentals, setFundamentals] = useState(null);
   const [showFundamentals, setShowFundamentals] = useState(false);
+  const [orderModification, setOrderModification] = useState(null);
+  const [ordersRefreshToken, setOrdersRefreshToken] = useState(0);
   const stockDataCacheRef = useRef(new Map());
+  const orderModificationCommittedRef = useRef(false);
 
   const getStockDataCacheKey = useCallback((symbol, interval = '1d', autoPredict = false) => {
     return `${String(symbol || '').trim().toUpperCase()}-max-${interval}-${autoPredict ? 'true' : 'false'}`;
@@ -144,6 +147,42 @@ function App() {
       await fetchStockData(selectedStock, interval, false);
     }
   };
+
+  const handleOrderPriceDrag = useCallback((order, price) => {
+    orderModificationCommittedRef.current = false;
+    setOrderModification({ order, price });
+    setActiveSidebar('trade');
+  }, []);
+
+  const handleOrderModified = useCallback(() => {
+    orderModificationCommittedRef.current = true;
+    setOrdersRefreshToken(prev => prev + 1);
+  }, []);
+
+  const handleOrderModificationPriceChange = useCallback((price) => {
+    setOrderModification(prev => prev ? { ...prev, price } : prev);
+  }, []);
+
+  const handleTradeClose = useCallback(() => {
+    setActiveSidebar(null);
+    setOrderModification(prev => {
+      if (prev && !orderModificationCommittedRef.current) {
+        setOrdersRefreshToken(token => token + 1);
+      }
+      orderModificationCommittedRef.current = false;
+      return null;
+    });
+  }, []);
+
+  const handleTradeButtonClick = useCallback(() => {
+    if (orderModification && !orderModificationCommittedRef.current) {
+      setOrdersRefreshToken(token => token + 1);
+    }
+
+    orderModificationCommittedRef.current = false;
+    setOrderModification(null);
+    setActiveSidebar(prev => (prev === 'trade' && !orderModification ? null : 'trade'));
+  }, [orderModification]);
 
   // Derive latest close from stockData for the instrument header
   const latestClose = useMemo(() => {
@@ -407,8 +446,11 @@ function App() {
                   currentInterval={currentInterval}
                   onIntervalChange={handleIntervalChange}
                   aiPrediction={aiPrediction}
-                  onTradeClick={() => setActiveSidebar(prev => prev === 'trade' ? null : 'trade')}
+                  onTradeClick={handleTradeButtonClick}
+                  onOrderPriceDrag={handleOrderPriceDrag}
+                  orderModification={orderModification}
                   ibConnected={ibConnected}
+                  ordersRefreshToken={ordersRefreshToken}
                 />
               </div>
             )}
@@ -418,9 +460,12 @@ function App() {
         <aside className={`app-sidebar${activeSidebar ? '' : ' app-sidebar-hidden'}`}>
           <TradeDialog
             isOpen={activeSidebar === 'trade'}
-            onClose={() => setActiveSidebar(null)}
+            onClose={handleTradeClose}
             stockSymbol={selectedStock?.symbol}
             ibConnected={ibConnected}
+            modification={orderModification}
+            onModificationPriceChange={handleOrderModificationPriceChange}
+            onModified={handleOrderModified}
           />
           <PortfolioDialog isOpen={activeSidebar === 'portfolio'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
           <OrdersDialog isOpen={activeSidebar === 'orders'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />

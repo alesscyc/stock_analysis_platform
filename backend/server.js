@@ -58,6 +58,7 @@ const portfolioWaiters = new Set();
 let openOrdersById = new Map();
 let openOrdersReady = false;
 let openOrdersSnapshotInFlight = false;
+let openOrdersSnapshotEndsPending = 0;
 let lastOpenOrdersError = null;
 let lastOpenOrdersUpdatedAt = null;
 let autoOpenOrdersWarningShown = false;
@@ -241,6 +242,7 @@ function rejectOpenOrdersWaiters(message) {
 function finalizeOpenOrdersSnapshot() {
   openOrdersReady = true;
   openOrdersSnapshotInFlight = false;
+  openOrdersSnapshotEndsPending = 0;
   lastOpenOrdersError = null;
   lastOpenOrdersUpdatedAt = Date.now();
 
@@ -250,6 +252,7 @@ function finalizeOpenOrdersSnapshot() {
 function failOpenOrdersSnapshot(message) {
   openOrdersReady = false;
   openOrdersSnapshotInFlight = false;
+  openOrdersSnapshotEndsPending = 0;
   lastOpenOrdersError = message;
   lastOpenOrdersUpdatedAt = null;
 
@@ -267,15 +270,19 @@ function requestOpenOrdersSnapshot() {
   openOrdersById = new Map();
   openOrdersReady = false;
   openOrdersSnapshotInFlight = true;
+  openOrdersSnapshotEndsPending = 0;
   lastOpenOrdersError = null;
 
   if (IB_CLIENT_ID === 0) {
     ib.reqAutoOpenOrders(true);
+    openOrdersSnapshotEndsPending += 1;
+    ib.reqOpenOrders();
   } else if (!autoOpenOrdersWarningShown) {
     autoOpenOrdersWarningShown = true;
     console.warn('[ib] To include manual TWS/IBKR open orders, connect with IB_CLIENT_ID=0 so reqAutoOpenOrders(true) can bind them');
   }
 
+  openOrdersSnapshotEndsPending += 1;
   ib.reqAllOpenOrders();
 }
 
@@ -332,8 +339,10 @@ function serializeOpenOrder(orderId, contract, order, orderState, existingOrder)
     status: orderState?.status || 'UNKNOWN',
     filled: Number(orderState?.filled || 0),
     remaining: Number(orderState?.remaining || 0),
+    tif: order?.tif || existingOrder?.tif || 'DAY',
     parentId: Number(order?.parentId || existingOrder?.parentId || 0),
     bracketRole: existingOrder?.bracketRole,
+    canModify: Number.isInteger(Number(orderId)) && Number(orderId) !== 0,
   };
 }
 
@@ -341,6 +350,7 @@ function resetOpenOrders() {
   openOrdersById = new Map();
   openOrdersReady = false;
   openOrdersSnapshotInFlight = false;
+  openOrdersSnapshotEndsPending = 0;
   lastOpenOrdersError = null;
   lastOpenOrdersUpdatedAt = null;
 }
@@ -658,6 +668,10 @@ ib.on('openOrder', (orderId, contract, order, orderState) => {
 
 ib.on('openOrderEnd', () => {
   if (!ibConnected) return;
+  if (openOrdersSnapshotEndsPending > 1) {
+    openOrdersSnapshotEndsPending -= 1;
+    return;
+  }
   finalizeOpenOrdersSnapshot();
   const updatedAt = lastOpenOrdersUpdatedAt
     ? new Date(lastOpenOrdersUpdatedAt).toISOString()
@@ -1013,8 +1027,10 @@ app.post('/api/orders', async (req, res) => {
           status: 'Submitted',
           filled: 0,
           remaining: quantity,
+          tif,
           parentId: 0,
           bracketRole: 'parent',
+          canModify: true,
         });
 
         trackSubmittedOpenOrder(takeProfitOrderId, {
@@ -1027,8 +1043,10 @@ app.post('/api/orders', async (req, res) => {
           status: 'Submitted',
           filled: 0,
           remaining: quantity,
+          tif,
           parentId: orderId,
           bracketRole: 'takeProfit',
+          canModify: true,
         });
 
         trackSubmittedOpenOrder(stopLossOrderId, {
@@ -1041,8 +1059,10 @@ app.post('/api/orders', async (req, res) => {
           status: 'Submitted',
           filled: 0,
           remaining: quantity,
+          tif,
           parentId: orderId,
           bracketRole: 'stopLoss',
+          canModify: true,
         });
 
         ib.placeOrder(orderId, contract, parentOrder);
@@ -1080,6 +1100,8 @@ app.post('/api/orders', async (req, res) => {
         status: 'Submitted',
         filled: 0,
         remaining: quantity,
+        tif,
+        canModify: true,
       });
 
       ib.placeOrder(orderId, contract, order);
@@ -1133,6 +1155,108 @@ app.get('/api/orders/pending', async (req, res) => {
   }
 });
 
+app.patch('/api/orders/:orderRef', async (req, res) => {
+  try {
+    const orderRef = decodeURIComponent(String(req.params.orderRef ?? '').trim());
+    const price = Number(req.body?.price);
+
+    if (!orderRef) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+
+    if (!Number.isFinite(price) || price <= 0) {
+      return res.status(400).json({ error: 'Price must be a positive number' });
+    }
+
+    if (!ibConnected) {
+      return res.status(503).json({ error: 'IB Gateway is not connected' });
+    }
+
+    const orderEntry = findOpenOrderEntry(orderRef);
+    const order = orderEntry?.[1];
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const orderId = Number(order.orderId);
+    if (!Number.isInteger(orderId) || orderId === 0) {
+      return res.status(409).json({
+        error: 'IB returned orderId 0 for this open order; it cannot be modified until TWS binds it to a non-zero API order ID.',
+      });
+    }
+
+    if (TERMINAL_ORDER_STATUSES.has(order.status)) {
+      return res.status(400).json({ error: `Order is already ${order.status.toLowerCase()}` });
+    }
+
+    if (hasAmbiguousIbOrderId(order)) {
+      return res.status(409).json({
+        error: 'IB returned duplicate order IDs for open orders; modify this order in IB Gateway/TWS to avoid changing the wrong order',
+      });
+    }
+
+    const orderType = String(order.orderType || '').toUpperCase();
+    if (orderType !== 'LMT' && orderType !== 'STP') {
+      return res.status(400).json({ error: `Order type ${order.orderType || 'UNKNOWN'} cannot be modified from this app` });
+    }
+
+    const quantity = Number(order.remaining || order.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return res.status(400).json({ error: 'Order has no remaining quantity to modify' });
+    }
+
+    const updatedOrder = {
+      action: order.action,
+      totalQuantity: quantity,
+      orderType,
+      tif: normalizeTimeInForce(order.tif),
+      transmit: true,
+    };
+
+    if (order.parentId) {
+      updatedOrder.parentId = order.parentId;
+    }
+
+    if (ibAccount) {
+      updatedOrder.account = ibAccount;
+    }
+
+    if (orderType === 'STP') {
+      updatedOrder.auxPrice = price;
+    } else {
+      updatedOrder.lmtPrice = price;
+    }
+
+    const contract = buildStockContract(order.symbol);
+    ib.placeOrder(orderId, contract, updatedOrder);
+
+    openOrdersById.set(orderEntry[0], {
+      ...order,
+      limitPrice: price,
+      tif: updatedOrder.tif,
+      remaining: quantity,
+    });
+
+    console.log(`[ib] Modify request sent for order ${orderId}: price=${price}`);
+
+    res.json({
+      success: true,
+      message: `Modify request sent for order ${orderId}`,
+      orderId,
+      id: order.id,
+      permId: order.permId,
+      symbol: order.symbol,
+      action: order.action,
+      quantity,
+      price,
+      orderType,
+    });
+  } catch (error) {
+    console.error('Error modifying IB order:', error);
+    res.status(500).json({ error: error.message || 'Failed to modify order' });
+  }
+});
+
 app.post('/api/orders/:orderRef/cancel', async (req, res) => {
   try {
     const orderRef = decodeURIComponent(String(req.params.orderRef ?? '').trim());
@@ -1152,7 +1276,7 @@ app.post('/api/orders/:orderRef/cancel', async (req, res) => {
     }
 
     const orderId = Number(order.orderId);
-    if (!Number.isInteger(orderId) || orderId < 0) {
+    if (!Number.isInteger(orderId) || orderId === 0) {
       return res.status(400).json({ error: 'Invalid IB order ID' });
     }
 

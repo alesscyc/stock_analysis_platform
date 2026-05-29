@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from '../src/i18n/useTranslation';
 import './TradeDialog.css';
 
@@ -17,7 +17,7 @@ function rememberSubmittedOrderPrice(orderId, orderPrice) {
   }
 }
 
-function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
+function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, onModificationPriceChange, onModified }) {
   const { t } = useTranslation();
   const [action, setAction] = useState('BUY');
   const [price, setPrice] = useState('');
@@ -33,6 +33,55 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
   const [stopLossError, setStopLossError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const isModifyMode = Boolean(modification?.order);
+
+  const handlePriceChange = (nextPrice) => {
+    setPrice(nextPrice);
+    setPriceError('');
+
+    if (!isModifyMode) return;
+    const numericPrice = Number(nextPrice);
+    if (Number.isFinite(numericPrice) && numericPrice > 0) {
+      onModificationPriceChange?.(numericPrice);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (!modification?.order) {
+      setAction('BUY');
+      setPrice('');
+      setAmount('');
+      setTif('DAY');
+      setIsBracketOrder(false);
+      setTakeProfitPrice('');
+      setStopLossPrice('');
+      setPriceError('');
+      setAmountError('');
+      setTakeProfitError('');
+      setStopLossError('');
+      setSuccessMsg('');
+      setErrorMsg('');
+      return;
+    }
+
+    const order = modification.order;
+    const nextPrice = Number(modification.price ?? order.limitPrice);
+    setAction(order.action === 'SELL' ? 'SELL' : 'BUY');
+    setPrice(Number.isFinite(nextPrice) ? nextPrice.toFixed(2) : '');
+    setAmount(String(Number(order.remaining || order.quantity || 0) || ''));
+    setTif(order.tif || 'DAY');
+    setIsBracketOrder(false);
+    setTakeProfitPrice('');
+    setStopLossPrice('');
+    setPriceError('');
+    setAmountError('');
+    setTakeProfitError('');
+    setStopLossError('');
+    setSuccessMsg('');
+    setErrorMsg('');
+  }, [isOpen, modification]);
 
   if (!isOpen) return null;
 
@@ -84,6 +133,29 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
 
     setLoading(true);
     try {
+      if (isModifyMode) {
+        const orderRef = modification.order.id ?? modification.order.permId ?? modification.order.orderId;
+        const response = await fetch(`/api/orders/${encodeURIComponent(orderRef)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ price: parseFloat(price) }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Unknown error');
+        }
+
+        setSuccessMsg(t('orderModified', {
+          action: action === 'BUY' ? t('buyAction') : t('sellAction'),
+          amount,
+          symbol: stockSymbol,
+          price: data.price ?? price
+        }));
+        onModified?.();
+        return;
+      }
+
       const orderPayload = {
         symbol: stockSymbol,
         price: parseFloat(price),
@@ -124,8 +196,12 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
       } else {
         setErrorMsg(t('failedSubmitOrder', { error: data.error || 'Unknown error' }));
       }
-    } catch {
-      setErrorMsg(t('networkError'));
+    } catch (error) {
+      if (isModifyMode && error.message) {
+        setErrorMsg(t('failedModifyOrder', { error: error.message }));
+      } else {
+        setErrorMsg(t('networkError'));
+      }
     } finally {
       setLoading(false);
     }
@@ -158,7 +234,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
         {/* Header */}
         <div id="trade-dialog-header">
           <div id="trade-dialog-header-left">
-            <div id="trade-dialog-type-badge">{t('orderTicket')}</div>
+            <div id="trade-dialog-type-badge">{isModifyMode ? t('modifyOrder') : t('orderTicket')}</div>
             <h2 id="trade-dialog-title">
               <span id="trade-dialog-symbol">{stockSymbol}</span>
             </h2>
@@ -176,6 +252,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
           <button
             className={`order-type-btn ${action === 'BUY' ? 'active buy' : ''}`}
             onClick={() => setAction('BUY')}
+            disabled={isModifyMode}
             type="button"
           >
             {t('buy')}
@@ -183,6 +260,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
           <button
             className={`order-type-btn ${action === 'SELL' ? 'active sell' : ''}`}
             onClick={() => setAction('SELL')}
+            disabled={isModifyMode}
             type="button"
           >
             {t('sell')}
@@ -202,7 +280,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
                 type="number"
                 placeholder="0.00"
                 value={price}
-                onChange={(e) => { setPrice(e.target.value); setPriceError(''); }}
+                onChange={(e) => handlePriceChange(e.target.value)}
                 min="0"
                 step="0.01"
               />
@@ -223,6 +301,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
                 placeholder="0"
                 value={amount}
                 onChange={(e) => { setAmount(e.target.value); setAmountError(''); }}
+                disabled={isModifyMode}
                 min="1"
                 step="1"
               />
@@ -239,6 +318,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
                 id="trade-tif-select"
                 value={tif}
                 onChange={(e) => setTif(e.target.value)}
+                disabled={isModifyMode}
               >
                 <option value="DAY">{t('day')}</option>
                 <option value="GTC">{t('goodTillCancelled')}</option>
@@ -248,7 +328,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
             </div>
           </div>
 
-          <div className="trade-bracket-toggle">
+          {!isModifyMode && <div className="trade-bracket-toggle">
             <div>
               <span className="trade-bracket-title">{t('bracketExits')}</span>
               <span className="trade-bracket-copy">{t('bracketExitsDesc')}</span>
@@ -266,9 +346,9 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
               />
               <span className="trade-switch-slider" />
             </label>
-          </div>
+          </div>}
 
-          {isBracketOrder && (
+          {!isModifyMode && isBracketOrder && (
             <div className="trade-bracket-fields">
               <div className="trade-field-group">
                 <label htmlFor="trade-take-profit-input" className="trade-label">
@@ -340,13 +420,13 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected }) {
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
                 <polyline points="17 6 23 6 23 12"/>
               </svg>
-              {t('placeOrder', { type: isBracketOrder ? t('bracket') : '' })}
+              {isModifyMode ? t('confirmChange') : t('placeOrder', { type: isBracketOrder ? t('bracket') : '' })}
             </>
           )}
         </button>
 
         <p id="trade-disclaimer">
-          {t('orderDisclaimer', { bracket: isBracketOrder ? t('withBracket') : '' })}
+          {isModifyMode ? t('modifyOrderDisclaimer') : t('orderDisclaimer', { bracket: isBracketOrder ? t('withBracket') : '' })}
         </p>
       </div>
   );
