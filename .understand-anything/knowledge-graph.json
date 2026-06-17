@@ -1,0 +1,2415 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "stock-platform",
+    "languages": [
+      "config",
+      "css",
+      "html",
+      "javascript",
+      "json",
+      "markdown",
+      "python",
+      "txt",
+      "yaml"
+    ],
+    "frameworks": [
+      "Express",
+      "GitHub Actions",
+      "React",
+      "Vite",
+      "Vitest"
+    ],
+    "description": "Full-stack stock analysis platform with a React/Vite frontend, Express API, Interactive Brokers bridge, and Python/scikit-learn ML engine for OHLCV analysis and trade signals.",
+    "analyzedAt": "2026-06-17T12:31:02.631Z",
+    "gitCommitHash": "f6ff3b9f35827ca4911532bc65464f0d2861eaf3"
+  },
+  "nodes": [
+    {
+      "id": "file:frontend/component/OrdersDialog.jsx",
+      "type": "file",
+      "name": "OrdersDialog.jsx",
+      "filePath": "frontend/component/OrdersDialog.jsx",
+      "summary": "Pending-orders sidebar that loads open orders from the backend and allows cancellation.",
+      "tags": [
+        "component",
+        "frontend",
+        "javascript"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:frontend/component/OrdersDialog.jsx:OrdersDialog",
+      "type": "function",
+      "name": "OrdersDialog",
+      "filePath": "frontend/component/OrdersDialog.jsx",
+      "lineRange": [
+        17,
+        269
+      ],
+      "summary": "OrdersDialog handles order-related behavior, validation, or API interaction in OrdersDialog.jsx.",
+      "tags": [
+        "function",
+        "component",
+        "orders-dialog"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/component/PortfolioDialog.jsx",
+      "type": "file",
+      "name": "PortfolioDialog.jsx",
+      "filePath": "frontend/component/PortfolioDialog.jsx",
+      "summary": "Portfolio sidebar that loads and displays Interactive Brokers position snapshots from the backend API.",
+      "tags": [
+        "component",
+        "frontend",
+        "javascript"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:frontend/component/PortfolioDialog.jsx:PortfolioDialog",
+      "type": "function",
+      "name": "PortfolioDialog",
+      "filePath": "frontend/component/PortfolioDialog.jsx",
+      "lineRange": [
+        5,
+        187
+      ],
+      "summary": "PortfolioDialog handles portfolio-related state or API behavior in PortfolioDialog.jsx.",
+      "tags": [
+        "function",
+        "component",
+        "portfolio-dialog"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:frontend/component/SearchBar.jsx",
+      "type": "file",
+      "name": "SearchBar.jsx",
+      "filePath": "frontend/component/SearchBar.jsx",
+      "summary": "Debounced Finnhub autocomplete search component with keyboard navigation and selection handling.",
+      "tags": [
+        "component",
+        "frontend",
+        "javascript"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:frontend/component/SearchBar.jsx:SearchBar",
+      "type": "function",
+      "name": "SearchBar",
+      "filePath": "frontend/component/SearchBar.jsx",
+      "lineRange": [
+        6,
+        183
+      ],
+      "summary": "SearchBar is a React component or exported UI unit in SearchBar.jsx.",
+      "tags": [
+        "function",
+        "component",
+        "search-bar"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:frontend/component/WatchlistDialog.jsx",
+      "type": "file",
+      "name": "WatchlistDialog.jsx",
+      "filePath": "frontend/component/WatchlistDialog.jsx",
+      "summary": "Watchlist management dialog for persisted user symbols and quick selection into the main workspace.",
+      "tags": [
+        "component",
+        "frontend",
+        "javascript"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:frontend/component/WatchlistDialog.jsx:loadWatchlist",
+      "type": "function",
+      "name": "loadWatchlist",
+      "filePath": "frontend/component/WatchlistDialog.jsx",
+      "lineRange": [
+        7,
+        23
+      ],
+      "summary": "loadWatchlist participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "load-watchlist"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:frontend/component/WatchlistDialog.jsx:WatchlistDialog",
+      "type": "function",
+      "name": "WatchlistDialog",
+      "filePath": "frontend/component/WatchlistDialog.jsx",
+      "lineRange": [
+        29,
+        383
+      ],
+      "summary": "WatchlistDialog participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "component",
+        "watchlist-dialog"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/src/i18n/translations.js",
+      "type": "file",
+      "name": "translations.js",
+      "filePath": "frontend/src/i18n/translations.js",
+      "summary": "Translation dictionary containing localized UI strings used throughout the frontend.",
+      "tags": [
+        "internationalization",
+        "javascript",
+        "code"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/src/i18n/useTranslation.js",
+      "type": "file",
+      "name": "useTranslation.js",
+      "filePath": "frontend/src/i18n/useTranslation.js",
+      "summary": "Custom React hook that reads i18n context and exposes localized strings to components.",
+      "tags": [
+        "internationalization",
+        "javascript",
+        "code"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:frontend/src/i18n/useTranslation.js:useTranslation",
+      "type": "function",
+      "name": "useTranslation",
+      "filePath": "frontend/src/i18n/useTranslation.js",
+      "lineRange": [
+        5,
+        24
+      ],
+      "summary": "useTranslation participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "internationalization",
+        "use-translation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:frontend/component/ScreenerDialog.jsx",
+      "type": "file",
+      "name": "ScreenerDialog.jsx",
+      "filePath": "frontend/component/ScreenerDialog.jsx",
+      "summary": "Stock screener dialog that presents candidate instruments and lets users select symbols for analysis.",
+      "tags": [
+        "component",
+        "frontend",
+        "javascript"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:frontend/component/ScreenerDialog.jsx:ScreenerDialog",
+      "type": "function",
+      "name": "ScreenerDialog",
+      "filePath": "frontend/component/ScreenerDialog.jsx",
+      "lineRange": [
+        25,
+        495
+      ],
+      "summary": "ScreenerDialog is a React component or exported UI unit in ScreenerDialog.jsx.",
+      "tags": [
+        "function",
+        "component",
+        "screener-dialog"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/component/TradeDialog.jsx",
+      "type": "file",
+      "name": "TradeDialog.jsx",
+      "filePath": "frontend/component/TradeDialog.jsx",
+      "summary": "Order ticket sidebar for BUY and SELL order submission, including limit pricing and bracket-order controls.",
+      "tags": [
+        "component",
+        "frontend",
+        "javascript"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:frontend/component/TradeDialog.jsx:rememberSubmittedOrderPrice",
+      "type": "function",
+      "name": "rememberSubmittedOrderPrice",
+      "filePath": "frontend/component/TradeDialog.jsx",
+      "lineRange": [
+        7,
+        18
+      ],
+      "summary": "rememberSubmittedOrderPrice handles order-related behavior, validation, or API interaction in TradeDialog.jsx.",
+      "tags": [
+        "function",
+        "remember-submitted-order-price"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:frontend/component/TradeDialog.jsx:TradeDialog",
+      "type": "function",
+      "name": "TradeDialog",
+      "filePath": "frontend/component/TradeDialog.jsx",
+      "lineRange": [
+        20,
+        433
+      ],
+      "summary": "TradeDialog participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "component",
+        "trade-dialog"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/src/App.jsx",
+      "type": "file",
+      "name": "App.jsx",
+      "filePath": "frontend/src/App.jsx",
+      "summary": "React application root that orchestrates selected symbol state, chart data fetching, topbar controls, watchlist, portfolio, orders, and trading dialogs.",
+      "tags": [
+        "component",
+        "frontend",
+        "state-orchestration",
+        "tested"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:frontend/src/App.jsx:App",
+      "type": "function",
+      "name": "App",
+      "filePath": "frontend/src/App.jsx",
+      "lineRange": [
+        14,
+        493
+      ],
+      "summary": "App is a React component or exported UI unit in App.jsx.",
+      "tags": [
+        "function",
+        "component",
+        "app"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/src/App.test.jsx",
+      "type": "file",
+      "name": "App.test.jsx",
+      "filePath": "frontend/src/App.test.jsx",
+      "summary": "App.test.jsx participates in the code layer of the stock analysis platform.",
+      "tags": [
+        "test",
+        "component",
+        "frontend"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:frontend/src/environment.js",
+      "type": "file",
+      "name": "environment.js",
+      "filePath": "frontend/src/environment.js",
+      "summary": "Frontend runtime configuration helper for resolving API base URLs and environment-dependent settings.",
+      "tags": [
+        "runtime-config",
+        "javascript",
+        "code"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:frontend/src/environment.js:isGitHubPages",
+      "type": "function",
+      "name": "isGitHubPages",
+      "filePath": "frontend/src/environment.js",
+      "lineRange": [
+        5,
+        11
+      ],
+      "summary": "isGitHubPages participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "is-git-hub-pages"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:frontend/src/environment.js:getApiBase",
+      "type": "function",
+      "name": "getApiBase",
+      "filePath": "frontend/src/environment.js",
+      "lineRange": [
+        18,
+        21
+      ],
+      "summary": "getApiBase participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "get-api-base"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:frontend/src/mockData.js",
+      "type": "file",
+      "name": "mockData.js",
+      "filePath": "frontend/src/mockData.js",
+      "summary": "Mock stock and application data used by frontend tests or local development paths.",
+      "tags": [
+        "javascript",
+        "code",
+        "project-file"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:frontend/src/mockData.js:generateNvdaMockData",
+      "type": "function",
+      "name": "generateNvdaMockData",
+      "filePath": "frontend/src/mockData.js",
+      "lineRange": [
+        26,
+        76
+      ],
+      "summary": "generateNvdaMockData participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "generate-nvda-mock-data"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:frontend/src/mockData.js:computeMovingAverages",
+      "type": "function",
+      "name": "computeMovingAverages",
+      "filePath": "frontend/src/mockData.js",
+      "lineRange": [
+        78,
+        118
+      ],
+      "summary": "computeMovingAverages participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "compute-moving-averages"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:frontend/src/i18n/I18nContext.js",
+      "type": "file",
+      "name": "I18nContext.js",
+      "filePath": "frontend/src/i18n/I18nContext.js",
+      "summary": "Shared i18n context object used by provider and translation hook modules.",
+      "tags": [
+        "internationalization",
+        "javascript",
+        "code"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:frontend/src/i18n/I18nContext.jsx",
+      "type": "file",
+      "name": "I18nContext.jsx",
+      "filePath": "frontend/src/i18n/I18nContext.jsx",
+      "summary": "React context provider that stores language state, exposes translation lookup, and persists locale preference.",
+      "tags": [
+        "component",
+        "frontend",
+        "internationalization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:frontend/src/i18n/I18nContext.jsx:I18nProvider",
+      "type": "function",
+      "name": "I18nProvider",
+      "filePath": "frontend/src/i18n/I18nContext.jsx",
+      "lineRange": [
+        6,
+        35
+      ],
+      "summary": "I18nProvider is a React component or exported UI unit in I18nContext.jsx.",
+      "tags": [
+        "function",
+        "component",
+        "internationalization",
+        "i18n-provider"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:frontend/src/main.jsx",
+      "type": "file",
+      "name": "main.jsx",
+      "filePath": "frontend/src/main.jsx",
+      "summary": "Frontend entry point that mounts the React app into the Vite HTML shell.",
+      "tags": [
+        "component",
+        "frontend",
+        "javascript"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "pipeline:.github/workflows/ci.yml",
+      "type": "pipeline",
+      "name": "ci.yml",
+      "filePath": ".github/workflows/ci.yml",
+      "summary": "GitHub Actions workflow that installs dependencies and runs backend, frontend, and Python checks on repository changes.",
+      "tags": [
+        "ci-cd",
+        "automation",
+        "yaml"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:backend/.env.example",
+      "type": "config",
+      "name": ".env.example",
+      "filePath": "backend/.env.example",
+      "summary": "Example backend environment configuration for IB Gateway, Finnhub, Python service, cache, and timeout settings.",
+      "tags": [
+        "configuration",
+        "config",
+        "project-file"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:backend/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "backend/AGENTS.md",
+      "summary": "Backend guidance for the Express API, Interactive Brokers bridge, environment requirements, and route responsibilities.",
+      "tags": [
+        "documentation",
+        "project-knowledge",
+        "markdown"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:backend/package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "backend/package.json",
+      "summary": "Backend package manifest defining Express, IB, environment, development, start, and node-test scripts.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "json"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:frontend/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "frontend/AGENTS.md",
+      "summary": "Frontend guidance for the React/Vite UI, component locations, styling conventions, and testing workflow.",
+      "tags": [
+        "documentation",
+        "project-knowledge",
+        "markdown"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:frontend/index.html",
+      "type": "file",
+      "name": "index.html",
+      "filePath": "frontend/index.html",
+      "summary": "Vite HTML shell that provides the root element for the React application.",
+      "tags": [
+        "html",
+        "markup",
+        "project-file"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:frontend/package.json",
+      "type": "config",
+      "name": "package.json",
+      "filePath": "frontend/package.json",
+      "summary": "Frontend package manifest defining React, Vite, charting, linting, and test dependencies and scripts.",
+      "tags": [
+        "configuration",
+        "build-system",
+        "json"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:frontend/component/OrdersDialog.css",
+      "type": "file",
+      "name": "OrdersDialog.css",
+      "filePath": "frontend/component/OrdersDialog.css",
+      "summary": "OrdersDialog.css defines component or global styling for the React frontend, using the project design tokens and layout conventions.",
+      "tags": [
+        "styling",
+        "frontend",
+        "css"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/component/PortfolioDialog.css",
+      "type": "file",
+      "name": "PortfolioDialog.css",
+      "filePath": "frontend/component/PortfolioDialog.css",
+      "summary": "PortfolioDialog.css defines component or global styling for the React frontend, using the project design tokens and layout conventions.",
+      "tags": [
+        "styling",
+        "frontend",
+        "css"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/component/ScreenerDialog.css",
+      "type": "file",
+      "name": "ScreenerDialog.css",
+      "filePath": "frontend/component/ScreenerDialog.css",
+      "summary": "ScreenerDialog.css defines component or global styling for the React frontend, using the project design tokens and layout conventions.",
+      "tags": [
+        "styling",
+        "frontend",
+        "css"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/component/StockChart.css",
+      "type": "file",
+      "name": "StockChart.css",
+      "filePath": "frontend/component/StockChart.css",
+      "summary": "StockChart.css defines component or global styling for the React frontend, using the project design tokens and layout conventions.",
+      "tags": [
+        "styling",
+        "frontend",
+        "css"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/component/TradeDialog.css",
+      "type": "file",
+      "name": "TradeDialog.css",
+      "filePath": "frontend/component/TradeDialog.css",
+      "summary": "TradeDialog.css defines component or global styling for the React frontend, using the project design tokens and layout conventions.",
+      "tags": [
+        "styling",
+        "frontend",
+        "css"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/component/WatchlistDialog.css",
+      "type": "file",
+      "name": "WatchlistDialog.css",
+      "filePath": "frontend/component/WatchlistDialog.css",
+      "summary": "WatchlistDialog.css defines component or global styling for the React frontend, using the project design tokens and layout conventions.",
+      "tags": [
+        "styling",
+        "frontend",
+        "css"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/component/searchBar.css",
+      "type": "file",
+      "name": "searchBar.css",
+      "filePath": "frontend/component/searchBar.css",
+      "summary": "searchBar.css defines component or global styling for the React frontend, using the project design tokens and layout conventions.",
+      "tags": [
+        "styling",
+        "frontend",
+        "css"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "AGENTS.md",
+      "summary": "Repository-level operating knowledge describing architecture, commands, conventions, risks, and file locations for future agents.",
+      "tags": [
+        "documentation",
+        "project-knowledge",
+        "markdown"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:analysis/AGENTS.md",
+      "type": "document",
+      "name": "AGENTS.md",
+      "filePath": "analysis/AGENTS.md",
+      "summary": "Analysis-module guidance covering the Python ML engine, JSON-only CLI behavior, model caching, and testing constraints.",
+      "tags": [
+        "documentation",
+        "project-knowledge",
+        "markdown"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "document:analysis/requirements.txt",
+      "type": "document",
+      "name": "requirements.txt",
+      "filePath": "analysis/requirements.txt",
+      "summary": "Python dependency list for yfinance, pandas, numpy, scikit-learn, FastAPI, uvicorn, and related analysis runtime packages.",
+      "tags": [
+        "documentation",
+        "txt",
+        "docs"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:analysis/stock_data.py",
+      "type": "file",
+      "name": "stock_data.py",
+      "filePath": "analysis/stock_data.py",
+      "summary": "Python FastAPI and CLI engine that fetches stock history, computes moving averages and ML features, trains or reuses a RandomForest model, and returns JSON-ready recommendations.",
+      "tags": [
+        "ml-engine",
+        "stock-data",
+        "python"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:analysis/stock_data.py:_get_cache_path",
+      "type": "function",
+      "name": "_get_cache_path",
+      "filePath": "analysis/stock_data.py",
+      "lineRange": [
+        17,
+        19
+      ],
+      "summary": "_get_cache_path participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "component",
+        "ml-engine",
+        "get-cache-path"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:analysis/stock_data.py:_load_model_from_disk",
+      "type": "function",
+      "name": "_load_model_from_disk",
+      "filePath": "analysis/stock_data.py",
+      "lineRange": [
+        22,
+        30
+      ],
+      "summary": "_load_model_from_disk is a React component or exported UI unit in stock_data.py.",
+      "tags": [
+        "function",
+        "component",
+        "ml-engine",
+        "load-model-from-disk"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:analysis/stock_data.py:_save_model_to_disk",
+      "type": "function",
+      "name": "_save_model_to_disk",
+      "filePath": "analysis/stock_data.py",
+      "lineRange": [
+        33,
+        40
+      ],
+      "summary": "_save_model_to_disk participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "component",
+        "ml-engine",
+        "save-model-to-disk"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:analysis/stock_data.py:_get_cached_model",
+      "type": "function",
+      "name": "_get_cached_model",
+      "filePath": "analysis/stock_data.py",
+      "lineRange": [
+        43,
+        65
+      ],
+      "summary": "_get_cached_model participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "component",
+        "ml-engine",
+        "get-cached-model"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:analysis/stock_data.py:_set_cached_model",
+      "type": "function",
+      "name": "_set_cached_model",
+      "filePath": "analysis/stock_data.py",
+      "lineRange": [
+        68,
+        73
+      ],
+      "summary": "_set_cached_model participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "component",
+        "ml-engine",
+        "set-cached-model"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:analysis/stock_data.py:get_stock_price_history",
+      "type": "function",
+      "name": "get_stock_price_history",
+      "filePath": "analysis/stock_data.py",
+      "lineRange": [
+        76,
+        326
+      ],
+      "summary": "get_stock_price_history processes stock market data, price history, or derived analysis output.",
+      "tags": [
+        "function",
+        "ml-engine",
+        "get-stock-price-history"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:analysis/stock_data.py:get_current_stock_price",
+      "type": "function",
+      "name": "get_current_stock_price",
+      "filePath": "analysis/stock_data.py",
+      "lineRange": [
+        329,
+        358
+      ],
+      "summary": "get_current_stock_price processes stock market data, price history, or derived analysis output.",
+      "tags": [
+        "function",
+        "ml-engine",
+        "get-current-stock-price"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:analysis/stock_data.py:get_fundamentals",
+      "type": "function",
+      "name": "get_fundamentals",
+      "filePath": "analysis/stock_data.py",
+      "lineRange": [
+        361,
+        419
+      ],
+      "summary": "get_fundamentals participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "ml-engine",
+        "get-fundamentals"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:analysis/stock_data.py:train_random_forest_model",
+      "type": "function",
+      "name": "train_random_forest_model",
+      "filePath": "analysis/stock_data.py",
+      "lineRange": [
+        421,
+        548
+      ],
+      "summary": "train_random_forest_model participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "ml-engine",
+        "train-random-forest-model"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:analysis/stock_data.py:predict_stock_recommendation",
+      "type": "function",
+      "name": "predict_stock_recommendation",
+      "filePath": "analysis/stock_data.py",
+      "lineRange": [
+        550,
+        608
+      ],
+      "summary": "predict_stock_recommendation processes stock market data, price history, or derived analysis output.",
+      "tags": [
+        "function",
+        "ml-engine",
+        "predict-stock-recommendation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:analysis/stock_data.py:_make_fastapi_app",
+      "type": "function",
+      "name": "_make_fastapi_app",
+      "filePath": "analysis/stock_data.py",
+      "lineRange": [
+        615,
+        684
+      ],
+      "summary": "_make_fastapi_app participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "component",
+        "ml-engine",
+        "make-fastapi-app"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:backend/server.js",
+      "type": "file",
+      "name": "server.js",
+      "filePath": "backend/server.js",
+      "summary": "Express API server that proxies stock history requests to the Python service, handles Finnhub symbol search, manages IB Gateway connectivity, and exposes portfolio and order routes.",
+      "tags": [
+        "api-handler",
+        "ib-gateway",
+        "javascript",
+        "tested"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:backend/server.js:resolvePortfolioWaiters",
+      "type": "function",
+      "name": "resolvePortfolioWaiters",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        80,
+        89
+      ],
+      "summary": "resolvePortfolioWaiters handles portfolio-related state or API behavior in server.js.",
+      "tags": [
+        "function",
+        "api-handler",
+        "resolve-portfolio-waiters"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:waitForPortfolioSnapshot",
+      "type": "function",
+      "name": "waitForPortfolioSnapshot",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        116,
+        135
+      ],
+      "summary": "waitForPortfolioSnapshot handles portfolio-related state or API behavior in server.js.",
+      "tags": [
+        "function",
+        "api-handler",
+        "wait-for-portfolio-snapshot"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:serializePortfolioRow",
+      "type": "function",
+      "name": "serializePortfolioRow",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        137,
+        152
+      ],
+      "summary": "serializePortfolioRow handles portfolio-related state or API behavior in server.js.",
+      "tags": [
+        "function",
+        "api-handler",
+        "serialize-portfolio-row"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:findOpenOrderEntry",
+      "type": "function",
+      "name": "findOpenOrderEntry",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        168,
+        189
+      ],
+      "summary": "findOpenOrderEntry handles order-related behavior, validation, or API interaction in server.js.",
+      "tags": [
+        "function",
+        "api-handler",
+        "find-open-order-entry"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:findOpenOrderEntryByStatus",
+      "type": "function",
+      "name": "findOpenOrderEntryByStatus",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        191,
+        204
+      ],
+      "summary": "findOpenOrderEntryByStatus handles order-related behavior, validation, or API interaction in server.js.",
+      "tags": [
+        "function",
+        "api-handler",
+        "find-open-order-entry-by-status"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:resolveOpenOrdersWaiters",
+      "type": "function",
+      "name": "resolveOpenOrdersWaiters",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        222,
+        231
+      ],
+      "summary": "resolveOpenOrdersWaiters handles order-related behavior, validation, or API interaction in server.js.",
+      "tags": [
+        "function",
+        "api-handler",
+        "resolve-open-orders-waiters"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:requestOpenOrdersSnapshot",
+      "type": "function",
+      "name": "requestOpenOrdersSnapshot",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        262,
+        287
+      ],
+      "summary": "requestOpenOrdersSnapshot handles order-related behavior, validation, or API interaction in server.js.",
+      "tags": [
+        "function",
+        "api-handler",
+        "request-open-orders-snapshot"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:waitForOpenOrdersSnapshot",
+      "type": "function",
+      "name": "waitForOpenOrdersSnapshot",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        289,
+        317
+      ],
+      "summary": "waitForOpenOrdersSnapshot handles order-related behavior, validation, or API interaction in server.js.",
+      "tags": [
+        "function",
+        "api-handler",
+        "wait-for-open-orders-snapshot"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:serializeOpenOrder",
+      "type": "function",
+      "name": "serializeOpenOrder",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        324,
+        347
+      ],
+      "summary": "serializeOpenOrder handles order-related behavior, validation, or API interaction in server.js.",
+      "tags": [
+        "function",
+        "api-handler",
+        "serialize-open-order"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:waitForNextOrderId",
+      "type": "function",
+      "name": "waitForNextOrderId",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        377,
+        397
+      ],
+      "summary": "waitForNextOrderId handles order-related behavior, validation, or API interaction in server.js.",
+      "tags": [
+        "function",
+        "api-handler",
+        "wait-for-next-order-id"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:buildBracketOrders",
+      "type": "function",
+      "name": "buildBracketOrders",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        428,
+        449
+      ],
+      "summary": "buildBracketOrders handles order-related behavior, validation, or API interaction in server.js.",
+      "tags": [
+        "function",
+        "api-handler",
+        "build-bracket-orders"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:scheduleReconnect",
+      "type": "function",
+      "name": "scheduleReconnect",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        451,
+        461
+      ],
+      "summary": "scheduleReconnect participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "api-handler",
+        "schedule-reconnect"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:connectIbGateway",
+      "type": "function",
+      "name": "connectIbGateway",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        463,
+        476
+      ],
+      "summary": "connectIbGateway participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "api-handler",
+        "connect-ib-gateway"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:buildPortfolioKey",
+      "type": "function",
+      "name": "buildPortfolioKey",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        478,
+        488
+      ],
+      "summary": "buildPortfolioKey handles portfolio-related state or API behavior in server.js.",
+      "tags": [
+        "function",
+        "api-handler",
+        "build-portfolio-key"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:normalizePortfolioRow",
+      "type": "function",
+      "name": "normalizePortfolioRow",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        490,
+        510
+      ],
+      "summary": "normalizePortfolioRow handles portfolio-related state or API behavior in server.js.",
+      "tags": [
+        "function",
+        "api-handler",
+        "normalize-portfolio-row"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:backend/server.js:startPythonService",
+      "type": "function",
+      "name": "startPythonService",
+      "filePath": "backend/server.js",
+      "lineRange": [
+        1316,
+        1343
+      ],
+      "summary": "startPythonService participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "api-handler",
+        "start-python-service"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:backend/test/server.test.js",
+      "type": "file",
+      "name": "server.test.js",
+      "filePath": "backend/test/server.test.js",
+      "summary": "Node test suite covering backend request validation, symbol search behavior, environment handling, and stock-route proxy behavior.",
+      "tags": [
+        "test",
+        "javascript",
+        "code"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:frontend/component/StockChart.jsx",
+      "type": "file",
+      "name": "StockChart.jsx",
+      "filePath": "frontend/component/StockChart.jsx",
+      "summary": "Candlestick chart component that renders OHLCV data, moving-average overlays, volume, interval controls, and AI recommendation state.",
+      "tags": [
+        "component",
+        "frontend",
+        "javascript"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:frontend/component/StockChart.jsx:createHorizontalLinesPrimitive",
+      "type": "function",
+      "name": "createHorizontalLinesPrimitive",
+      "filePath": "frontend/component/StockChart.jsx",
+      "lineRange": [
+        29,
+        177
+      ],
+      "summary": "createHorizontalLinesPrimitive participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "create-horizontal-lines-primitive"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:frontend/component/StockChart.jsx:createSwingZonesPrimitive",
+      "type": "function",
+      "name": "createSwingZonesPrimitive",
+      "filePath": "frontend/component/StockChart.jsx",
+      "lineRange": [
+        182,
+        254
+      ],
+      "summary": "createSwingZonesPrimitive participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "create-swing-zones-primitive"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:frontend/component/StockChart.jsx:toChartDate",
+      "type": "function",
+      "name": "toChartDate",
+      "filePath": "frontend/component/StockChart.jsx",
+      "lineRange": [
+        259,
+        269
+      ],
+      "summary": "toChartDate participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "to-chart-date"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:frontend/component/StockChart.jsx:loadWatchlist",
+      "type": "function",
+      "name": "loadWatchlist",
+      "filePath": "frontend/component/StockChart.jsx",
+      "lineRange": [
+        273,
+        289
+      ],
+      "summary": "loadWatchlist participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "load-watchlist"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:frontend/component/StockChart.jsx:StockChart",
+      "type": "function",
+      "name": "StockChart",
+      "filePath": "frontend/component/StockChart.jsx",
+      "lineRange": [
+        295,
+        1032
+      ],
+      "summary": "StockChart processes stock market data, price history, or derived analysis output.",
+      "tags": [
+        "function",
+        "component",
+        "stock-chart"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/eslint.config.js",
+      "type": "file",
+      "name": "eslint.config.js",
+      "filePath": "frontend/eslint.config.js",
+      "summary": "Flat ESLint configuration for frontend JavaScript and React conventions.",
+      "tags": [
+        "build-system",
+        "javascript",
+        "code"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:frontend/src/App.css",
+      "type": "file",
+      "name": "App.css",
+      "filePath": "frontend/src/App.css",
+      "summary": "App.css defines component or global styling for the React frontend, using the project design tokens and layout conventions.",
+      "tags": [
+        "styling",
+        "frontend",
+        "css"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:frontend/src/hooks/usePersistedState.js",
+      "type": "file",
+      "name": "usePersistedState.js",
+      "filePath": "frontend/src/hooks/usePersistedState.js",
+      "summary": "Reusable React hook that syncs component state to localStorage with safe initialization and updates.",
+      "tags": [
+        "javascript",
+        "code",
+        "project-file"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:frontend/src/hooks/usePersistedState.js:usePersistedState",
+      "type": "function",
+      "name": "usePersistedState",
+      "filePath": "frontend/src/hooks/usePersistedState.js",
+      "lineRange": [
+        11,
+        30
+      ],
+      "summary": "usePersistedState participates in frontend localization and translation lookup.",
+      "tags": [
+        "function",
+        "use-persisted-state"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:frontend/src/index.css",
+      "type": "file",
+      "name": "index.css",
+      "filePath": "frontend/src/index.css",
+      "summary": "index.css defines component or global styling for the React frontend, using the project design tokens and layout conventions.",
+      "tags": [
+        "styling",
+        "frontend",
+        "css"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:frontend/src/setupTests.js",
+      "type": "file",
+      "name": "setupTests.js",
+      "filePath": "frontend/src/setupTests.js",
+      "summary": "Vitest and Testing Library setup file that installs browser-like test helpers.",
+      "tags": [
+        "test",
+        "javascript",
+        "code"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:frontend/vite.config.js",
+      "type": "file",
+      "name": "vite.config.js",
+      "filePath": "frontend/vite.config.js",
+      "summary": "Vite build configuration for the React frontend and test environment integration.",
+      "tags": [
+        "build-system",
+        "javascript",
+        "code"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:frontend/vitest.config.js",
+      "type": "file",
+      "name": "vitest.config.js",
+      "filePath": "frontend/vitest.config.js",
+      "summary": "Vitest configuration for frontend unit tests and jsdom behavior.",
+      "tags": [
+        "test",
+        "build-system",
+        "javascript"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "document:README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "README.md",
+      "summary": "Project overview and setup guide for the full-stack stock analysis platform, including runtime configuration and development workflow.",
+      "tags": [
+        "documentation",
+        "project-knowledge",
+        "markdown"
+      ],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:frontend/component/OrdersDialog.jsx",
+      "target": "file:frontend/component/OrdersDialog.css",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/OrdersDialog.jsx",
+      "target": "file:frontend/src/i18n/useTranslation.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/OrdersDialog.jsx",
+      "target": "function:frontend/component/OrdersDialog.jsx:OrdersDialog",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/component/PortfolioDialog.jsx",
+      "target": "file:frontend/component/PortfolioDialog.css",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/PortfolioDialog.jsx",
+      "target": "file:frontend/src/i18n/useTranslation.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/PortfolioDialog.jsx",
+      "target": "function:frontend/component/PortfolioDialog.jsx:PortfolioDialog",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/component/SearchBar.jsx",
+      "target": "file:frontend/component/searchBar.css",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/SearchBar.jsx",
+      "target": "file:frontend/src/i18n/useTranslation.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/SearchBar.jsx",
+      "target": "function:frontend/component/SearchBar.jsx:SearchBar",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/component/WatchlistDialog.jsx",
+      "target": "file:frontend/component/WatchlistDialog.css",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/WatchlistDialog.jsx",
+      "target": "file:frontend/src/i18n/useTranslation.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/WatchlistDialog.jsx",
+      "target": "function:frontend/component/WatchlistDialog.jsx:loadWatchlist",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/component/WatchlistDialog.jsx",
+      "target": "function:frontend/component/WatchlistDialog.jsx:WatchlistDialog",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/src/i18n/useTranslation.js",
+      "target": "file:frontend/src/i18n/I18nContext.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/i18n/useTranslation.js",
+      "target": "file:frontend/src/i18n/translations.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/i18n/useTranslation.js",
+      "target": "function:frontend/src/i18n/useTranslation.js:useTranslation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/src/i18n/useTranslation.js",
+      "target": "function:frontend/src/i18n/useTranslation.js:useTranslation",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:frontend/component/ScreenerDialog.jsx",
+      "target": "file:frontend/component/ScreenerDialog.css",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/ScreenerDialog.jsx",
+      "target": "file:frontend/src/i18n/useTranslation.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/ScreenerDialog.jsx",
+      "target": "function:frontend/component/ScreenerDialog.jsx:ScreenerDialog",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/component/TradeDialog.jsx",
+      "target": "file:frontend/component/TradeDialog.css",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/TradeDialog.jsx",
+      "target": "file:frontend/src/i18n/useTranslation.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/TradeDialog.jsx",
+      "target": "function:frontend/component/TradeDialog.jsx:rememberSubmittedOrderPrice",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/component/TradeDialog.jsx",
+      "target": "function:frontend/component/TradeDialog.jsx:TradeDialog",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/src/App.jsx",
+      "target": "file:frontend/component/OrdersDialog.jsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/App.jsx",
+      "target": "file:frontend/component/PortfolioDialog.jsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/App.jsx",
+      "target": "file:frontend/component/ScreenerDialog.jsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/App.jsx",
+      "target": "file:frontend/component/SearchBar.jsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/App.jsx",
+      "target": "file:frontend/component/StockChart.jsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/App.jsx",
+      "target": "file:frontend/component/TradeDialog.jsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/App.jsx",
+      "target": "file:frontend/component/WatchlistDialog.jsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/App.jsx",
+      "target": "file:frontend/src/App.css",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/App.jsx",
+      "target": "file:frontend/src/environment.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/App.jsx",
+      "target": "file:frontend/src/i18n/useTranslation.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/App.jsx",
+      "target": "file:frontend/src/mockData.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/App.jsx",
+      "target": "function:frontend/src/App.jsx:App",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/src/App.test.jsx",
+      "target": "file:frontend/src/App.jsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/environment.js",
+      "target": "function:frontend/src/environment.js:isGitHubPages",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/src/environment.js",
+      "target": "function:frontend/src/environment.js:isGitHubPages",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:frontend/src/environment.js",
+      "target": "function:frontend/src/environment.js:getApiBase",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/src/environment.js",
+      "target": "function:frontend/src/environment.js:getApiBase",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:frontend/src/mockData.js",
+      "target": "function:frontend/src/mockData.js:generateNvdaMockData",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/src/mockData.js",
+      "target": "function:frontend/src/mockData.js:generateNvdaMockData",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:frontend/src/mockData.js",
+      "target": "function:frontend/src/mockData.js:computeMovingAverages",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/src/App.jsx",
+      "target": "file:frontend/src/App.test.jsx",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:frontend/src/i18n/I18nContext.jsx",
+      "target": "file:frontend/src/i18n/I18nContext.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/i18n/I18nContext.jsx",
+      "target": "function:frontend/src/i18n/I18nContext.jsx:I18nProvider",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/src/i18n/I18nContext.jsx",
+      "target": "function:frontend/src/i18n/I18nContext.jsx:I18nProvider",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:frontend/src/main.jsx",
+      "target": "file:frontend/src/App.jsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/main.jsx",
+      "target": "file:frontend/src/i18n/I18nContext.jsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/src/main.jsx",
+      "target": "file:frontend/src/index.css",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "pipeline:.github/workflows/ci.yml",
+      "target": "file:backend/test/server.test.js",
+      "type": "triggers",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "pipeline:.github/workflows/ci.yml",
+      "target": "file:frontend/src/App.test.jsx",
+      "type": "triggers",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "pipeline:.github/workflows/ci.yml",
+      "target": "file:analysis/stock_data.py",
+      "type": "triggers",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "config:backend/.env.example",
+      "target": "file:backend/server.js",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:backend/AGENTS.md",
+      "target": "file:backend/server.js",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:backend/package.json",
+      "target": "file:backend/server.js",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:frontend/AGENTS.md",
+      "target": "file:frontend/src/App.jsx",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "config:frontend/package.json",
+      "target": "file:frontend/src/main.jsx",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:_get_cache_path",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:_get_cache_path",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:_load_model_from_disk",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:_load_model_from_disk",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:_save_model_to_disk",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:_save_model_to_disk",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:_get_cached_model",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:_get_cached_model",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:_set_cached_model",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:_set_cached_model",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:get_stock_price_history",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:get_stock_price_history",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:get_current_stock_price",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:get_current_stock_price",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:get_fundamentals",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:get_fundamentals",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:train_random_forest_model",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:train_random_forest_model",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:predict_stock_recommendation",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:predict_stock_recommendation",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:_make_fastapi_app",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:analysis/stock_data.py",
+      "target": "function:analysis/stock_data.py:_make_fastapi_app",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:resolvePortfolioWaiters",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:waitForPortfolioSnapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:serializePortfolioRow",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:findOpenOrderEntry",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:findOpenOrderEntryByStatus",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:resolveOpenOrdersWaiters",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:requestOpenOrdersSnapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:waitForOpenOrdersSnapshot",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:serializeOpenOrder",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:waitForNextOrderId",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:buildBracketOrders",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:scheduleReconnect",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:connectIbGateway",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:buildPortfolioKey",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:normalizePortfolioRow",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "function:backend/server.js:startPythonService",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/component/StockChart.jsx",
+      "target": "file:frontend/component/StockChart.css",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/StockChart.jsx",
+      "target": "file:frontend/src/hooks/usePersistedState.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/StockChart.jsx",
+      "target": "file:frontend/src/i18n/useTranslation.js",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:frontend/component/StockChart.jsx",
+      "target": "function:frontend/component/StockChart.jsx:createHorizontalLinesPrimitive",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/component/StockChart.jsx",
+      "target": "function:frontend/component/StockChart.jsx:createSwingZonesPrimitive",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/component/StockChart.jsx",
+      "target": "function:frontend/component/StockChart.jsx:toChartDate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/component/StockChart.jsx",
+      "target": "function:frontend/component/StockChart.jsx:loadWatchlist",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/component/StockChart.jsx",
+      "target": "function:frontend/component/StockChart.jsx:StockChart",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/src/hooks/usePersistedState.js",
+      "target": "function:frontend/src/hooks/usePersistedState.js:usePersistedState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:frontend/src/hooks/usePersistedState.js",
+      "target": "function:frontend/src/hooks/usePersistedState.js:usePersistedState",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:backend/server.js",
+      "target": "file:backend/test/server.test.js",
+      "type": "tested_by",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:AGENTS.md",
+      "target": "document:README.md",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:analysis/AGENTS.md",
+      "target": "file:analysis/stock_data.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "file:frontend/eslint.config.js",
+      "target": "file:frontend/src/App.jsx",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:frontend/vite.config.js",
+      "target": "file:frontend/src/main.jsx",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:frontend/vitest.config.js",
+      "target": "file:frontend/src/main.jsx",
+      "type": "configures",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:frontend/src/App.jsx",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:backend/server.js",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:analysis/stock_data.py",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:frontend-ui",
+      "name": "Frontend UI",
+      "description": "React components, hooks, i18n, styling, and Vite entry files that make up the single-page stock analysis workspace.",
+      "nodeIds": [
+        "file:frontend/component/OrdersDialog.css",
+        "file:frontend/component/OrdersDialog.jsx",
+        "file:frontend/component/PortfolioDialog.css",
+        "file:frontend/component/PortfolioDialog.jsx",
+        "file:frontend/component/ScreenerDialog.css",
+        "file:frontend/component/ScreenerDialog.jsx",
+        "file:frontend/component/SearchBar.jsx",
+        "file:frontend/component/StockChart.css",
+        "file:frontend/component/StockChart.jsx",
+        "file:frontend/component/TradeDialog.css",
+        "file:frontend/component/TradeDialog.jsx",
+        "file:frontend/component/WatchlistDialog.css",
+        "file:frontend/component/WatchlistDialog.jsx",
+        "file:frontend/component/searchBar.css",
+        "file:frontend/index.html",
+        "file:frontend/src/App.css",
+        "file:frontend/src/App.jsx",
+        "file:frontend/src/environment.js",
+        "file:frontend/src/hooks/usePersistedState.js",
+        "file:frontend/src/i18n/I18nContext.js",
+        "file:frontend/src/i18n/I18nContext.jsx",
+        "file:frontend/src/i18n/translations.js",
+        "file:frontend/src/i18n/useTranslation.js",
+        "file:frontend/src/index.css",
+        "file:frontend/src/main.jsx",
+        "file:frontend/src/mockData.js"
+      ]
+    },
+    {
+      "id": "layer:backend-api-trading",
+      "name": "Backend API & Trading",
+      "description": "Express routes, API proxying, Interactive Brokers connectivity, order handling, and backend tests.",
+      "nodeIds": [
+        "config:backend/.env.example",
+        "config:backend/package.json",
+        "file:backend/server.js"
+      ]
+    },
+    {
+      "id": "layer:analysis-engine",
+      "name": "Analysis Engine",
+      "description": "Python stock-data retrieval, moving-average feature engineering, RandomForest training, prediction, and analysis runtime dependencies.",
+      "nodeIds": [
+        "document:analysis/requirements.txt",
+        "file:analysis/stock_data.py"
+      ]
+    },
+    {
+      "id": "layer:project-knowledge",
+      "name": "Project Knowledge",
+      "description": "Repository documentation and AGENTS guidance that explain setup, architecture, conventions, and operational risks.",
+      "nodeIds": [
+        "document:AGENTS.md",
+        "document:README.md",
+        "document:analysis/AGENTS.md",
+        "document:backend/AGENTS.md",
+        "document:frontend/AGENTS.md"
+      ]
+    },
+    {
+      "id": "layer:configuration",
+      "name": "Configuration",
+      "description": "Package manifests, environment examples, linting, Vite, and Vitest configuration that shape local development and tests.",
+      "nodeIds": [
+        "config:frontend/package.json",
+        "file:frontend/eslint.config.js",
+        "file:frontend/vite.config.js",
+        "file:frontend/vitest.config.js"
+      ]
+    },
+    {
+      "id": "layer:ci-support",
+      "name": "CI Support",
+      "description": "Automation and test setup files that validate the frontend, backend, and Python analysis pieces in CI or local test runs.",
+      "nodeIds": [
+        "file:backend/test/server.test.js",
+        "file:frontend/src/App.test.jsx",
+        "file:frontend/src/setupTests.js",
+        "pipeline:.github/workflows/ci.yml"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "Project Overview",
+      "description": "Start with the README to understand the platform as three cooperating runtimes: React/Vite in the browser, Express as the API and trading bridge, and Python for market data and ML recommendations. This gives the rest of the tour its shape before diving into implementation details.",
+      "nodeIds": [
+        "document:README.md"
+      ]
+    },
+    {
+      "order": 2,
+      "title": "Frontend Boot",
+      "description": "The Vite HTML shell and React entry point show how the single-page app is mounted. The package and Vite configuration explain the development scripts, test environment, and React build setup behind that first render.",
+      "nodeIds": [
+        "file:frontend/index.html",
+        "file:frontend/src/main.jsx",
+        "config:frontend/package.json",
+        "file:frontend/vite.config.js"
+      ],
+      "languageLesson": "Vite applications typically keep the HTML shell small and let the JavaScript entry point mount the React tree into a root element."
+    },
+    {
+      "order": 3,
+      "title": "Application State",
+      "description": "App.jsx is the frontend orchestration center: it tracks the selected instrument, fetches chart data, and coordinates the dialogs for orders, portfolio, screeners, and watchlists. The environment helper and persisted-state hook support that stateful workspace without introducing routing or global state libraries.",
+      "nodeIds": [
+        "file:frontend/src/App.jsx",
+        "file:frontend/src/environment.js",
+        "file:frontend/src/hooks/usePersistedState.js"
+      ]
+    },
+    {
+      "order": 4,
+      "title": "Market Workspace",
+      "description": "The chart and search components are the main user workflow: find a symbol, fetch data, and inspect candlesticks, moving averages, volume, and AI signal state. Their CSS files show the visual layer that keeps the chart controls and autocomplete usable inside the dashboard.",
+      "nodeIds": [
+        "file:frontend/component/SearchBar.jsx",
+        "file:frontend/component/StockChart.jsx",
+        "file:frontend/component/searchBar.css",
+        "file:frontend/component/StockChart.css"
+      ]
+    },
+    {
+      "order": 5,
+      "title": "Trading Surfaces",
+      "description": "The trading, portfolio, orders, watchlist, and screener dialogs are the operational panels around the chart. Together they turn the analysis screen into a trading workspace by wiring frontend actions to backend portfolio, order, and symbol-selection flows.",
+      "nodeIds": [
+        "file:frontend/component/TradeDialog.jsx",
+        "file:frontend/component/PortfolioDialog.jsx",
+        "file:frontend/component/OrdersDialog.jsx",
+        "file:frontend/component/WatchlistDialog.jsx",
+        "file:frontend/component/ScreenerDialog.jsx"
+      ]
+    },
+    {
+      "order": 6,
+      "title": "Backend Bridge",
+      "description": "The Express server is the integration hub for stock-history requests, Finnhub symbol search, Interactive Brokers portfolio/order state, and Python-service proxying. Its environment example and package manifest show which runtime settings and dependencies are required before real trading can work.",
+      "nodeIds": [
+        "file:backend/server.js",
+        "config:backend/.env.example",
+        "config:backend/package.json"
+      ]
+    },
+    {
+      "order": 7,
+      "title": "Analysis Engine",
+      "description": "The Python analysis engine fetches OHLCV data, calculates moving-average and technical features, trains or loads a RandomForest classifier, and exposes both CLI and FastAPI behavior. The requirements file captures the scientific and web-service dependencies that make that engine run.",
+      "nodeIds": [
+        "file:analysis/stock_data.py",
+        "document:analysis/requirements.txt"
+      ],
+      "languageLesson": "This module mixes data-frame feature engineering with service boundaries, so stdout discipline matters: CLI calls must return pure JSON while diagnostics go to stderr."
+    },
+    {
+      "order": 8,
+      "title": "Localization Layer",
+      "description": "The i18n context, hook, and translation dictionary provide localized UI text to the React components without threading strings manually through every component. This is a small but important cross-cutting layer because nearly every dialog can depend on the same translation surface.",
+      "nodeIds": [
+        "file:frontend/src/i18n/I18nContext.js",
+        "file:frontend/src/i18n/I18nContext.jsx",
+        "file:frontend/src/i18n/useTranslation.js",
+        "file:frontend/src/i18n/translations.js"
+      ]
+    },
+    {
+      "order": 9,
+      "title": "Verification Path",
+      "description": "The frontend and backend test files show the expected behavior around UI orchestration and API validation. The GitHub Actions workflow ties those checks together so changes can be validated across the JavaScript and Python parts of the platform.",
+      "nodeIds": [
+        "file:frontend/src/App.test.jsx",
+        "file:backend/test/server.test.js",
+        "pipeline:.github/workflows/ci.yml",
+        "file:frontend/src/setupTests.js"
+      ],
+      "languageLesson": "GitHub Actions workflows use event triggers and jobs to codify the same commands developers run locally, making regression checks repeatable."
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+# .understandignore - patterns for files/dirs to exclude from analysis
+# Syntax: same as .gitignore (globs, # comments, ! negation, trailing / for dirs)
+# Lines below are suggestions - uncomment to activate.
+# Use ! prefix to force-include something excluded by defaults.
+#
+# Built-in defaults (always excluded unless negated):
+#   node_modules/, .git/, dist/, build/, obj/, *.lock, *.min.js, etc.
+#
+
+.understand-anything/
+# --- From .gitignore (uncomment to exclude) ---
+
+# backend/.env
+# *.pkl
+# .opencode.json
+# stock_rf_model.pkl
+# .opencode/*
+# docs/roadmap/Council_Features_Roadmap.md
+# *.pyc
+# analysis/model_cache/
+# run-project.bat
+
+# --- Detected directories (uncomment to exclude) ---
+
+# docs/
+
+# --- Test file patterns (uncomment to exclude) ---
+
+# *.test.*
+# *.spec.*
+# *.snap

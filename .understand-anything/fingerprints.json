@@ -1,0 +1,1528 @@
+{
+  "version": "1.0.0",
+  "gitCommitHash": "f6ff3b9f35827ca4911532bc65464f0d2861eaf3",
+  "generatedAt": "2026-06-17T12:32:09.757Z",
+  "files": {
+    ".github/workflows/ci.yml": {
+      "filePath": ".github/workflows/ci.yml",
+      "contentHash": "cd24b397291ed58e98d43f0219bca975c5710f7642c23efb7a8b1ddbb8cf2d25",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 85,
+      "hasStructuralAnalysis": true
+    },
+    "AGENTS.md": {
+      "filePath": "AGENTS.md",
+      "contentHash": "984f9f7fa62ee6f10bd8949690f8529cb885d0588c52b841e5169db16100b848",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 149,
+      "hasStructuralAnalysis": true
+    },
+    "analysis/AGENTS.md": {
+      "filePath": "analysis/AGENTS.md",
+      "contentHash": "57cf5eedcad5d37fd9270c647a43829840e02f5bc046876cfad2d4f204c1bb11",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 104,
+      "hasStructuralAnalysis": true
+    },
+    "analysis/requirements.txt": {
+      "filePath": "analysis/requirements.txt",
+      "contentHash": "cbdc4d112e1fcecc7c60bb97d9322814f8b3c7c966cf48c316a8ce500f0f01c7",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 8,
+      "hasStructuralAnalysis": false
+    },
+    "analysis/stock_data.py": {
+      "filePath": "analysis/stock_data.py",
+      "contentHash": "200fb2aa9121f981a690f12ff73f79a7c56af213e45f5651600a66eed10b1672",
+      "functions": [
+        {
+          "name": "_get_cache_path",
+          "params": [
+            "symbol"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "_load_model_from_disk",
+          "params": [
+            "symbol"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "_save_model_to_disk",
+          "params": [
+            "symbol",
+            "cache_entry"
+          ],
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "_get_cached_model",
+          "params": [
+            "symbol"
+          ],
+          "exported": true,
+          "lineCount": 23
+        },
+        {
+          "name": "_set_cached_model",
+          "params": [
+            "symbol",
+            "model_data"
+          ],
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "get_stock_price_history",
+          "params": [
+            "symbol",
+            "date_range",
+            "interval",
+            "auto_predict"
+          ],
+          "exported": true,
+          "lineCount": 251
+        },
+        {
+          "name": "get_current_stock_price",
+          "params": [
+            "symbol"
+          ],
+          "exported": true,
+          "lineCount": 30
+        },
+        {
+          "name": "get_fundamentals",
+          "params": [
+            "symbol"
+          ],
+          "exported": true,
+          "lineCount": 59
+        },
+        {
+          "name": "train_random_forest_model",
+          "params": [
+            "stock_data"
+          ],
+          "exported": true,
+          "lineCount": 128
+        },
+        {
+          "name": "predict_stock_recommendation",
+          "params": [
+            "stock_data",
+            "model_data"
+          ],
+          "exported": true,
+          "lineCount": 59
+        },
+        {
+          "name": "_make_fastapi_app",
+          "params": [],
+          "exported": true,
+          "lineCount": 70
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "yfinance",
+          "specifiers": [
+            "yf"
+          ]
+        },
+        {
+          "source": "pandas",
+          "specifiers": [
+            "pd"
+          ]
+        },
+        {
+          "source": "sys",
+          "specifiers": [
+            "sys"
+          ]
+        },
+        {
+          "source": "json",
+          "specifiers": [
+            "json"
+          ]
+        },
+        {
+          "source": "os",
+          "specifiers": [
+            "os"
+          ]
+        },
+        {
+          "source": "pickle",
+          "specifiers": [
+            "pickle"
+          ]
+        },
+        {
+          "source": "datetime",
+          "specifiers": [
+            "datetime",
+            "timedelta"
+          ]
+        }
+      ],
+      "exports": [
+        "_get_cache_path",
+        "_load_model_from_disk",
+        "_save_model_to_disk",
+        "_get_cached_model",
+        "_set_cached_model",
+        "get_stock_price_history",
+        "get_current_stock_price",
+        "get_fundamentals",
+        "train_random_forest_model",
+        "predict_stock_recommendation",
+        "_make_fastapi_app"
+      ],
+      "totalLines": 721,
+      "hasStructuralAnalysis": true
+    },
+    "backend/.env.example": {
+      "filePath": "backend/.env.example",
+      "contentHash": "b77d07b9526c01c9987fc17f57b5d193babba82a5cf0cce1a2ce58cd85bcc960",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 23,
+      "hasStructuralAnalysis": true
+    },
+    "backend/AGENTS.md": {
+      "filePath": "backend/AGENTS.md",
+      "contentHash": "1e7957dd927b37a3090275db9f530fece5664ad76467e909d648c4b82f85e1ed",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 75,
+      "hasStructuralAnalysis": true
+    },
+    "backend/package.json": {
+      "filePath": "backend/package.json",
+      "contentHash": "af2ba6488150e0fe28aaac3278b613a02d24a477ecad1d502be13bdae286d482",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 24,
+      "hasStructuralAnalysis": true
+    },
+    "backend/server.js": {
+      "filePath": "backend/server.js",
+      "contentHash": "f37856669fc54d7456b9cfb4f74b96d7c6f258352f0b16178a4dcc95f8649822",
+      "functions": [
+        {
+          "name": "resetPortfolioSnapshot",
+          "params": [],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "getPortfolioRows",
+          "params": [],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "resolvePortfolioWaiters",
+          "params": [],
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "rejectPortfolioWaiters",
+          "params": [
+            "message"
+          ],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "finalizePortfolioSnapshot",
+          "params": [],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "failPortfolioSnapshot",
+          "params": [
+            "message"
+          ],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "waitForPortfolioSnapshot",
+          "params": [],
+          "exported": false,
+          "lineCount": 20
+        },
+        {
+          "name": "serializePortfolioRow",
+          "params": [
+            "row"
+          ],
+          "exported": false,
+          "lineCount": 16
+        },
+        {
+          "name": "getOpenOrders",
+          "params": [],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "getOpenOrderKey",
+          "params": [
+            "orderId",
+            "order"
+          ],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "getOpenOrderKeyFromValues",
+          "params": [
+            "orderId",
+            "permId"
+          ],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "findOpenOrderEntry",
+          "params": [
+            "orderRef"
+          ],
+          "exported": false,
+          "lineCount": 22
+        },
+        {
+          "name": "findOpenOrderEntryByStatus",
+          "params": [
+            "orderId",
+            "permId"
+          ],
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "hasAmbiguousIbOrderId",
+          "params": [
+            "order"
+          ],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "trackSubmittedOpenOrder",
+          "params": [
+            "orderId",
+            "order"
+          ],
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "resolveOpenOrdersWaiters",
+          "params": [],
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "rejectOpenOrdersWaiters",
+          "params": [
+            "message"
+          ],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "finalizeOpenOrdersSnapshot",
+          "params": [],
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "failOpenOrdersSnapshot",
+          "params": [
+            "message"
+          ],
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "requestOpenOrdersSnapshot",
+          "params": [],
+          "exported": false,
+          "lineCount": 26
+        },
+        {
+          "name": "waitForOpenOrdersSnapshot",
+          "params": [],
+          "exported": false,
+          "lineCount": 29
+        },
+        {
+          "name": "normalizeOrderPrice",
+          "params": [
+            "price"
+          ],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "serializeOpenOrder",
+          "params": [
+            "orderId",
+            "contract",
+            "order",
+            "orderState",
+            "existingOrder"
+          ],
+          "exported": false,
+          "lineCount": 24
+        },
+        {
+          "name": "resetOpenOrders",
+          "params": [],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "resolveOrderIdWaiters",
+          "params": [
+            "orderId"
+          ],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "rejectOrderIdWaiters",
+          "params": [
+            "message"
+          ],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "waitForNextOrderId",
+          "params": [],
+          "exported": false,
+          "lineCount": 21
+        },
+        {
+          "name": "enqueueOrderPlacement",
+          "params": [
+            "task"
+          ],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "normalizeTimeInForce",
+          "params": [
+            "tif"
+          ],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "buildStockContract",
+          "params": [
+            "symbol"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "buildLimitOrder",
+          "params": [
+            "action",
+            "quantity",
+            "price",
+            "tif"
+          ],
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "getOppositeAction",
+          "params": [
+            "action"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "buildBracketOrders",
+          "params": [
+            "action",
+            "quantity",
+            "entryPrice",
+            "takeProfitPrice",
+            "stopLossPrice",
+            "tif",
+            "parentOrderId"
+          ],
+          "exported": false,
+          "lineCount": 22
+        },
+        {
+          "name": "scheduleReconnect",
+          "params": [],
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "connectIbGateway",
+          "params": [],
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "buildPortfolioKey",
+          "params": [
+            "account",
+            "contract"
+          ],
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "normalizePortfolioRow",
+          "params": [
+            "account",
+            "contract",
+            "position",
+            "avgCost"
+          ],
+          "exported": false,
+          "lineCount": 21
+        },
+        {
+          "name": "upsertPortfolioPosition",
+          "params": [
+            "account",
+            "contract",
+            "position",
+            "avgCost"
+          ],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "startPythonService",
+          "params": [],
+          "exported": false,
+          "lineCount": 28
+        },
+        {
+          "name": "stopPythonService",
+          "params": [],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "shutdown",
+          "params": [
+            "signal"
+          ],
+          "exported": false,
+          "lineCount": 6
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 1369,
+      "hasStructuralAnalysis": true
+    },
+    "backend/test/server.test.js": {
+      "filePath": "backend/test/server.test.js",
+      "contentHash": "971d003d4b9b681bcb19d772d5baa556859a59b7668935e052ede950d4cfe9f0",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 57,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/AGENTS.md": {
+      "filePath": "frontend/AGENTS.md",
+      "contentHash": "490e3d32798919146adff3f5f68148809e0465907fe9aa2344c0a87a84954f46",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 75,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/component/OrdersDialog.css": {
+      "filePath": "frontend/component/OrdersDialog.css",
+      "contentHash": "30a2e7ba19f842d1e7407eb267a7f5799574b3f8f3598181330a23f90211d3f0",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 371,
+      "hasStructuralAnalysis": false
+    },
+    "frontend/component/OrdersDialog.jsx": {
+      "filePath": "frontend/component/OrdersDialog.jsx",
+      "contentHash": "3324c3bb679cb67b27aad5f8b6a411a4d8db06d56d4bcab4ab939fd4df90bda2",
+      "functions": [
+        {
+          "name": "loadSubmittedOrderPrices",
+          "params": [],
+          "exported": false,
+          "lineCount": 9
+        },
+        {
+          "name": "OrdersDialog",
+          "params": [],
+          "exported": false,
+          "lineCount": 253
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useState",
+            "useEffect"
+          ]
+        },
+        {
+          "source": "../src/i18n/useTranslation",
+          "specifiers": [
+            "useTranslation"
+          ]
+        },
+        {
+          "source": "./OrdersDialog.css",
+          "specifiers": []
+        }
+      ],
+      "exports": [],
+      "totalLines": 272,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/component/PortfolioDialog.css": {
+      "filePath": "frontend/component/PortfolioDialog.css",
+      "contentHash": "841a54fd35978d0bd1485cfc130a2128a8bfa52ed36777ab24b481b44e3b0f46",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 286,
+      "hasStructuralAnalysis": false
+    },
+    "frontend/component/PortfolioDialog.jsx": {
+      "filePath": "frontend/component/PortfolioDialog.jsx",
+      "contentHash": "83d3523bd45f2ecd6683117d99fae3572a5fadc2b1bd177635f12f501f8196d0",
+      "functions": [
+        {
+          "name": "PortfolioDialog",
+          "params": [],
+          "exported": false,
+          "lineCount": 183
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useState",
+            "useEffect"
+          ]
+        },
+        {
+          "source": "../src/i18n/useTranslation",
+          "specifiers": [
+            "useTranslation"
+          ]
+        },
+        {
+          "source": "./PortfolioDialog.css",
+          "specifiers": []
+        }
+      ],
+      "exports": [],
+      "totalLines": 190,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/component/ScreenerDialog.css": {
+      "filePath": "frontend/component/ScreenerDialog.css",
+      "contentHash": "72aebbc386fcaca545cca3f7a75be68664806fc171aede5055e01a1e0acb060b",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 592,
+      "hasStructuralAnalysis": false
+    },
+    "frontend/component/ScreenerDialog.jsx": {
+      "filePath": "frontend/component/ScreenerDialog.jsx",
+      "contentHash": "80d331c24b439b7361bff75a521b7f4cf0dc2d17918807bf6b3aae8b6f193952",
+      "functions": [
+        {
+          "name": "clampNumber",
+          "params": [
+            "value",
+            "min",
+            "max",
+            "fallback"
+          ],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "ScreenerDialog",
+          "params": [],
+          "exported": false,
+          "lineCount": 471
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useState",
+            "useCallback",
+            "useRef"
+          ]
+        },
+        {
+          "source": "../src/i18n/useTranslation",
+          "specifiers": [
+            "useTranslation"
+          ]
+        },
+        {
+          "source": "./ScreenerDialog.css",
+          "specifiers": []
+        }
+      ],
+      "exports": [],
+      "totalLines": 498,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/component/searchBar.css": {
+      "filePath": "frontend/component/searchBar.css",
+      "contentHash": "ae49b1f650f454e9a504854c53ebc83e37d72591ecc8685b9b32d1761db5c003",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 158,
+      "hasStructuralAnalysis": false
+    },
+    "frontend/component/SearchBar.jsx": {
+      "filePath": "frontend/component/SearchBar.jsx",
+      "contentHash": "3d63125141b18932eb39814f7b81c09ab23d4ac9df173122c093042adbfc24fa",
+      "functions": [
+        {
+          "name": "SearchBar",
+          "params": [],
+          "exported": false,
+          "lineCount": 178
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "React",
+            "useState",
+            "useEffect",
+            "useRef"
+          ]
+        },
+        {
+          "source": "./searchBar.css",
+          "specifiers": []
+        },
+        {
+          "source": "../src/i18n/useTranslation",
+          "specifiers": [
+            "useTranslation"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 186,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/component/StockChart.css": {
+      "filePath": "frontend/component/StockChart.css",
+      "contentHash": "61f09fde00f822959f45c34599fa619986b80a83b210d52848d5feed4fb08b25",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 368,
+      "hasStructuralAnalysis": false
+    },
+    "frontend/component/StockChart.jsx": {
+      "filePath": "frontend/component/StockChart.jsx",
+      "contentHash": "1737e8ad30a47750766db140d9074b1cfbe72a64dedfe8818d2d677a98ec81c6",
+      "functions": [
+        {
+          "name": "createHorizontalLinesPrimitive",
+          "params": [],
+          "exported": false,
+          "lineCount": 149
+        },
+        {
+          "name": "createSwingZonesPrimitive",
+          "params": [],
+          "exported": false,
+          "lineCount": 73
+        },
+        {
+          "name": "toChartDate",
+          "params": [
+            "raw"
+          ],
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "loadWatchlist",
+          "params": [],
+          "exported": false,
+          "lineCount": 17
+        },
+        {
+          "name": "saveWatchlist",
+          "params": [
+            "list"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "StockChart",
+          "params": [],
+          "exported": false,
+          "lineCount": 738
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useRef",
+            "useMemo",
+            "useEffect",
+            "useCallback",
+            "useState"
+          ]
+        },
+        {
+          "source": "../src/hooks/usePersistedState",
+          "specifiers": [
+            "usePersistedState"
+          ]
+        },
+        {
+          "source": "lightweight-charts",
+          "specifiers": [
+            "createChart",
+            "CandlestickSeries",
+            "HistogramSeries",
+            "LineSeries",
+            "CrosshairMode",
+            "LineStyle"
+          ]
+        },
+        {
+          "source": "./StockChart.css",
+          "specifiers": []
+        },
+        {
+          "source": "../src/i18n/useTranslation",
+          "specifiers": [
+            "useTranslation"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 1035,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/component/TradeDialog.css": {
+      "filePath": "frontend/component/TradeDialog.css",
+      "contentHash": "4bab799b7b96bcd0821bb7a425aedb9eb3ebf75bbee59e5e3c5dd0bfa04a1e42",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 447,
+      "hasStructuralAnalysis": false
+    },
+    "frontend/component/TradeDialog.jsx": {
+      "filePath": "frontend/component/TradeDialog.jsx",
+      "contentHash": "120233579cdd3fe15d771aba1827e2eb237f9b244d68c937a077520e0ee24641",
+      "functions": [
+        {
+          "name": "rememberSubmittedOrderPrice",
+          "params": [
+            "orderId",
+            "orderPrice"
+          ],
+          "exported": false,
+          "lineCount": 12
+        },
+        {
+          "name": "TradeDialog",
+          "params": [],
+          "exported": false,
+          "lineCount": 414
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useEffect",
+            "useState"
+          ]
+        },
+        {
+          "source": "../src/i18n/useTranslation",
+          "specifiers": [
+            "useTranslation"
+          ]
+        },
+        {
+          "source": "./TradeDialog.css",
+          "specifiers": []
+        }
+      ],
+      "exports": [],
+      "totalLines": 436,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/component/WatchlistDialog.css": {
+      "filePath": "frontend/component/WatchlistDialog.css",
+      "contentHash": "7e7638b32a8c618e3ba848f5f5dbc171966694eef3d9d61c887887994c293241",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 390,
+      "hasStructuralAnalysis": false
+    },
+    "frontend/component/WatchlistDialog.jsx": {
+      "filePath": "frontend/component/WatchlistDialog.jsx",
+      "contentHash": "b707728d5ccd242f322c7c252346aae0a20d98704c2d250bb9c415af512928ca",
+      "functions": [
+        {
+          "name": "loadWatchlist",
+          "params": [],
+          "exported": false,
+          "lineCount": 17
+        },
+        {
+          "name": "saveWatchlist",
+          "params": [
+            "list"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "WatchlistDialog",
+          "params": [],
+          "exported": false,
+          "lineCount": 355
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useState",
+            "useEffect",
+            "useRef",
+            "useCallback"
+          ]
+        },
+        {
+          "source": "../src/i18n/useTranslation",
+          "specifiers": [
+            "useTranslation"
+          ]
+        },
+        {
+          "source": "./WatchlistDialog.css",
+          "specifiers": []
+        }
+      ],
+      "exports": [],
+      "totalLines": 386,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/eslint.config.js": {
+      "filePath": "frontend/eslint.config.js",
+      "contentHash": "8072e235e93520431830159f220f3ce18ddae8ec581f4503446173dd009b4e15",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@eslint/js",
+          "specifiers": [
+            "js"
+          ]
+        },
+        {
+          "source": "globals",
+          "specifiers": [
+            "globals"
+          ]
+        },
+        {
+          "source": "eslint-plugin-react-hooks",
+          "specifiers": [
+            "reactHooks"
+          ]
+        },
+        {
+          "source": "eslint-plugin-react-refresh",
+          "specifiers": [
+            "reactRefresh"
+          ]
+        },
+        {
+          "source": "eslint/config",
+          "specifiers": [
+            "defineConfig",
+            "globalIgnores"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 30,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/index.html": {
+      "filePath": "frontend/index.html",
+      "contentHash": "f2a2614a3a07a92f674b1e57e1e41dfd99be32e7c3da38864053af02083974fc",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 14,
+      "hasStructuralAnalysis": false
+    },
+    "frontend/package.json": {
+      "filePath": "frontend/package.json",
+      "contentHash": "68cd2fd4982d7fd7544d839270543e6025acbe3076297e578ce89f1e4fd9ba57",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 34,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/src/App.css": {
+      "filePath": "frontend/src/App.css",
+      "contentHash": "9fa8b2b8f0556de395cbeb3c58adab1b5204490330760d8d190b8bd1cdaee2b1",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 425,
+      "hasStructuralAnalysis": false
+    },
+    "frontend/src/App.jsx": {
+      "filePath": "frontend/src/App.jsx",
+      "contentHash": "92be63d001feff82ca573bb637126c13bca973a7beb8723a674e25132f188ed1",
+      "functions": [
+        {
+          "name": "App",
+          "params": [],
+          "exported": false,
+          "lineCount": 480
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "./App.css",
+          "specifiers": []
+        },
+        {
+          "source": "react",
+          "specifiers": [
+            "useState",
+            "useMemo",
+            "useEffect",
+            "useRef",
+            "useCallback"
+          ]
+        },
+        {
+          "source": "../component/SearchBar",
+          "specifiers": [
+            "SearchBar"
+          ]
+        },
+        {
+          "source": "../component/StockChart",
+          "specifiers": [
+            "StockChart"
+          ]
+        },
+        {
+          "source": "../component/TradeDialog",
+          "specifiers": [
+            "TradeDialog"
+          ]
+        },
+        {
+          "source": "../component/PortfolioDialog",
+          "specifiers": [
+            "PortfolioDialog"
+          ]
+        },
+        {
+          "source": "../component/OrdersDialog",
+          "specifiers": [
+            "OrdersDialog"
+          ]
+        },
+        {
+          "source": "../component/WatchlistDialog",
+          "specifiers": [
+            "WatchlistDialog"
+          ]
+        },
+        {
+          "source": "../component/ScreenerDialog",
+          "specifiers": [
+            "ScreenerDialog"
+          ]
+        },
+        {
+          "source": "./environment",
+          "specifiers": [
+            "isGitHubPages"
+          ]
+        },
+        {
+          "source": "./mockData",
+          "specifiers": [
+            "generateNvdaMockData"
+          ]
+        },
+        {
+          "source": "./i18n/useTranslation",
+          "specifiers": [
+            "useTranslation"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 496,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/src/App.test.jsx": {
+      "filePath": "frontend/src/App.test.jsx",
+      "contentHash": "a171a72c8bf8fff005b1b9217e560d668ecb32cb6f014852a7578792522841ce",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "vitest",
+          "specifiers": [
+            "describe",
+            "it",
+            "expect"
+          ]
+        },
+        {
+          "source": "@testing-library/react",
+          "specifiers": [
+            "render",
+            "screen"
+          ]
+        },
+        {
+          "source": "./App",
+          "specifiers": [
+            "App"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 18,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/src/environment.js": {
+      "filePath": "frontend/src/environment.js",
+      "contentHash": "50b1c273cad16d8ebb141b4e2ebb7d661b13490d900bd565ae51615879a5a89d",
+      "functions": [
+        {
+          "name": "isGitHubPages",
+          "params": [],
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "getApiBase",
+          "params": [],
+          "exported": true,
+          "lineCount": 4
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [
+        "isGitHubPages",
+        "getApiBase"
+      ],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/src/hooks/usePersistedState.js": {
+      "filePath": "frontend/src/hooks/usePersistedState.js",
+      "contentHash": "877a24a19af082455d1ffe53bfcf7ee061e2459d69fab6b198ee75320725d39a",
+      "functions": [
+        {
+          "name": "usePersistedState",
+          "params": [
+            "key",
+            "defaultValue"
+          ],
+          "exported": true,
+          "lineCount": 20
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useState",
+            "useEffect"
+          ]
+        }
+      ],
+      "exports": [
+        "usePersistedState"
+      ],
+      "totalLines": 30,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/src/i18n/I18nContext.js": {
+      "filePath": "frontend/src/i18n/I18nContext.js",
+      "contentHash": "2b245709f2846f5dbc0d823d3bb0136b66b69ab482359812c69e3130a9a8a65e",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "createContext"
+          ]
+        }
+      ],
+      "exports": [
+        "I18nContext"
+      ],
+      "totalLines": 7,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/src/i18n/I18nContext.jsx": {
+      "filePath": "frontend/src/i18n/I18nContext.jsx",
+      "contentHash": "0bd25af8f2ac87bf0539d57295f7c50e635d213cf4e6aee0952460382d84d428",
+      "functions": [
+        {
+          "name": "I18nProvider",
+          "params": [],
+          "exported": true,
+          "lineCount": 30
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useState",
+            "useEffect",
+            "useCallback"
+          ]
+        },
+        {
+          "source": "./I18nContext.js",
+          "specifiers": [
+            "I18nContext"
+          ]
+        }
+      ],
+      "exports": [
+        "I18nProvider"
+      ],
+      "totalLines": 36,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/src/i18n/translations.js": {
+      "filePath": "frontend/src/i18n/translations.js",
+      "contentHash": "1444e9241982d60da202b71c5b1577271d9ca6092dc1e89aa75cbc91f0d561a1",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [
+        "translations"
+      ],
+      "totalLines": 393,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/src/i18n/useTranslation.js": {
+      "filePath": "frontend/src/i18n/useTranslation.js",
+      "contentHash": "96aaaa8fe2123956a0465ce442c0bd6c2b5571a32a4a52edbe30dfacb3e35cd1",
+      "functions": [
+        {
+          "name": "useTranslation",
+          "params": [],
+          "exported": true,
+          "lineCount": 20
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useContext",
+            "useCallback"
+          ]
+        },
+        {
+          "source": "./I18nContext.js",
+          "specifiers": [
+            "I18nContext"
+          ]
+        },
+        {
+          "source": "./translations",
+          "specifiers": [
+            "translations"
+          ]
+        }
+      ],
+      "exports": [
+        "useTranslation"
+      ],
+      "totalLines": 25,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/src/index.css": {
+      "filePath": "frontend/src/index.css",
+      "contentHash": "71dab4a440c879e12bf1af7d35ecaa58229225063223555973045e4793e3173d",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 143,
+      "hasStructuralAnalysis": false
+    },
+    "frontend/src/main.jsx": {
+      "filePath": "frontend/src/main.jsx",
+      "contentHash": "71ee53e4f9a3f6eecd2f880a704d9670e7b221b67d6ff505286d3ee9ee71d52f",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "StrictMode"
+          ]
+        },
+        {
+          "source": "react-dom/client",
+          "specifiers": [
+            "createRoot"
+          ]
+        },
+        {
+          "source": "./index.css",
+          "specifiers": []
+        },
+        {
+          "source": "./App.jsx",
+          "specifiers": [
+            "App"
+          ]
+        },
+        {
+          "source": "./i18n/I18nContext.jsx",
+          "specifiers": [
+            "I18nProvider"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 14,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/src/mockData.js": {
+      "filePath": "frontend/src/mockData.js",
+      "contentHash": "278ca2c160c0ce321a007d7eb7d9635872bde1299a5d76990886f5a0067eab19",
+      "functions": [
+        {
+          "name": "createRng",
+          "params": [
+            "seed"
+          ],
+          "exported": false,
+          "lineCount": 7
+        },
+        {
+          "name": "formatDate",
+          "params": [
+            "date"
+          ],
+          "exported": false,
+          "lineCount": 6
+        },
+        {
+          "name": "toFixed",
+          "params": [
+            "n"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "generateNvdaMockData",
+          "params": [],
+          "exported": true,
+          "lineCount": 51
+        },
+        {
+          "name": "computeMovingAverages",
+          "params": [
+            "data"
+          ],
+          "exported": false,
+          "lineCount": 41
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [
+        "generateNvdaMockData"
+      ],
+      "totalLines": 119,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/src/setupTests.js": {
+      "filePath": "frontend/src/setupTests.js",
+      "contentHash": "d87e69b8107f06c8a61e9d9613b25893ac6130734cdcf3af1c801521565061e9",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@testing-library/jest-dom",
+          "specifiers": []
+        }
+      ],
+      "exports": [],
+      "totalLines": 2,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/vite.config.js": {
+      "filePath": "frontend/vite.config.js",
+      "contentHash": "2a35a7b71167b9673378b4faebcae4b441ebed3107841cccaf3ac6a2c9d974c6",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "vite",
+          "specifiers": [
+            "defineConfig"
+          ]
+        },
+        {
+          "source": "@vitejs/plugin-react",
+          "specifiers": [
+            "react"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 18,
+      "hasStructuralAnalysis": true
+    },
+    "frontend/vitest.config.js": {
+      "filePath": "frontend/vitest.config.js",
+      "contentHash": "969e07439297b89fbfa8109e0782dc790860195632dd3234e1e41e5b939b8b76",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "vitest/config",
+          "specifiers": [
+            "defineConfig"
+          ]
+        },
+        {
+          "source": "@vitejs/plugin-react",
+          "specifiers": [
+            "react"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 12,
+      "hasStructuralAnalysis": true
+    },
+    "README.md": {
+      "filePath": "README.md",
+      "contentHash": "1a9d0a0b5e57bc5d8e057cbd29f661645841fdeafc3d3055d8e03c4fd0405d4f",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 166,
+      "hasStructuralAnalysis": true
+    }
+  }
+}
