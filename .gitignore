@@ -9,3 +9,7 @@ __pycache__/
 *.pyc
 analysis/model_cache/
 run-project.bat
+.understand-anything/dashboard*.log
+.understand-anything/dashboard.pid
+.understand-anything/intermediate/
+.understand-anything/.trash-*/
