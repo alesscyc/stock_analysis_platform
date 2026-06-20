@@ -198,6 +198,33 @@
   flex-shrink: 0;
 }
 
+#trend-line-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 6px 12px;
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#trend-line-btn:hover,
+#trend-line-btn.active {
+  color: var(--warning);
+  border-color: var(--warning);
+  background: var(--warning-dim);
+}
+
+#trend-line-btn svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
 /* ── Indicators Dropdown ───────────────────────────────── */
 #indicators-dropdown {
   position: relative;
@@ -343,6 +370,10 @@
 #lw-chart-container.hovering-order-line,
 #lw-chart-container.dragging-order-line {
   cursor: ns-resize;
+}
+
+#lw-chart-container.drawing-trend-line {
+  cursor: crosshair;
 }
 
 /* ── Responsive ────────────────────────────────────────── */

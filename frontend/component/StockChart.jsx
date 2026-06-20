@@ -1134,7 +1134,11 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
 
       {/* ── Chart canvas ── */}
       <div id="stock-chart-canvas-wrapper">
-        <div ref={containerRef} id="lw-chart-container" />
+        <div
+          ref={containerRef}
+          id="lw-chart-container"
+          className={drawingMode ? 'drawing-trend-line' : ''}
+        />
       </div>
 
     </div>
