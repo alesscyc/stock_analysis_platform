@@ -10,6 +10,7 @@ import {
 } from 'lightweight-charts';
 import './StockChart.css';
 import { useTranslation } from '../src/i18n/useTranslation';
+import { createTrendLinesPrimitive, loadTrendLines, saveTrendLines } from './trendLines';
 
 // ── MA config: key → display label and colour ─────────────
 const MA_CONFIG = [
@@ -303,6 +304,10 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   const volumeSeriesRef  = useRef(null);
   const maSeriesRefs          = useRef({});
   const swingZonesPrimitiveRef = useRef(null);
+  const trendLinesPrimitiveRef  = useRef(null);
+  const drawingStartRef         = useRef(null);
+  const drawingModeRef          = useRef(false);
+  const skipTrendLineSaveRef    = useRef(true);
   const vol20maSeriesRef       = useRef(null);
   const ibLinesPrimitiveRef    = useRef(null);
   const ibPriceLinesRef        = useRef([]);
@@ -319,7 +324,52 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   const [watchlistAdded, setWatchlistAdded] = useState(false);
   const [ibPosition, setIbPosition] = useState(null);
   const [symbolOrders, setSymbolOrders] = useState([]);
+  const [drawingMode, setDrawingMode] = useState(false);
+  const [trendLines, setTrendLines] = useState(() => loadTrendLines(stockSymbol));
+  const [selectedTrendLine, setSelectedTrendLine] = useState(-1);
   const { t } = useTranslation();
+
+  useEffect(() => {
+    drawingModeRef.current = drawingMode;
+  }, [drawingMode]);
+
+  useEffect(() => {
+    skipTrendLineSaveRef.current = true;
+    setTrendLines(loadTrendLines(stockSymbol));
+    setSelectedTrendLine(-1);
+    setDrawingMode(false);
+    drawingModeRef.current = false;
+    drawingStartRef.current = null;
+  }, [stockSymbol]);
+
+  useEffect(() => {
+    trendLinesPrimitiveRef.current?.setLines(trendLines, selectedTrendLine);
+
+    if (skipTrendLineSaveRef.current) {
+      skipTrendLineSaveRef.current = false;
+      return;
+    }
+
+    saveTrendLines(stockSymbol, trendLines);
+  }, [selectedTrendLine, stockSymbol, trendLines]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+
+      const target = event.target;
+      const tagName = target?.tagName?.toLowerCase();
+      if (tagName === 'input' || tagName === 'textarea' || target?.isContentEditable) return;
+      if (selectedTrendLine < 0) return;
+
+      event.preventDefault();
+      setTrendLines(prev => prev.filter((_, index) => index !== selectedTrendLine));
+      setSelectedTrendLine(-1);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTrendLine]);
 
   useEffect(() => {
     onOrderPriceDragRef.current = onOrderPriceDrag;
@@ -616,6 +666,35 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     candleSeries.attachPrimitive(swingPrimitive);
     swingZonesPrimitiveRef.current = swingPrimitive;
 
+    // ── User-drawn trend lines primitive ─────────────────────
+    const trendLinesPrimitive = createTrendLinesPrimitive();
+    candleSeries.attachPrimitive(trendLinesPrimitive);
+    trendLinesPrimitiveRef.current = trendLinesPrimitive;
+
+    const handleChartClick = (param) => {
+      if (!drawingModeRef.current || !param.point || param.time == null) return;
+
+      const price = candleSeries.coordinateToPrice(param.point.y);
+      if (!Number.isFinite(price)) return;
+
+      const point = {
+        time: param.time,
+        price: Math.round(price * 100) / 100,
+      };
+
+      if (!drawingStartRef.current) {
+        drawingStartRef.current = point;
+        return;
+      }
+
+      const start = drawingStartRef.current;
+      setTrendLines(prev => [...prev, { start, end: point }]);
+      drawingStartRef.current = null;
+      drawingModeRef.current = false;
+      setDrawingMode(false);
+    };
+    chart.subscribeClick(handleChartClick);
+
     // ── Horizontal IB lines primitive (custom canvas lines) ───
     const ibLinesPrimitive = createHorizontalLinesPrimitive();
     candleSeries.attachPrimitive(ibLinesPrimitive);
@@ -684,8 +763,18 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     };
 
     const handleMouseDown = (e) => {
-      if (!ibLinesPrimitiveRef.current) return;
+      if (drawingModeRef.current) return;
+
       const point = getMousePoint(e);
+      const trendLineIndex = trendLinesPrimitiveRef.current?.lineIndexAt(point.x, point.y) ?? -1;
+      if (trendLineIndex >= 0) {
+        setSelectedTrendLine(trendLineIndex);
+        e.preventDefault();
+        return;
+      }
+      setSelectedTrendLine(-1);
+
+      if (!ibLinesPrimitiveRef.current) return;
       const hit = ibLinesPrimitiveRef.current.hitTest(point.x, point.y);
       const line = ibLinesPrimitiveRef.current.getLine(hit);
       if (!line?.draggable || !line.order) return;
@@ -735,6 +824,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       containerEl.removeEventListener('mousedown', handleMouseDown);
       containerEl.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      chart.unsubscribeClick(handleChartClick);
       ro.disconnect();
       chart.remove();
       chartRef.current = null;
@@ -742,6 +832,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       volumeSeriesRef.current      = null;
       maSeriesRefs.current         = {};
       swingZonesPrimitiveRef.current = null;
+      trendLinesPrimitiveRef.current = null;
       vol20maSeriesRef.current = null;
       ibLinesPrimitiveRef.current = null;
       ibPriceLinesRef.current = [];
@@ -877,6 +968,25 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
               </button>
             ))}
           </div>
+
+          <button
+            id="trend-line-btn"
+            className={drawingMode ? 'active' : ''}
+            aria-pressed={drawingMode}
+            title={t('trendLine')}
+            onClick={() => {
+              setDrawingMode(prev => !prev);
+              drawingStartRef.current = null;
+              setSelectedTrendLine(-1);
+            }}
+          >
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="4" y1="18" x2="20" y2="6" />
+              <circle cx="4" cy="18" r="2" />
+              <circle cx="20" cy="6" r="2" />
+            </svg>
+            {t('trendLine')}
+          </button>
 
           {/* AI Recommendation */}
           {aiPrediction && (

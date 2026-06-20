@@ -29,6 +29,7 @@ export const translations = {
 
     // StockChart.jsx
     vol20MA: 'Vol 20 MA',
+    trendLine: 'Trend Line',
     ai: 'AI:',
     confidence: 'confidence',
     insufficientData: 'Insufficient data for prediction',
@@ -227,6 +228,7 @@ export const translations = {
 
     // StockChart.jsx
     vol20MA: '成交量 20 MA',
+    trendLine: '趨勢線',
     ai: 'AI:',
     confidence: '信心度',
     insufficientData: '數據不足，無法預測',
