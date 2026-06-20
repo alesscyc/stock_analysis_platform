@@ -83,7 +83,7 @@ export function createTrendLinesPrimitive() {
       requestUpdate?.()
     },
 
-    hitTest(x, y) {
+    lineIndexAt(x, y) {
       for (let index = lines.length - 1; index >= 0; index--) {
         const points = coordinates(lines[index])
         if (points && distanceToSegment(x, y, points.x1, points.y1, points.x2, points.y2) <= 6) {
@@ -112,7 +112,6 @@ export function createTrendLinesPrimitive() {
           draw(target) {
             target.useBitmapCoordinateSpace(scope => {
               const { context, horizontalPixelRatio, verticalPixelRatio } = scope
-              const widthRatio = Math.min(horizontalPixelRatio, verticalPixelRatio)
 
               for (let index = 0; index < lines.length; index++) {
                 const points = coordinates(lines[index])
@@ -120,7 +119,7 @@ export function createTrendLinesPrimitive() {
 
                 context.beginPath()
                 context.strokeStyle = index === selectedIndex ? '#ffffff' : '#f0b429'
-                context.lineWidth = (index === selectedIndex ? 3 : 2) * widthRatio
+                context.lineWidth = (index === selectedIndex ? 3 : 2) * horizontalPixelRatio
                 context.moveTo(points.x1 * horizontalPixelRatio, points.y1 * verticalPixelRatio)
                 context.lineTo(points.x2 * horizontalPixelRatio, points.y2 * verticalPixelRatio)
                 context.stroke()
