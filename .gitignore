@@ -13,3 +13,5 @@ run-project.bat
 .understand-anything/dashboard.pid
 .understand-anything/intermediate/
 .understand-anything/.trash-*/
+.worktrees/
+.superpowers/
