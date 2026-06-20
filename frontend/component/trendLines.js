@@ -54,3 +54,81 @@ export function distanceToSegment(px, py, x1, y1, x2, y2) {
 
   return Math.hypot(px - nearestX, py - nearestY)
 }
+
+export function createTrendLinesPrimitive() {
+  let lines = []
+  let selectedIndex = -1
+  let chart = null
+  let series = null
+  let requestUpdate = null
+
+  const coordinates = line => {
+    if (!chart || !series) return null
+
+    const timeScale = chart.timeScale()
+    const x1 = timeScale.timeToCoordinate(line.start.time)
+    const y1 = series.priceToCoordinate(line.start.price)
+    const x2 = timeScale.timeToCoordinate(line.end.time)
+    const y2 = series.priceToCoordinate(line.end.price)
+
+    return x1 === null || y1 === null || x2 === null || y2 === null
+      ? null
+      : { x1, y1, x2, y2 }
+  }
+
+  return {
+    setLines(nextLines, nextSelectedIndex = -1) {
+      lines = nextLines
+      selectedIndex = nextSelectedIndex
+      requestUpdate?.()
+    },
+
+    hitTest(x, y) {
+      for (let index = lines.length - 1; index >= 0; index--) {
+        const points = coordinates(lines[index])
+        if (points && distanceToSegment(x, y, points.x1, points.y1, points.x2, points.y2) <= 6) {
+          return index
+        }
+      }
+      return -1
+    },
+
+    attached(params) {
+      chart = params.chart
+      series = params.series
+      requestUpdate = params.requestUpdate
+    },
+
+    detached() {
+      chart = null
+      series = null
+      requestUpdate = null
+    },
+
+    paneViews() {
+      return [{
+        zOrder: () => 'top',
+        renderer: () => ({
+          draw(target) {
+            target.useBitmapCoordinateSpace(scope => {
+              const { context, horizontalPixelRatio, verticalPixelRatio } = scope
+              const widthRatio = Math.min(horizontalPixelRatio, verticalPixelRatio)
+
+              for (let index = 0; index < lines.length; index++) {
+                const points = coordinates(lines[index])
+                if (!points) continue
+
+                context.beginPath()
+                context.strokeStyle = index === selectedIndex ? '#ffffff' : '#f0b429'
+                context.lineWidth = (index === selectedIndex ? 3 : 2) * widthRatio
+                context.moveTo(points.x1 * horizontalPixelRatio, points.y1 * verticalPixelRatio)
+                context.lineTo(points.x2 * horizontalPixelRatio, points.y2 * verticalPixelRatio)
+                context.stroke()
+              }
+            })
+          },
+        }),
+      }]
+    },
+  }
+}

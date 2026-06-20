@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { distanceToSegment, loadTrendLines, saveTrendLines } from './trendLines'
+import {
+  createTrendLinesPrimitive,
+  distanceToSegment,
+  loadTrendLines,
+  saveTrendLines,
+} from './trendLines'
 
 const line = {
   start: { time: '2026-01-02', price: 100 },
@@ -74,5 +79,27 @@ describe('trend lines', () => {
 
   it('measures distance to a zero-length segment', () => {
     expect(distanceToSegment(3, 4, 0, 0, 0, 0)).toBe(5)
+  })
+
+  it('hit-tests rendered trend lines within six pixels', () => {
+    const primitive = createTrendLinesPrimitive()
+    primitive.attached({
+      chart: {
+        timeScale: () => ({
+          timeToCoordinate: time => time === 'a' ? 10 : 90,
+        }),
+      },
+      series: {
+        priceToCoordinate: price => price,
+      },
+      requestUpdate: () => {},
+    })
+    primitive.setLines([{
+      start: { time: 'a', price: 20 },
+      end: { time: 'b', price: 20 },
+    }])
+
+    expect(primitive.hitTest(50, 24)).toBe(0)
+    expect(primitive.hitTest(50, 30)).toBe(-1)
   })
 })
