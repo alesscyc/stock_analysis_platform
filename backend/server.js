@@ -1308,6 +1308,55 @@ app.post('/api/orders/:orderRef/cancel', async (req, res) => {
 
 connectIbGateway();
 
+
+// ── Backtest endpoint ──────────────────────────────────────────────────────
+app.post('/api/backtest', async (req, res) => {
+  try {
+    const body = req.body ?? {};
+    const symbol = String(body.symbol ?? '').trim().toUpperCase();
+    const strategyConfig = body.strategyConfig;
+    const capital = Number(body.capital ?? 10000);
+    const dateRange = String(body.dateRange ?? '2y').trim();
+    const interval = String(body.interval ?? '1d').trim();
+
+    if (!/^[A-Z0-9.\-]{1,20}$/.test(symbol)) {
+      return res.status(400).json({ error: 'Invalid symbol' });
+    }
+
+    if (!strategyConfig || typeof strategyConfig !== 'object') {
+      return res.status(400).json({ error: 'Strategy config is required' });
+    }
+
+    if (!Number.isFinite(capital) || capital <= 0) {
+      return res.status(400).json({ error: 'Capital must be a positive number' });
+    }
+
+    const pyRes = await fetch(`${PYTHON_SERVICE_URL}/backtest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol,
+        strategy_config: strategyConfig,
+        capital,
+        date_range: dateRange,
+        interval,
+      }),
+    });
+
+    if (!pyRes.ok) {
+      const errBody = await pyRes.json().catch(() => ({}));
+      return res.status(400).json({ error: errBody.detail || 'Backtest failed' });
+    }
+
+    const result = await pyRes.json();
+    res.json(result);
+  } catch (error) {
+    console.error('[backtest] Error:', error.message);
+    res.status(502).json({ error: 'Could not reach Python analysis service' });
+  }
+});
+
+
 // ── Python FastAPI service manager ───────────────────────────────────────────
 const PYTHON_SCRIPT = path.join(__dirname, '../analysis/stock_data.py');
 let pythonProcess = null;

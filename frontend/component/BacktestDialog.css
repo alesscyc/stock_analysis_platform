@@ -1,0 +1,211 @@
+.backtest-dialog {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  gap: var(--space-3);
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.backtest-dialog-hidden {
+  display: none;
+}
+
+.backtest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.backtest-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+.backtest-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.backtest-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.backtest-editor {
+  width: 100%;
+  font-family: var(--font-mono, 'Cascadia Code', 'Fira Code', monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  resize: vertical;
+  min-height: 180px;
+  tab-size: 4;
+}
+
+.backtest-controls-row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.backtest-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.backtest-field label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.backtest-field input,
+.backtest-field select {
+  padding: 6px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+.backtest-run {
+  padding: 10px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.backtest-run:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.backtest-run:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.backtest-back {
+  padding: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.backtest-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.backtest-actions .backtest-run {
+  flex: 1;
+}
+
+.backtest-error {
+  padding: 8px 12px;
+  background: rgba(255, 80, 80, 0.1);
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  border-radius: var(--radius-sm);
+  color: var(--red-bright, #ff5555);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Metrics grid */
+.backtest-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.backtest-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-3);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.backtest-metric-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.backtest-metric.good .backtest-metric-value { color: var(--green-bright, #50fa7b); }
+.backtest-metric.bad .backtest-metric-value { color: var(--red-bright, #ff5555); }
+
+.backtest-metric-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+/* Trade table */
+.backtest-trades {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.backtest-trades table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.backtest-trades th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-surface);
+  padding: 6px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.backtest-trades td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.backtest-trades tr.win tr.positive { background: rgba(80, 250, 123, 0.04); }
+.backtest-trades tr.loss tr.negative { background: rgba(255, 85, 85, 0.04); }
+.backtest-trades .positive { color: var(--green-bright, #50fa7b); }
+.backtest-trades .negative { color: var(--red-bright, #ff5555); }

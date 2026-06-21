@@ -15,4 +15,6 @@ run-project.bat
 .understand-anything/.trash-*/
 .worktrees/
 .superpowers/
+docs/superpowers/plans/
+docs/superpowers/specs/
 .claude/settings.local.json

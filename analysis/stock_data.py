@@ -1,9 +1,11 @@
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import sys
 import json
 import os
 import pickle
+import math
 from datetime import datetime, timedelta
 
 # ── Model cache ──────────────────────────────────────────────────────────────
@@ -418,6 +420,302 @@ def get_fundamentals(symbol):
     except Exception as e:
         return {"error": f"Error fetching fundamentals: {str(e)}"}
 
+
+# ── Backtesting engine ─────────────────────────────────────────────────────
+# Strategy defined as declarative JSON — no code execution.
+# Safe for open API use.
+
+# ponytail: no slippage, commission, partial fills, shorting. Add when needed.
+
+
+RULE_OPS = {'>': lambda a, b: a > b, '<': lambda a, b: a < b, '>=': lambda a, b: a >= b, '<=': lambda a, b: a <= b}
+
+
+def _get_col_val(df, i, spec):
+    """Resolve a rule operand to a scalar value. spec is column name or literal number."""
+    if isinstance(spec, (int, float)):
+        return float(spec)
+    col = str(spec)
+    val = df.loc[i, col] if col in df.columns else None
+    return float(val) if pd.notna(val) else None
+
+
+def _check_rule(df, i, rule):
+    """Check a single rule at row i. rule: {left, op, right}."""
+    op_fn = RULE_OPS.get(rule['op'])
+    if not op_fn:
+        return None
+    left_val = _get_col_val(df, i, rule['left'])
+    right_val = _get_col_val(df, i, rule['right'])
+    if left_val is None or right_val is None:
+        return None
+    return op_fn(left_val, right_val)
+
+
+def _apply_rules(df, entry_rule, exit_rule, exit_mode, dca_periods, dca_unit):
+    """Apply declarative strategy rules to generate buy/sell_pct signals."""
+    df['buy'] = False
+    df['sell_pct'] = 0.0
+
+    if dca_unit == 'month':
+        bars_per = 21
+    elif dca_unit == 'week':
+        bars_per = 5
+    elif dca_unit == 'day':
+        bars_per = 1
+    else:
+        bars_per = 21
+
+    total_exit_bars = dca_periods * bars_per
+    bars_below = 0
+    prev_entry = None
+
+    for i in range(len(df)):
+        entry_val = _check_rule(df, i, entry_rule)
+
+        # Entry on crossover day
+        if entry_val is True and prev_entry is not True:
+            df.loc[i, 'buy'] = True
+            bars_below = 0
+
+        # Track consec bars below (exit condition)
+        exit_val = _check_rule(df, i, exit_rule)
+        if exit_val is True:
+            bars_below += 1
+        else:
+            bars_below = 0
+
+        # Exit signal: immediate or DCA
+        if exit_val is True:
+            if exit_mode == 'immediate':
+                df.loc[i, 'sell_pct'] = 1.0
+            else:
+                if bars_below <= total_exit_bars:
+                    df.loc[i, 'sell_pct'] = 1.0 / (total_exit_bars - bars_below + 1)
+                else:
+                    df.loc[i, 'sell_pct'] = 1.0
+
+        prev_entry = entry_val
+
+    return df
+
+
+def _run_simulation(df, capital):
+    """Simulate trades from buy/sell columns. Supports sell_pct (0-1) for fractional exits.
+    Returns (trades, equityCurve, final_value)."""
+    trades = []
+    equity_curve = []
+    cash = float(capital)
+    shares = 0.0
+    entry_price = 0.0
+    entry_date = None
+    has_sell_pct = 'sell_pct' in df.columns
+
+    for idx, row in df.iterrows():
+        date_str = str(row['Date'])[:10]
+        buy_signal = bool(row.get('buy', False))
+        sell_signal = bool(row.get('sell', False))
+        sell_fraction = float(row['sell_pct']) if has_sell_pct and pd.notna(row.get('sell_pct')) else 0.0
+
+        # Exit(s) before entry
+        if shares > 0:
+            if sell_fraction > 0:
+                sell_fraction = min(sell_fraction, 1.0)
+            elif sell_signal:
+                sell_fraction = 1.0
+
+            if sell_fraction > 0:
+                shares_to_sell = shares * sell_fraction
+                exit_price = float(row['Close'])
+                exit_value = shares_to_sell * exit_price
+                trade_pnl = exit_value - (shares_to_sell * entry_price)
+                trade_ret = ((exit_price - entry_price) / entry_price) * 100 if entry_price > 0 else 0
+                trades.append({
+                    'entryDate': str(entry_date)[:10] if entry_date else None,
+                    'entryPrice': round(float(entry_price), 2),
+                    'exitDate': date_str,
+                    'exitPrice': round(float(exit_price), 2),
+                    'returnPct': round(float(trade_ret), 2),
+                    'pnl': round(float(trade_pnl), 2),
+                    'exitReason': 'signal',
+                })
+                cash += exit_value
+                shares -= shares_to_sell
+
+        # Entry (only with cash)
+        if shares <= 0 and buy_signal and cash > 0:
+            entry_price = float(row['Close'])
+            entry_date = row['Date']
+            shares = cash / entry_price
+            cash = 0.0
+
+        portfolio_value = cash + shares * float(row['Close'])
+        equity_curve.append({'date': date_str, 'value': round(float(portfolio_value), 2)})
+
+    # Liquidate remaining position at last close
+    if shares > 0 and len(df) > 0:
+        last = df.iloc[-1]
+        exit_price = float(last['Close'])
+        exit_value = shares * exit_price
+        trade_pnl = exit_value - (shares * entry_price)
+        trade_ret = ((exit_price - entry_price) / entry_price) * 100 if entry_price > 0 else 0
+        trades.append({
+            'entryDate': str(entry_date)[:10] if entry_date else None,
+            'entryPrice': round(float(entry_price), 2),
+            'exitDate': str(last['Date'])[:10],
+            'exitPrice': round(float(exit_price), 2),
+            'returnPct': round(float(trade_ret), 2),
+            'pnl': round(float(trade_pnl), 2),
+            'exitReason': 'end_of_data',
+        })
+        cash += exit_value
+        shares = 0
+        portfolio_value = cash
+        equity_curve[-1]['value'] = round(float(portfolio_value), 2)
+
+    return trades, equity_curve, cash
+
+
+def _compute_metrics(trades, equity_curve, initial_capital, final_value):
+    """Calculate performance metrics from trades and equity curve."""
+    total_return_pct = ((final_value - initial_capital) / initial_capital) * 100 if initial_capital > 0 else 0
+
+    # CAGR
+    cagr = 0.0
+    if len(equity_curve) >= 2:
+        try:
+            first = datetime.strptime(equity_curve[0]['date'], '%Y-%m-%d')
+            last = datetime.strptime(equity_curve[-1]['date'], '%Y-%m-%d')
+            days = (last - first).days
+            years = days / 365.25
+            if years > 0 and initial_capital > 0 and final_value > 0:
+                cagr = (pow(final_value / initial_capital, 1 / years) - 1) * 100
+        except (ValueError, ZeroDivisionError):
+            pass
+
+    # Sharpe from daily equity curve returns
+    sharpe = 0.0
+    if len(equity_curve) > 1:
+        vals = [e['value'] for e in equity_curve]
+        daily_rets = [(vals[i] - vals[i - 1]) / vals[i - 1] for i in range(1, len(vals)) if vals[i - 1] > 0]
+        if daily_rets:
+            mean_r = np.mean(daily_rets)
+            std_r = np.std(daily_rets)
+            if std_r > 0:
+                sharpe = round(float((mean_r / std_r) * math.sqrt(252)), 2)
+
+    # Max drawdown
+    max_dd = 0.0
+    if equity_curve:
+        peak = equity_curve[0]['value']
+        for e in equity_curve:
+            v = e['value']
+            if v > peak:
+                peak = v
+            dd = (peak - v) / peak * 100 if peak > 0 else 0
+            if dd > max_dd:
+                max_dd = dd
+
+    # Trade metrics
+    num_trades = len(trades)
+    winning = [t for t in trades if t['pnl'] > 0]
+    losing = [t for t in trades if t['pnl'] <= 0]
+    win_rate = len(winning) / num_trades if num_trades > 0 else 0
+    gross_profit = sum(t['pnl'] for t in winning)
+    gross_loss = abs(sum(t['pnl'] for t in losing))
+    profit_factor = round(gross_profit / gross_loss, 2) if gross_loss > 0 else (99.99 if gross_profit > 0 else 0)
+    avg_return = round(float(np.mean([t['returnPct'] for t in trades])), 2) if trades else 0
+    avg_loss = round(float(np.mean([t['returnPct'] for t in losing])), 2) if losing else 0
+
+    return {
+        'totalReturn': round(float(total_return_pct), 2),
+        'cagr': round(float(cagr), 2),
+        'sharpe': sharpe,
+        'maxDrawdown': round(float(max_dd), 2),
+        'winRate': round(float(win_rate), 4),
+        'numTrades': num_trades,
+        'avgReturn': avg_return,
+        'avgLoss': avg_loss,
+        'profitFactor': profit_factor,
+        'totalReturnPct': round(float(total_return_pct), 2),
+    }
+
+
+def run_backtest(symbol, strategy_config, capital=10000, date_range='2y', interval='1d'):
+    """Execute backtest from declarative strategy config dict.
+
+    Config format:
+    {
+        "entry": {"left": "Close", "op": ">", "right": "MA_200"},
+        "exit_condition": {"left": "Close", "op": "<", "right": "MA_200"},
+        "exit_mode": "dca",
+        "dca_periods": 3,
+        "dca_unit": "month"
+    }
+
+    If strategy_config is a string, parse as JSON.
+    """
+    if isinstance(strategy_config, str):
+        strategy_config = json.loads(strategy_config)
+
+    entry_rule = strategy_config['entry']
+    exit_rule = strategy_config.get('exit_condition', strategy_config.get('exit', {}))
+    exit_mode = strategy_config.get('exit_mode', 'immediate')
+    dca_periods = int(strategy_config.get('dca_periods', 3))
+    dca_unit = strategy_config.get('dca_unit', 'month')
+
+    try:
+        raw = get_stock_price_history(symbol, date_range, interval, auto_predict=False)
+        if isinstance(raw, dict) and 'error' in raw:
+            return {'error': raw['error']}
+
+        df = pd.DataFrame(raw)
+        if df.empty:
+            return {'error': f'No data found for {symbol}'}
+
+        df['Date'] = pd.to_datetime(df['Date'])
+        df.sort_values('Date', inplace=True)
+        df.reset_index(drop=True, inplace=True)
+
+        # Compute standard MAs (10-200) plus any MA referenced in config
+        needed_periods = set([10, 20, 50, 150, 200])
+        for rule in [entry_rule, exit_rule]:
+            for key in ['left', 'right']:
+                val = rule.get(key, '')
+                if isinstance(val, str) and val.startswith('MA_'):
+                    try:
+                        needed_periods.add(int(val.split('_')[1]))
+                    except (IndexError, ValueError):
+                        pass
+
+        for period in sorted(needed_periods):
+            col = f'MA_{period}'
+            if col not in df.columns:
+                df[col] = df['Close'].rolling(window=period, min_periods=min(period, 20)).mean()
+
+        # Apply strategy rules
+        df = _apply_rules(df, entry_rule, exit_rule, exit_mode, dca_periods, dca_unit)
+
+        # Trim NaN rows where rules couldn't evaluate
+        valid = df.dropna(subset=['buy', 'sell_pct'])
+        if valid.empty:
+            return {'error': 'No valid rows after NaN removal — data may be insufficient'}
+
+        trades, equity_curve, final_value = _run_simulation(valid, capital)
+        metrics = _compute_metrics(trades, equity_curve, capital, final_value)
+
+        return {
+            'metrics': metrics,
+            'trades': trades,
+            'equityCurve': equity_curve,
+            'error': None,
+        }
+
+    except json.JSONDecodeError as e:
+        return {'error': f'Invalid strategy JSON: {str(e)}'}
+    except Exception as e:
+        return {'error': f'Backtest failed: {str(e)}'}
+
 def train_random_forest_model(stock_data):
     """
     Train a Random Forest model using pre-fetched stock data from a single symbol.
@@ -627,6 +925,13 @@ def _make_fastapi_app():
     class PriceRequest(BaseModel):
         symbol: str
 
+    class BacktestRequest(BaseModel):
+        symbol: str
+        strategy_config: dict
+        capital: float = 10000
+        date_range: str = '2y'
+        interval: str = '1d'
+
     @service.get("/health")
     def health():
         return {"status": "ok"}
@@ -650,6 +955,45 @@ def _make_fastapi_app():
         result = get_fundamentals(req.symbol)
         if isinstance(result, dict) and "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
+        return result
+
+    @service.post("/backtest")
+    def backtest(req: BacktestRequest):
+        import subprocess, os
+        # Run backtest in subprocess so we can kill on timeout
+        script = (
+            "import sys, json\n"
+            f"sys.path.insert(0, {json.dumps(os.path.dirname(__file__) or '.')})\n"
+            "from stock_data import run_backtest\n"
+            "params = json.loads(sys.stdin.read())\n"
+            "result = run_backtest(**params)\n"
+            "print(json.dumps(result))\n"
+        )
+        params = {
+            'symbol': req.symbol,
+            'strategy_config': req.strategy_config,
+            'capital': req.capital,
+            'date_range': req.date_range,
+            'interval': req.interval,
+        }
+        proc = subprocess.Popen(
+            [sys.executable, '-c', script],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = proc.communicate(input=json.dumps(params).encode(), timeout=30)
+            if stderr:
+                sys.stderr.write(f'[backtest-worker] {stderr.decode().strip()}\n')
+            result = json.loads(stdout.decode())
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            raise HTTPException(status_code=408, detail='Backtest timed out (30s)')
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=500, detail='Backtest worker returned invalid JSON')
+
+        if isinstance(result, dict) and result.get('error'):
+            raise HTTPException(status_code=400, detail=result['error'])
         return result
 
     @service.get("/model/status/{symbol}")

@@ -7,6 +7,7 @@ import PortfolioDialog from '../component/PortfolioDialog';
 import OrdersDialog from '../component/OrdersDialog';
 import WatchlistDialog from '../component/WatchlistDialog';
 import ScreenerDialog from '../component/ScreenerDialog';
+import BacktestDialog from '../component/BacktestDialog';
 import { isGitHubPages } from './environment';
 import { generateNvdaMockData } from './mockData';
 import { useTranslation } from './i18n/useTranslation';
@@ -247,6 +248,16 @@ function App() {
             {t('screener')}
           </button>
           <button
+            className="btn-backtest"
+            onClick={() => setActiveSidebar(prev => prev === 'backtest' ? null : 'backtest')}
+            aria-label="Backtest"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            Backtest
+          </button>
+          <button
             className="btn-watchlist"
             onClick={() => setActiveSidebar(prev => prev === 'watchlist' ? null : 'watchlist')}
             aria-label={t('watchlist')}
@@ -485,6 +496,11 @@ function App() {
             onClose={() => setActiveSidebar(null)}
             onStockSelect={handleStockSelect}
             onStockDataScanned={rememberStockData}
+          />
+          <BacktestDialog
+            isOpen={activeSidebar === 'backtest'}
+            onClose={() => setActiveSidebar(null)}
+            selectedSymbol={selectedStock?.symbol}
           />
         </aside>
       </div>
