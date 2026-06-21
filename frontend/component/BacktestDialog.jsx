@@ -9,8 +9,14 @@ const DEFAULT_STRATEGY = `{
   "dca_unit": "month"
 }`;
 
+function getInitialStrategy() {
+  const stored = localStorage.getItem('bt_strategy');
+  if (!stored) return DEFAULT_STRATEGY;
+  try { JSON.parse(stored); return stored; } catch { return DEFAULT_STRATEGY; }
+}
+
 export default function BacktestDialog({ isOpen, onClose, selectedSymbol }) {
-  const [strategyJson, setStrategyJson] = useState(localStorage.getItem('bt_strategy') || DEFAULT_STRATEGY);
+  const [strategyJson, setStrategyJson] = useState(getInitialStrategy);
   const [capital, setCapital] = useState(10000);
   const [dateRange, setDateRange] = useState('2y');
   const [running, setRunning] = useState(false);

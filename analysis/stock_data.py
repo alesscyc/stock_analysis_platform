@@ -453,49 +453,62 @@ def _check_rule(df, i, rule):
 
 
 def _apply_rules(df, entry_rule, exit_rule, exit_mode, dca_periods, dca_unit):
-    """Apply declarative strategy rules to generate buy/sell_pct signals."""
+    """Apply declarative strategy rules to generate buy/sell_pct signals.
+
+    DCA sells only once per period (month/week), on the first bar where
+    exit_rule triggers in that period. State persists across above/below
+    transitions so DCA resumes rather than restarting on each dip.
+    """
     df['buy'] = False
     df['sell_pct'] = 0.0
 
-    if dca_unit == 'month':
-        bars_per = 21
-    elif dca_unit == 'week':
-        bars_per = 5
-    elif dca_unit == 'day':
-        bars_per = 1
-    else:
-        bars_per = 21
-
-    total_exit_bars = dca_periods * bars_per
-    bars_below = 0
     prev_entry = None
+    dca_state = None  # {'periods_left': N, 'remaining_pct': float, 'sold_periods': set}
+
+    def _period_key(d):
+        if dca_unit == 'month':
+            return d.year * 12 + d.month
+        if dca_unit == 'week':
+            return d.isocalendar()[0] * 100 + d.isocalendar()[1]
+        return d.toordinal()
 
     for i in range(len(df)):
         entry_val = _check_rule(df, i, entry_rule)
-
-        # Entry on crossover day
-        if entry_val is True and prev_entry is not True:
-            df.loc[i, 'buy'] = True
-            bars_below = 0
-
-        # Track consec bars below (exit condition)
         exit_val = _check_rule(df, i, exit_rule)
-        if exit_val is True:
-            bars_below += 1
-        else:
-            bars_below = 0
+        pkey = _period_key(pd.to_datetime(df.loc[i, 'Date']))
 
-        # Exit signal: immediate or DCA
+        # Entry on crossover day — blocked while DCA is active
+        if entry_val is True and prev_entry is not True and dca_state is None:
+            df.loc[i, 'buy'] = True
+            dca_state = None
+
+        # Exit
         if exit_val is True:
             if exit_mode == 'immediate':
                 df.loc[i, 'sell_pct'] = 1.0
             else:
-                if bars_below <= total_exit_bars:
-                    df.loc[i, 'sell_pct'] = 1.0 / (total_exit_bars - bars_below + 1)
-                else:
+                # Init DCA state on first exit bar (or resume if still active)
+                if dca_state is None:
+                    dca_state = {'left': dca_periods, 'sold': set()}
+                # Sell only once per period
+                if pkey not in dca_state['sold'] and dca_state['left'] > 0:
+                    dca_state['sold'].add(pkey)
+                    df.loc[i, 'sell_pct'] = 1.0 / dca_state['left']
+                    dca_state['left'] -= 1
+                    if dca_state['left'] == 0:
+                        dca_state = None  # DCA complete, allow new entries
+                elif pkey not in dca_state['sold']:
+                    # All periods sold, dump remaining
+                    dca_state['sold'].add(pkey)
                     df.loc[i, 'sell_pct'] = 1.0
+                    dca_state = None
+        else:
+            # Above — freeze DCA state (don't reset), will resume when dips again
+            pass
 
         prev_entry = entry_val
+
+    return df
 
     return df
 
