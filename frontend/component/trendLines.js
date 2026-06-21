@@ -58,6 +58,7 @@ export function distanceToSegment(px, py, x1, y1, x2, y2) {
 export function createTrendLinesPrimitive() {
   let lines = []
   let selectedIndex = -1
+  let preview = null
   let chart = null
   let series = null
   let requestUpdate = null
@@ -80,6 +81,11 @@ export function createTrendLinesPrimitive() {
     setLines(nextLines, nextSelectedIndex = -1) {
       lines = nextLines
       selectedIndex = nextSelectedIndex
+      requestUpdate?.()
+    },
+
+    setPreview(nextPreview) {
+      preview = nextPreview
       requestUpdate?.()
     },
 
@@ -123,6 +129,20 @@ export function createTrendLinesPrimitive() {
                 context.moveTo(points.x1 * horizontalPixelRatio, points.y1 * verticalPixelRatio)
                 context.lineTo(points.x2 * horizontalPixelRatio, points.y2 * verticalPixelRatio)
                 context.stroke()
+              }
+
+              if (preview) {
+                const pts = coordinates(preview)
+                if (pts) {
+                  context.beginPath()
+                  context.strokeStyle = '#f0b429'
+                  context.lineWidth = 2 * horizontalPixelRatio
+                  context.setLineDash([6, 4])
+                  context.moveTo(pts.x1 * horizontalPixelRatio, pts.y1 * verticalPixelRatio)
+                  context.lineTo(pts.x2 * horizontalPixelRatio, pts.y2 * verticalPixelRatio)
+                  context.stroke()
+                  context.setLineDash([])
+                }
               }
             })
           },

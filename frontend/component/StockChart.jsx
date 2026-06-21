@@ -340,6 +340,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     setDrawingMode(false);
     drawingModeRef.current = false;
     drawingStartRef.current = null;
+    trendLinesPrimitiveRef.current?.setPreview(null);
   }, [stockSymbol]);
 
   useEffect(() => {
@@ -355,6 +356,14 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
 
   useEffect(() => {
     const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && drawingModeRef.current && drawingStartRef.current) {
+        drawingStartRef.current = null;
+        drawingModeRef.current = false;
+        setDrawingMode(false);
+        trendLinesPrimitiveRef.current?.setPreview(null);
+        return;
+      }
+
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
 
       const target = event.target;
@@ -692,6 +701,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       drawingStartRef.current = null;
       drawingModeRef.current = false;
       setDrawingMode(false);
+      trendLinesPrimitiveRef.current?.setPreview(null);
     };
     chart.subscribeClick(handleChartClick);
 
@@ -796,6 +806,20 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     };
 
     const handleMouseMove = (e) => {
+      // Trend line drawing preview: update preview line from start point to cursor
+      if (drawingModeRef.current && drawingStartRef.current && trendLinesPrimitiveRef.current) {
+        const point = getMousePoint(e);
+        const time = chart.timeScale().coordinateToTime(point.x);
+        const price = candleSeries.coordinateToPrice(point.y);
+        if (time != null && Number.isFinite(price)) {
+          trendLinesPrimitiveRef.current.setPreview({
+            start: drawingStartRef.current,
+            end: { time, price: Math.round(price * 100) / 100 },
+          });
+        }
+        return;
+      }
+
       if (!ibLinesPrimitiveRef.current) return;
       const point = getMousePoint(e);
 
@@ -978,6 +1002,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
               setDrawingMode(prev => !prev);
               drawingStartRef.current = null;
               setSelectedTrendLine(-1);
+              trendLinesPrimitiveRef.current?.setPreview(null);
             }}
           >
             <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
