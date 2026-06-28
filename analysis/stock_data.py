@@ -452,18 +452,24 @@ def _check_rule(df, i, rule):
     return op_fn(left_val, right_val)
 
 
-def _apply_rules(df, entry_rule, exit_rule, exit_mode, dca_periods, dca_unit):
+def _apply_rules(df, entry_rule, exit_rule, exit_mode, dca_periods, dca_unit, eval_frequency='daily'):
     """Apply declarative strategy rules to generate buy/sell_pct signals.
 
     DCA sells only once per period (month/week), on the first bar where
     exit_rule triggers in that period. State persists across above/below
     transitions so DCA resumes rather than restarting on each dip.
+
+    eval_frequency 'monthly': rules checked on first trading bar of each
+    month only; entry uses level (above/below) not crossover.
     """
     df['buy'] = False
     df['sell_pct'] = 0.0
 
     prev_entry = None
-    dca_state = None  # {'periods_left': N, 'remaining_pct': float, 'sold_periods': set}
+    dca_state = None
+    in_position = False
+    last_eval_month = None
+    monthly = eval_frequency == 'monthly'
 
     def _period_key(d):
         if dca_unit == 'month':
@@ -473,42 +479,51 @@ def _apply_rules(df, entry_rule, exit_rule, exit_mode, dca_periods, dca_unit):
         return d.toordinal()
 
     for i in range(len(df)):
+        dt = pd.to_datetime(df.loc[i, 'Date'])
+        if monthly:
+            month_key = dt.year * 12 + dt.month
+            if last_eval_month == month_key:
+                continue
+            last_eval_month = month_key
+
         entry_val = _check_rule(df, i, entry_rule)
         exit_val = _check_rule(df, i, exit_rule)
-        pkey = _period_key(pd.to_datetime(df.loc[i, 'Date']))
+        pkey = _period_key(dt)
 
-        # Entry on crossover day — blocked while DCA is active
-        if entry_val is True and prev_entry is not True and dca_state is None:
-            df.loc[i, 'buy'] = True
-            dca_state = None
-
-        # Exit
-        if exit_val is True:
+        # Exit before entry (matches simulation order)
+        if in_position and exit_val is True:
             if exit_mode == 'immediate':
                 df.loc[i, 'sell_pct'] = 1.0
+                in_position = False
+                dca_state = None
             else:
-                # Init DCA state on first exit bar (or resume if still active)
                 if dca_state is None:
                     dca_state = {'left': dca_periods, 'sold': set()}
-                # Sell only once per period
                 if pkey not in dca_state['sold'] and dca_state['left'] > 0:
                     dca_state['sold'].add(pkey)
                     df.loc[i, 'sell_pct'] = 1.0 / dca_state['left']
                     dca_state['left'] -= 1
                     if dca_state['left'] == 0:
-                        dca_state = None  # DCA complete, allow new entries
+                        in_position = False
+                        dca_state = None
                 elif pkey not in dca_state['sold']:
-                    # All periods sold, dump remaining
                     dca_state['sold'].add(pkey)
                     df.loc[i, 'sell_pct'] = 1.0
+                    in_position = False
                     dca_state = None
-        else:
-            # Above — freeze DCA state (don't reset), will resume when dips again
-            pass
+
+        # Entry — crossover on daily eval; level check on monthly eval
+        entry_trigger = (
+            not in_position
+            and entry_val is True
+            and dca_state is None
+            and ((not monthly and prev_entry is not True) or monthly)
+        )
+        if entry_trigger:
+            df.loc[i, 'buy'] = True
+            in_position = True
 
         prev_entry = entry_val
-
-    return df
 
     return df
 
@@ -663,7 +678,8 @@ def run_backtest(symbol, strategy_config, capital=10000, date_range='2y', interv
         "exit_condition": {"left": "Close", "op": "<", "right": "MA_200"},
         "exit_mode": "dca",
         "dca_periods": 3,
-        "dca_unit": "month"
+        "dca_unit": "month",
+        "eval_frequency": "monthly"
     }
 
     If strategy_config is a string, parse as JSON.
@@ -676,6 +692,9 @@ def run_backtest(symbol, strategy_config, capital=10000, date_range='2y', interv
     exit_mode = strategy_config.get('exit_mode', 'immediate')
     dca_periods = int(strategy_config.get('dca_periods', 3))
     dca_unit = strategy_config.get('dca_unit', 'month')
+    eval_frequency = strategy_config.get('eval_frequency', 'daily')
+    if eval_frequency == 'monthly' and dca_unit == 'week':
+        dca_unit = 'month'
 
     try:
         raw = get_stock_price_history(symbol, date_range, interval, auto_predict=False)
@@ -707,7 +726,9 @@ def run_backtest(symbol, strategy_config, capital=10000, date_range='2y', interv
                 df[col] = df['Close'].rolling(window=period, min_periods=min(period, 20)).mean()
 
         # Apply strategy rules
-        df = _apply_rules(df, entry_rule, exit_rule, exit_mode, dca_periods, dca_unit)
+        df = _apply_rules(
+            df, entry_rule, exit_rule, exit_mode, dca_periods, dca_unit, eval_frequency,
+        )
 
         # Trim NaN rows where rules couldn't evaluate
         valid = df.dropna(subset=['buy', 'sell_pct'])

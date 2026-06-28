@@ -42,19 +42,64 @@
   letter-spacing: 0.5px;
 }
 
-.backtest-editor {
-  width: 100%;
-  font-family: var(--font-mono, 'Cascadia Code', 'Fira Code', monospace);
-  font-size: 12px;
-  line-height: 1.5;
-  background: var(--bg-base);
-  color: var(--text-primary);
+.backtest-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.backtest-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.backtest-rule {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.backtest-rule-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.backtest-rule-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.backtest-rule-row select,
+.backtest-rule-num {
+  padding: 6px 8px;
+  background: var(--bg-elevated);
   border: 1px solid var(--border-normal);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  resize: vertical;
-  min-height: 180px;
-  tab-size: 4;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.backtest-rule-row select {
+  flex: 1;
+  min-width: 90px;
+}
+
+.backtest-rule-op {
+  flex: 0 0 52px !important;
+  min-width: 52px !important;
+  text-align: center;
+}
+
+.backtest-rule-num {
+  flex: 0 0 72px;
+  width: 72px;
 }
 
 .backtest-controls-row {
@@ -205,7 +250,13 @@
   font-size: 10px;
 }
 
-.backtest-trades tr.win tr.positive { background: rgba(80, 250, 123, 0.04); }
-.backtest-trades tr.loss tr.negative { background: rgba(255, 85, 85, 0.04); }
 .backtest-trades .positive { color: var(--green-bright, #50fa7b); }
 .backtest-trades .negative { color: var(--red-bright, #ff5555); }
+
+.backtest-side {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.backtest-side-buy { color: var(--green-bright, #50fa7b); }
+.backtest-side-sell { color: var(--red-bright, #ff5555); }

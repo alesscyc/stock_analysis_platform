@@ -31,12 +31,12 @@ function App() {
   const stockDataCacheRef = useRef(new Map());
   const orderModificationCommittedRef = useRef(false);
 
-  // Use '2y' as the default date_range — 'max' can return 40+ years of data
+  // Use '5y' as the default date_range — 'max' can return 40+ years of data
   // for popular symbols (10,000+ rows), which dramatically slows down yfinance
   // download, feature computation, serialization, transfer, and chart rendering.
-  // 2 years (~500 trading days) is more than sufficient for chart display and
-  // still provides ample data for ML feature computation (200MA needs ~200 days).
-  const DEFAULT_DATE_RANGE = '2y';
+  // 5 years (~1,250 trading days) gives a wider chart view while still providing
+  // ample data for ML feature computation (200MA needs ~200 days).
+  const DEFAULT_DATE_RANGE = '5y';
 
   const getStockDataCacheKey = useCallback((symbol, interval = '1d', autoPredict = false) => {
     return `${String(symbol || '').trim().toUpperCase()}-${DEFAULT_DATE_RANGE}-${interval}-${autoPredict ? 'true' : 'false'}`;

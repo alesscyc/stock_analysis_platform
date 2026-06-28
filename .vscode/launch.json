@@ -1,0 +1,77 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Backend (Express)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/server.js",
+      "cwd": "${workspaceFolder}/backend",
+      "envFile": "${workspaceFolder}/backend/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Frontend (Vite)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}/frontend",
+      "console": "integratedTerminal",
+      "serverReadyAction": {
+        "pattern": "Local:\\s+(https?://\\S+)",
+        "uriFormat": "%s",
+        "action": "openExternally"
+      }
+    },
+    {
+      "name": "Chrome: Frontend",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend",
+      "preLaunchTask": "frontend:dev"
+    },
+    {
+      "name": "Python (FastAPI)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/analysis/stock_data.py",
+      "args": ["serve"],
+      "cwd": "${workspaceFolder}/analysis",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Backend Tests",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/backend",
+      "runtimeArgs": ["--test", "test/*.test.js"],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Frontend Tests",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "test"],
+      "cwd": "${workspaceFolder}/frontend",
+      "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack",
+      "configurations": ["Backend (Express)", "Frontend (Vite)"],
+      "stopAll": true
+    },
+    {
+      "name": "Full Stack + Chrome",
+      "configurations": ["Backend (Express)", "Chrome: Frontend"],
+      "stopAll": true
+    }
+  ]
+}
