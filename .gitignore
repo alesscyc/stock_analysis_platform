@@ -18,3 +18,9 @@ run-project.bat
 docs/superpowers/plans/
 docs/superpowers/specs/
 .claude/settings.local.json
+.agents/
+skills-lock.json
+.cursor/
+.clinerules/
+.windsurf/
+.codegraph/
