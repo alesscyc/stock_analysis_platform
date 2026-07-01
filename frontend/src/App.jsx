@@ -28,6 +28,7 @@ function App() {
   const [showFundamentals, setShowFundamentals] = useState(false);
   const [orderModification, setOrderModification] = useState(null);
   const [ordersRefreshToken, setOrdersRefreshToken] = useState(0);
+  const [backtestTrades, setBacktestTrades] = useState(null);
   const stockDataCacheRef = useRef(new Map());
   const orderModificationCommittedRef = useRef(false);
 
@@ -146,6 +147,7 @@ function App() {
     setAiPrediction(null);
     setFundamentals(null);
     setShowFundamentals(false);
+    setBacktestTrades(null);
     // Fire both requests in parallel — fundamentals don't depend on stock data
     await Promise.all([
       fetchStockData(stock, currentInterval),
@@ -154,6 +156,7 @@ function App() {
   };
 
   const handleIntervalChange = async (interval) => {
+    setBacktestTrades(null);
     if (selectedStock) {
       await fetchStockData(selectedStock, interval, false);
     }
@@ -472,6 +475,7 @@ function App() {
                   orderModification={orderModification}
                   ibConnected={ibConnected}
                   ordersRefreshToken={ordersRefreshToken}
+                  backtestTrades={backtestTrades}
                 />
               </div>
             )}
@@ -501,6 +505,8 @@ function App() {
             isOpen={activeSidebar === 'backtest'}
             onClose={() => setActiveSidebar(null)}
             selectedSymbol={selectedStock?.symbol}
+            currentInterval={currentInterval}
+            onTradesUpdate={setBacktestTrades}
           />
         </aside>
       </div>

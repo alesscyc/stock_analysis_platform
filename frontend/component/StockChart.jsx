@@ -7,6 +7,7 @@ import {
   LineSeries,
   CrosshairMode,
   LineStyle,
+  createSeriesMarkers,
 } from 'lightweight-charts';
 import './StockChart.css';
 import { useTranslation } from '../src/i18n/useTranslation';
@@ -269,6 +270,24 @@ function toChartDate(raw) {
   return String(raw).slice(0, 10);
 }
 
+function backtestActionsToMarkers(actions, validTimes) {
+  if (!actions?.length) return [];
+  return actions
+    .map(a => {
+      const time = toChartDate(a.date);
+      if (!time || !validTimes.has(time)) return null;
+      const isBuy = a.side === 'BUY';
+      return {
+        time,
+        position: isBuy ? 'belowBar' : 'aboveBar',
+        shape: isBuy ? 'arrowUp' : 'arrowDown',
+        color: isBuy ? '#26a69a' : '#ef5350',
+        text: isBuy ? 'B' : 'S',
+      };
+    })
+    .filter(Boolean);
+}
+
 const WATCHLIST_STORAGE_KEY = 'stockai-watchlist';
 
 function loadWatchlist() {
@@ -293,7 +312,7 @@ function saveWatchlist(list) {
   localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(list));
 }
 
-function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick, onOrderPriceDrag, orderModification, ibConnected, ordersRefreshToken }) {
+function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick, onOrderPriceDrag, orderModification, ibConnected, ordersRefreshToken, backtestTrades }) {
   const containerRef = useRef(null);
   const chartRef     = useRef(null);
   const onOrderPriceDragRef = useRef(onOrderPriceDrag);
@@ -311,6 +330,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   const vol20maSeriesRef       = useRef(null);
   const ibLinesPrimitiveRef    = useRef(null);
   const ibPriceLinesRef        = useRef([]);
+  const backtestMarkersRef     = useRef(null);
 
   const [maVisibility, setMaVisibility] = usePersistedState('chart-ma-visibility',
     () => Object.fromEntries(MA_CONFIG.map(m => [m.key, true]))
@@ -527,6 +547,12 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     return { candleData: candle, volumeData: volume, maData: ma, vol20maData: vol20ma };
   }, [stockData]);
 
+  const backtestMarkers = useMemo(() => {
+    if (!backtestTrades?.length) return [];
+    const validTimes = new Set(candleData.map(c => c.time));
+    return backtestActionsToMarkers(backtestTrades, validTimes);
+  }, [backtestTrades, candleData]);
+
   // ── Swing boxes: pivot high → first candle that meets or exceeds that pivot high ──
   const SWING_WINDOW = 3; // ±3 bars for local extrema
   const swingZones = useMemo(() => {
@@ -669,6 +695,8 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       priceScaleId:     'right',
     });
     candleSeriesRef.current = candleSeries;
+
+    backtestMarkersRef.current = createSeriesMarkers(candleSeries, []);
 
     // ── Swing zones primitive (custom canvas boxes) ──────────
     const swingPrimitive = createSwingZonesPrimitive();
@@ -860,8 +888,15 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       vol20maSeriesRef.current = null;
       ibLinesPrimitiveRef.current = null;
       ibPriceLinesRef.current = [];
+      backtestMarkersRef.current?.detach?.();
+      backtestMarkersRef.current = null;
     };
   }, []); // only on mount/unmount
+
+  // ── Backtest BUY/SELL markers ─────────────────────────────
+  useEffect(() => {
+    backtestMarkersRef.current?.setMarkers(backtestMarkers);
+  }, [backtestMarkers]);
 
   // ── Feed data into series whenever stockData changes ─────
   useEffect(() => {

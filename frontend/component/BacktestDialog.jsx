@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import './BacktestDialog.css';
+import { tradesToActions } from './backtestTrades';
 
 const OPERATORS = ['>', '<', '>=', '<='];
 const MA_PERIOD_MIN = 2;
@@ -136,40 +137,6 @@ function migrateLegacyConfig(config) {
   };
 }
 
-function tradesToActions(trades) {
-  if (!trades?.length) return [];
-
-  const actions = [];
-  let lastEntryDate = null;
-  let seq = 0;
-
-  for (const t of trades) {
-    if (t.entryDate && t.entryDate !== lastEntryDate) {
-      actions.push({
-        date: t.entryDate,
-        side: 'BUY',
-        price: t.entryPrice,
-        pnl: null,
-        seq: seq++,
-      });
-      lastEntryDate = t.entryDate;
-    }
-    actions.push({
-      date: t.exitDate,
-      side: 'SELL',
-      price: t.exitPrice,
-      pnl: t.pnl,
-      seq: seq++,
-    });
-  }
-
-  return actions.sort((a, b) => {
-    const byDate = a.date.localeCompare(b.date);
-    if (byDate !== 0) return byDate;
-    return a.seq - b.seq;
-  });
-}
-
 function RuleRow({ label, left, leftNum, op, right, rightNum, onChange }) {
   const showLeftNum = left === '__number__' || left === '__ma__';
   const showRightNum = right === '__number__' || right === '__ma__';
@@ -224,7 +191,7 @@ function RuleRow({ label, left, leftNum, op, right, rightNum, onChange }) {
   );
 }
 
-export default function BacktestDialog({ isOpen, onClose, selectedSymbol }) {
+export default function BacktestDialog({ isOpen, onClose, selectedSymbol, currentInterval, onTradesUpdate }) {
   const [strategy, setStrategy] = useState(loadStoredStrategy);
   const [capital, setCapital] = useState(10000);
   const [dateRange, setDateRange] = useState('2y');
@@ -265,6 +232,7 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol }) {
     setRunning(true);
     setError(null);
     setResult(null);
+    onTradesUpdate?.(null);
     try {
       const res = await fetch('/api/backtest', {
         method: 'POST',
@@ -274,11 +242,13 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol }) {
           strategyConfig: config,
           capital,
           dateRange,
+          interval: currentInterval || '1d',
         }),
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'Backtest failed');
       setResult(data);
+      onTradesUpdate?.(tradesToActions(data.trades));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -286,7 +256,11 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol }) {
     }
   };
 
-  const reset = () => { setResult(null); setError(null); };
+  const reset = () => {
+    setResult(null);
+    setError(null);
+    onTradesUpdate?.(null);
+  };
 
   const m = result?.metrics;
   const tradeActions = tradesToActions(result?.trades);

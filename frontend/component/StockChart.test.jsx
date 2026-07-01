@@ -69,6 +69,7 @@ vi.mock('lightweight-charts', () => ({
   LineSeries: Symbol('LineSeries'),
   LineStyle: { Dotted: 1, Solid: 0 },
   createChart: chartMock.createChart,
+  createSeriesMarkers: vi.fn(() => ({ setMarkers: vi.fn(), detach: vi.fn() })),
 }))
 
 class ResizeObserverStub {
