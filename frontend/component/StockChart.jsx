@@ -12,6 +12,8 @@ import {
 import './StockChart.css';
 import { useTranslation } from '../src/i18n/useTranslation';
 import { createTrendLinesPrimitive, loadTrendLines, saveTrendLines } from './trendLines';
+import { detectDoubleBottoms } from './doubleBottom';
+import { createDoubleBottomPrimitive } from './doubleBottomChart';
 
 // ── MA config: key → display label and colour ─────────────
 const MA_CONFIG = [
@@ -323,6 +325,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   const volumeSeriesRef  = useRef(null);
   const maSeriesRefs          = useRef({});
   const swingZonesPrimitiveRef = useRef(null);
+  const doubleBottomPrimitiveRef = useRef(null);
   const trendLinesPrimitiveRef  = useRef(null);
   const drawingStartRef         = useRef(null);
   const drawingModeRef          = useRef(false);
@@ -336,6 +339,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     () => Object.fromEntries(MA_CONFIG.map(m => [m.key, true]))
   );
   const [swingVisibility, setSwingVisibility] = usePersistedState('chart-swing-visible', true);
+  const [doubleBottomVisibility, setDoubleBottomVisibility] = usePersistedState('chart-double-bottom-visible', true);
   const [vol20maVisibility, setVol20maVisibility] = usePersistedState('chart-vol20ma-visibility', true);
 
   const [indicatorsOpen, setIndicatorsOpen] = useState(false);
@@ -347,7 +351,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   const [drawingMode, setDrawingMode] = useState(false);
   const [trendLines, setTrendLines] = useState(() => loadTrendLines(stockSymbol));
   const [selectedTrendLine, setSelectedTrendLine] = useState(-1);
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   useEffect(() => {
     drawingModeRef.current = drawingMode;
@@ -547,6 +551,17 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     return { candleData: candle, volumeData: volume, maData: ma, vol20maData: vol20ma };
   }, [stockData]);
 
+  const doubleBottomPatterns = useMemo(() => {
+    if (!candleData.length || currentInterval !== '1d') return [];
+
+    const candles = candleData.map((c, i) => ({
+      ...c,
+      volume: volumeData[i]?.value ?? 0,
+    }));
+
+    return detectDoubleBottoms(candles);
+  }, [candleData, volumeData, currentInterval]);
+
   const backtestMarkers = useMemo(() => {
     if (!backtestTrades?.length) return [];
     const validTimes = new Set(candleData.map(c => c.time));
@@ -702,6 +717,10 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     const swingPrimitive = createSwingZonesPrimitive();
     candleSeries.attachPrimitive(swingPrimitive);
     swingZonesPrimitiveRef.current = swingPrimitive;
+
+    const doubleBottomPrimitive = createDoubleBottomPrimitive();
+    candleSeries.attachPrimitive(doubleBottomPrimitive);
+    doubleBottomPrimitiveRef.current = doubleBottomPrimitive;
 
     // ── User-drawn trend lines primitive ─────────────────────
     const trendLinesPrimitive = createTrendLinesPrimitive();
@@ -983,6 +1002,18 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     );
   }, [swingZones, swingVisibility]);
 
+  useEffect(() => {
+    if (!doubleBottomPrimitiveRef.current) return;
+    doubleBottomPrimitiveRef.current.setLabels({
+      bottom1: t('patternBottom1'),
+      bottom2: t('patternBottom2'),
+      neckline: t('patternNeckline'),
+    });
+    doubleBottomPrimitiveRef.current.setPatterns(
+      doubleBottomVisibility ? doubleBottomPatterns : []
+    );
+  }, [doubleBottomPatterns, doubleBottomVisibility, language, t]);
+
   // ── Sync Vol 20 MA visibility with series ─────────────────
   useEffect(() => {
     vol20maSeriesRef.current?.applyOptions({ visible: vol20maVisibility });
@@ -1185,6 +1216,15 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
                   />
                   <span className="indicator-checkbox-color" style={{ backgroundColor: '#f0b429' }} />
                   <span className="indicator-checkbox-text">{t('recentVolatility')}</span>
+                </label>
+                <label className="indicator-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={doubleBottomVisibility}
+                    onChange={() => setDoubleBottomVisibility(prev => !prev)}
+                  />
+                  <span className="indicator-checkbox-color" style={{ backgroundColor: '#26a69a' }} />
+                  <span className="indicator-checkbox-text">{t('pricePattern')}</span>
                 </label>
               </div>
             </div>
