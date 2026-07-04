@@ -146,3 +146,19 @@ describe('StockChart trend lines', () => {
     expect(JSON.parse(localStorage.getItem('stockai-trend-lines:AAPL'))).toEqual([])
   })
 })
+
+describe('StockChart indicators', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    chartMock.reset()
+    globalThis.ResizeObserver = ResizeObserverStub
+  })
+
+  it('checks moving average indicators by default', () => {
+    renderChart()
+
+    fireEvent.click(screen.getByRole('button', { name: /Indicators/i }))
+
+    expect(screen.getByRole('checkbox', { name: '200 MA' })).toBeChecked()
+  })
+})

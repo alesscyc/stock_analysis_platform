@@ -9,12 +9,16 @@ import { useState, useEffect } from 'react';
  * @returns {[any, Function]}    - same API as useState
  */
 export default function usePersistedState(key, defaultValue) {
+  const getDefaultValue = () => (
+    typeof defaultValue === 'function' ? defaultValue() : defaultValue
+  );
+
   const [value, setValue] = useState(() => {
     try {
       const stored = localStorage.getItem(key);
-      return stored !== null ? JSON.parse(stored) : defaultValue;
+      return stored !== null ? JSON.parse(stored) : getDefaultValue();
     } catch {
-      return defaultValue;
+      return getDefaultValue();
     }
   });
 
