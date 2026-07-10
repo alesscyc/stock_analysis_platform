@@ -12,8 +12,8 @@ import {
 import './StockChart.css';
 import { useTranslation } from '../src/i18n/useTranslation';
 import { createTrendLinesPrimitive, loadTrendLines, saveTrendLines } from './trendLines';
-import { detectDoubleBottoms, detectDoubleTops } from './doubleBottom';
-import { createPricePatternPrimitive } from './doubleBottomChart';
+import { detectPricePatterns } from './pricePatterns';
+import { createPricePatternPrimitive } from './pricePatternChart';
 
 // ── MA config: key → display label and colour ─────────────
 const MA_CONFIG = [
@@ -339,8 +339,14 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     () => Object.fromEntries(MA_CONFIG.map(m => [m.key, true]))
   );
   const [swingVisibility, setSwingVisibility] = usePersistedState('chart-swing-visible', true);
-  // Keep the legacy key so existing Price Pattern visibility preferences survive.
-  const [pricePatternVisibility, setPricePatternVisibility] = usePersistedState('chart-double-bottom-visible', true);
+  const [pricePatternVisibility, setPricePatternVisibility] = usePersistedState('chart-price-pattern-visible', () => {
+    try {
+      const legacy = localStorage.getItem('chart-double-bottom-visible');
+      return legacy === null ? true : JSON.parse(legacy);
+    } catch {
+      return true;
+    }
+  });
   const [vol20maVisibility, setVol20maVisibility] = usePersistedState('chart-vol20ma-visibility', true);
 
   const [indicatorsOpen, setIndicatorsOpen] = useState(false);
@@ -560,12 +566,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       volume: volumeData[i]?.value ?? 0,
     }));
 
-    return [...detectDoubleBottoms(candles), ...detectDoubleTops(candles)]
-      .sort((a, b) => {
-        const aStart = a.type === 'double-top' ? a.t1 : a.l1;
-        const bStart = b.type === 'double-top' ? b.t1 : b.l1;
-        return aStart.index - bStart.index;
-      });
+    return detectPricePatterns(candles);
   }, [candleData, volumeData, currentInterval]);
 
   const backtestMarkers = useMemo(() => {
@@ -1010,13 +1011,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
 
   useEffect(() => {
     if (!pricePatternPrimitiveRef.current) return;
-    pricePatternPrimitiveRef.current.setLabels({
-      top1: t('patternTop1'),
-      top2: t('patternTop2'),
-      bottom1: t('patternBottom1'),
-      bottom2: t('patternBottom2'),
-      neckline: t('patternNeckline'),
-    });
+    pricePatternPrimitiveRef.current.setLabelResolver(t);
     pricePatternPrimitiveRef.current.setPatterns(
       pricePatternVisibility ? pricePatterns : []
     );

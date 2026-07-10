@@ -170,6 +170,14 @@ describe('StockChart indicators', () => {
     expect(toggle).toBeChecked()
 
     fireEvent.click(toggle)
-    expect(localStorage.getItem('chart-double-bottom-visible')).toBe('false')
+    expect(localStorage.getItem('chart-price-pattern-visible')).toBe('false')
+  })
+
+  it('migrates the old double-bottom visibility preference', () => {
+    localStorage.setItem('chart-double-bottom-visible', 'false')
+    renderChart()
+
+    fireEvent.click(screen.getByRole('button', { name: /Indicators/i }))
+    expect(screen.getByRole('checkbox', { name: 'Price Pattern' })).not.toBeChecked()
   })
 })

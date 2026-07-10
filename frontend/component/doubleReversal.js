@@ -17,16 +17,17 @@
  */
 
 /**
- * @typedef {Object} DoubleBottomPattern
+ * @typedef {Object} PricePattern
  * @property {string} id
- * @property {PivotPoint} h0
- * @property {PivotPoint} l1
- * @property {PivotPoint} h1
- * @property {PivotPoint} l2
+ * @property {'double-bottom'|'double-top'} type
+ * @property {'pending'|'confirmed'|'failed'} status
+ * @property {number} startIndex
+ * @property {string} color
+ * @property {string} pendingColor
+ * @property {Object[]} lines
+ * @property {Object[]} labels
  * @property {Candle} [breakout]
  * @property {Candle} [invalidated]
- * @property {'double-bottom'} type
- * @property {'pending'|'confirmed'|'failed'} status
  */
 
 /**
@@ -240,10 +241,47 @@ function dedupeOverlapping(patterns) {
   return kept.sort((a, b) => patternEnds(a)[0].index - patternEnds(b)[0].index)
 }
 
+function toPricePattern(pattern) {
+  const isTop = pattern.type === 'double-top'
+  const path = isTop
+    ? [pattern.l0, pattern.t1, pattern.l1, pattern.t2]
+    : [pattern.h0, pattern.l1, pattern.h1, pattern.l2]
+  const first = path[1]
+  const neckline = path[2]
+  const second = path[3]
+
+  return {
+    id: pattern.id,
+    type: pattern.type,
+    status: pattern.status,
+    startIndex: first.index,
+    color: isTop ? '#ef5350' : '#26a69a',
+    pendingColor: isTop ? 'rgba(239, 83, 80, 0.55)' : 'rgba(38, 166, 154, 0.55)',
+    lines: [
+      { points: path, style: 'status', width: 2 },
+      {
+        points: [
+          { time: first.time, price: neckline.price },
+          { time: second.time, price: neckline.price },
+        ],
+        style: 'dashed',
+        width: pattern.status === 'confirmed' ? 2 : 1.5,
+        label: { key: 'patternNeckline', position: isTop ? 'below' : 'above' },
+      },
+    ],
+    labels: [
+      { point: first, key: isTop ? 'patternTop1' : 'patternBottom1', position: isTop ? 'above' : 'below' },
+      { point: second, key: isTop ? 'patternTop2' : 'patternBottom2', position: isTop ? 'above' : 'below' },
+    ],
+    breakout: pattern.breakout,
+    invalidated: pattern.invalidated,
+  }
+}
+
 /**
  * @param {Candle[]} data
  * @param {DoubleBottomOptions} [options]
- * @returns {DoubleBottomPattern[]}
+ * @returns {PricePattern[]}
  */
 export function detectDoubleBottoms(data, options = {}) {
   if (!data?.length) return []
@@ -317,14 +355,14 @@ export function detectDoubleBottoms(data, options = {}) {
     })
   }
 
-  return dedupeOverlapping(patterns)
+  return dedupeOverlapping(patterns).map(toPricePattern)
 }
 
 /**
  * Vertical mirror of detectDoubleBottoms.
  * @param {Candle[]} data
  * @param {Object} [options]
- * @returns {Object[]}
+ * @returns {PricePattern[]}
  */
 export function detectDoubleTops(data, options = {}) {
   if (!data?.length) return []
@@ -396,5 +434,5 @@ export function detectDoubleTops(data, options = {}) {
     })
   }
 
-  return dedupeOverlapping(patterns)
+  return dedupeOverlapping(patterns).map(toPricePattern)
 }
