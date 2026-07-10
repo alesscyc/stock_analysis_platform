@@ -232,6 +232,12 @@ export function detectDoubleBottoms(data, options = {}) {
     const h0Candidates = pivotHighs.filter(h => h.index < l1.index)
     if (!h0Candidates.length) continue
     const h0 = h0Candidates[h0Candidates.length - 1]
+    const previousHigh = h0Candidates[h0Candidates.length - 2]
+    const previousLows = pivotLows.filter(l => l.index < l1.index)
+    const previousLow = previousLows[previousLows.length - 1]
+
+    if (!previousHigh || !previousLow) continue
+    if (previousHigh.price <= h0.price || previousLow.price <= l1.price) continue
 
     const id = `${h0.index}-${l1.index}-${h1.index}-${l2.index}`
     if (seenIds.has(id)) continue
