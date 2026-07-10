@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { detectDoubleBottoms, detectDoubleTops } from './pricePatterns'
+import { detectDoubleBottoms, detectDoubleTops, detectHeadAndShoulders } from './pricePatterns'
 import { createPricePatternPrimitive } from './pricePatternChart'
 
 const candle = (time, high, low, close = high - 1) => ({
@@ -92,6 +92,47 @@ describe('double top', () => {
 
     expect(pattern.status).toBe('failed')
     expect(pattern.invalidated.time).toBe(12)
+  })
+})
+
+describe('head and shoulders', () => {
+  const headAndShoulders = [
+    candle(0, 88, 80),
+    candle(1, 96, 88),
+    candle(2, 90, 84),
+    candle(3, 101, 90),
+    candle(4, 94, 87),
+    candle(5, 110, 98),
+    candle(6, 101, 92),
+    candle(7, 125, 105),
+    candle(8, 103, 93),
+    candle(9, 111, 100),
+    candle(10, 105, 95),
+    candle(11, 100, 89, 90),
+  ]
+  const headOptions = {
+    leftBars: 1,
+    rightBars: 1,
+    minBarsBetweenPeaks: 2,
+    maxBarsBetweenPeaks: 4,
+    minHeadHeight: 0.08,
+  }
+
+  it('finds three peaks after an uptrend and confirms below the sloped neckline', () => {
+    const [pattern] = detectHeadAndShoulders(headAndShoulders, headOptions)
+
+    expect(pattern.type).toBe('head-and-shoulders')
+    expect(pattern.status).toBe('confirmed')
+    expect(pattern.breakout.time).toBe(11)
+    expect(pattern.lines[0].points.map(point => point.time)).toEqual([5, 6, 7, 8, 9])
+    expect(pattern.labels.map(label => label.key)).toEqual([
+      'patternLeftShoulder',
+      'patternHead',
+      'patternRightShoulder',
+    ])
+
+    const flatHead = headAndShoulders.map(bar => bar.time === 7 ? candle(7, 112, 105) : bar)
+    expect(detectHeadAndShoulders(flatHead, headOptions)).toEqual([])
   })
 })
 
