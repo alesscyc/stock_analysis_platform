@@ -24,7 +24,9 @@
  * @property {PivotPoint} h1
  * @property {PivotPoint} l2
  * @property {Candle} [breakout]
- * @property {'pending'|'confirmed'} status
+ * @property {Candle} [invalidated]
+ * @property {'double-bottom'} type
+ * @property {'pending'|'confirmed'|'failed'} status
  */
 
 /**
@@ -49,6 +51,19 @@ export const DEFAULT_DOUBLE_BOTTOM_OPTIONS = {
   minNecklineDecline: 0.02,
   minBarsBetweenBottoms: 10,
   maxBarsBetweenBottoms: 80,
+  requireBreakoutVolume: false,
+  breakoutVolumeMultiplier: 1.2,
+  avgVolumePeriod: 20,
+}
+
+export const DEFAULT_DOUBLE_TOP_OPTIONS = {
+  leftBars: 3,
+  rightBars: 3,
+  topTolerance: 0.03,
+  necklineThreshold: 1.03,
+  minNecklineRise: 0.02,
+  minBarsBetweenTops: 10,
+  maxBarsBetweenTops: 80,
   requireBreakoutVolume: false,
   breakoutVolumeMultiplier: 1.2,
   avgVolumePeriod: 20,
@@ -133,10 +148,20 @@ function avgVolumeBefore(data, index, period) {
   return sum / period
 }
 
-function findBreakout(data, l2Index, necklinePrice, opts) {
-  for (let i = l2Index + 1; i < data.length; i++) {
+function findOutcome(data, secondIndex, necklinePrice, extremePrice, opts, direction) {
+  for (let i = secondIndex + 1; i < data.length; i++) {
     const candle = data[i]
-    if (candle.close <= necklinePrice) continue
+    const confirmed = direction === 'up'
+      ? candle.close > necklinePrice
+      : candle.close < necklinePrice
+
+    if (!confirmed) {
+      const failed = direction === 'up'
+        ? candle.close < extremePrice
+        : candle.close > extremePrice
+      if (failed) return { status: 'failed', candle }
+      continue
+    }
 
     if (opts.requireBreakoutVolume) {
       const avgVol = avgVolumeBefore(data, i, opts.avgVolumePeriod)
@@ -144,10 +169,10 @@ function findBreakout(data, l2Index, necklinePrice, opts) {
       if (avgVol === null || volume <= avgVol * opts.breakoutVolumeMultiplier) continue
     }
 
-    return candle
+    return { status: 'confirmed', candle }
   }
 
-  return null
+  return { status: 'pending', candle: undefined }
 }
 
 /** ponytail: 0.5% wick slack only — not bottomTolerance (3% L1≈L2 match) */
@@ -171,10 +196,32 @@ function breaksFirstBottomBeforeNeckline(data, l1Index, h1Index, l1Price) {
   return false
 }
 
+function hasHigherHighBetween(data, t1Index, t2Index, ceilingPrice) {
+  const maxAllowed = ceilingPrice * (1 + INTERMEDIATE_WICK_SLACK)
+  for (let i = t1Index + 1; i < t2Index; i++) {
+    if (data[i].high > maxAllowed) return true
+  }
+  return false
+}
+
+function breaksFirstTopBeforeNeckline(data, t1Index, l1Index, t1Price) {
+  const maxAllowed = t1Price * (1 + INTERMEDIATE_WICK_SLACK)
+  for (let i = t1Index + 1; i < l1Index; i++) {
+    if (data[i].high > maxAllowed) return true
+  }
+  return false
+}
+
+function patternEnds(pattern) {
+  return pattern.type === 'double-top'
+    ? [pattern.t1, pattern.t2]
+    : [pattern.l1, pattern.l2]
+}
+
 function patternQuality(p) {
-  const bottomDiff = Math.abs(p.l2.price - p.l1.price) / p.l1.price
-  const span = p.l2.index - p.l1.index
-  return bottomDiff + span / 1000
+  const [first, second] = patternEnds(p)
+  const priceDiff = Math.abs(second.price - first.price) / first.price
+  return priceDiff + (second.index - first.index) / 1000
 }
 
 function dedupeOverlapping(patterns) {
@@ -182,11 +229,15 @@ function dedupeOverlapping(patterns) {
   const kept = []
 
   for (const p of ranked) {
-    const overlaps = kept.some(k => p.l1.index <= k.l2.index && p.l2.index >= k.l1.index)
+    const [first, second] = patternEnds(p)
+    const overlaps = kept.some(k => {
+      const [keptFirst, keptSecond] = patternEnds(k)
+      return first.index <= keptSecond.index && second.index >= keptFirst.index
+    })
     if (!overlaps) kept.push(p)
   }
 
-  return kept.sort((a, b) => a.l1.index - b.l1.index)
+  return kept.sort((a, b) => patternEnds(a)[0].index - patternEnds(b)[0].index)
 }
 
 /**
@@ -251,16 +302,97 @@ export function detectDoubleBottoms(data, options = {}) {
     if (h1.price <= maxBottom * opts.necklineThreshold) continue
 
     seenIds.add(id)
-    const breakout = findBreakout(data, l2.index, h1.price, opts)
+    const outcome = findOutcome(data, l2.index, h1.price, floorPrice, opts, 'up')
 
     patterns.push({
       id,
+      type: 'double-bottom',
       h0,
       l1,
       h1,
       l2,
-      breakout: breakout ?? undefined,
-      status: breakout ? 'confirmed' : 'pending',
+      breakout: outcome.status === 'confirmed' ? outcome.candle : undefined,
+      invalidated: outcome.status === 'failed' ? outcome.candle : undefined,
+      status: outcome.status,
+    })
+  }
+
+  return dedupeOverlapping(patterns)
+}
+
+/**
+ * Vertical mirror of detectDoubleBottoms.
+ * @param {Candle[]} data
+ * @param {Object} [options]
+ * @returns {Object[]}
+ */
+export function detectDoubleTops(data, options = {}) {
+  if (!data?.length) return []
+
+  const opts = { ...DEFAULT_DOUBLE_TOP_OPTIONS, ...options }
+  const pivotHighs = findPivotHighs(data, opts.leftBars, opts.rightBars)
+  const pivotLows = findPivotLows(data, opts.leftBars, opts.rightBars)
+  const patterns = []
+  const seenIds = new Set()
+
+  for (const t1 of pivotHighs) {
+    const t2Candidates = pivotHighs.filter(t => {
+      if (t.index <= t1.index) return false
+      const barsBetween = t.index - t1.index
+      if (barsBetween < opts.minBarsBetweenTops || barsBetween > opts.maxBarsBetweenTops) return false
+      return Math.abs(t.price - t1.price) / t1.price <= opts.topTolerance
+    })
+    if (!t2Candidates.length) continue
+
+    const t2 = t2Candidates.reduce((best, t) => {
+      const bestDiff = Math.abs(best.price - t1.price)
+      const candDiff = Math.abs(t.price - t1.price)
+      if (candDiff !== bestDiff) return candDiff < bestDiff ? t : best
+      return t.index > best.index ? t : best
+    })
+
+    const ceilingPrice = Math.max(t1.price, t2.price)
+    if (hasHigherHighBetween(data, t1.index, t2.index, ceilingPrice)) continue
+
+    const betweenLows = pivotLows.filter(l => l.index > t1.index && l.index < t2.index)
+    if (!betweenLows.length) continue
+    const l1 = betweenLows.reduce((best, l) => (l.price < best.price ? l : best))
+
+    if (breaksFirstTopBeforeNeckline(data, t1.index, l1.index, t1.price)) continue
+
+    const l0Candidates = pivotLows.filter(l => l.index < t1.index)
+    if (!l0Candidates.length) continue
+    const l0 = l0Candidates[l0Candidates.length - 1]
+    const previousLow = l0Candidates[l0Candidates.length - 2]
+    const previousHighs = pivotHighs.filter(h => h.index < t1.index)
+    const previousHigh = previousHighs[previousHighs.length - 1]
+
+    if (!previousLow || !previousHigh) continue
+    if (previousLow.price >= l0.price || previousHigh.price >= t1.price) continue
+
+    const id = `top-${l0.index}-${t1.index}-${l1.index}-${t2.index}`
+    if (seenIds.has(id)) continue
+    if (l1.price <= l0.price) continue
+
+    const necklineRise = (l1.price - l0.price) / l0.price
+    if (necklineRise < opts.minNecklineRise) continue
+
+    const minTop = Math.min(t1.price, t2.price)
+    if (l1.price >= minTop / opts.necklineThreshold) continue
+
+    seenIds.add(id)
+    const outcome = findOutcome(data, t2.index, l1.price, ceilingPrice, opts, 'down')
+
+    patterns.push({
+      id,
+      type: 'double-top',
+      l0,
+      t1,
+      l1,
+      t2,
+      breakout: outcome.status === 'confirmed' ? outcome.candle : undefined,
+      invalidated: outcome.status === 'failed' ? outcome.candle : undefined,
+      status: outcome.status,
     })
   }
 

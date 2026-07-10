@@ -161,4 +161,15 @@ describe('StockChart indicators', () => {
 
     expect(screen.getByRole('checkbox', { name: '200 MA' })).toBeChecked()
   })
+
+  it('uses one persisted Price Pattern toggle', () => {
+    renderChart()
+
+    fireEvent.click(screen.getByRole('button', { name: /Indicators/i }))
+    const toggle = screen.getByRole('checkbox', { name: 'Price Pattern' })
+    expect(toggle).toBeChecked()
+
+    fireEvent.click(toggle)
+    expect(localStorage.getItem('chart-double-bottom-visible')).toBe('false')
+  })
 })

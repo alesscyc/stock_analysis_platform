@@ -1,13 +1,19 @@
 /**
- * lightweight-charts v5 primitive for double-bottom pattern overlays.
+ * lightweight-charts v5 primitive for double-top and double-bottom overlays.
  */
 
 /**
  * @param {import('./doubleBottom.js').DoubleBottomPattern[]} patterns
  */
-export function createDoubleBottomPrimitive() {
+export function createPricePatternPrimitive() {
   let patterns = []
-  let labels = { bottom1: 'Bottom 1', bottom2: 'Bottom 2', neckline: 'Neckline' }
+  let labels = {
+    top1: 'Top 1',
+    top2: 'Top 2',
+    bottom1: 'Bottom 1',
+    bottom2: 'Bottom 2',
+    neckline: 'Neckline',
+  }
   let chart = null
   let series = null
   let requestUpdate = null
@@ -87,41 +93,50 @@ export function createDoubleBottomPrimitive() {
               const vr = scope.verticalPixelRatio
 
               for (const pattern of patterns) {
+                const isTop = pattern.type === 'double-top'
                 const confirmed = pattern.status === 'confirmed'
-                const lineColor = confirmed ? '#26a69a' : '#8892a4'
-                const h0 = coordinates(pattern.h0.time, pattern.h0.price)
-                const l1 = coordinates(pattern.l1.time, pattern.l1.price)
-                const h1 = coordinates(pattern.h1.time, pattern.h1.price)
-                const l2 = coordinates(pattern.l2.time, pattern.l2.price)
+                const failed = pattern.status === 'failed'
+                const lineColor = failed
+                  ? '#8892a4'
+                  : isTop
+                    ? (confirmed ? '#ef5350' : 'rgba(239, 83, 80, 0.55)')
+                    : (confirmed ? '#26a69a' : 'rgba(38, 166, 154, 0.55)')
+                const path = isTop
+                  ? [pattern.l0, pattern.t1, pattern.l1, pattern.t2]
+                  : [pattern.h0, pattern.l1, pattern.h1, pattern.l2]
+                const points = path.map(point => coordinates(point.time, point.price))
 
-                const wPath = [h0, l1, h1, l2].filter(Boolean)
-                if (wPath.length >= 2) {
+                if (points.every(Boolean)) {
                   ctx.beginPath()
                   ctx.strokeStyle = lineColor
                   ctx.lineWidth = 2 * hr
-                  ctx.setLineDash([])
-                  ctx.moveTo(wPath[0].x * hr, wPath[0].y * vr)
-                  for (let i = 1; i < wPath.length; i++) {
-                    ctx.lineTo(wPath[i].x * hr, wPath[i].y * vr)
+                  ctx.setLineDash(confirmed ? [] : failed ? [2 * hr, 4 * hr] : [6 * hr, 4 * hr])
+                  ctx.moveTo(points[0].x * hr, points[0].y * vr)
+                  for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i].x * hr, points[i].y * vr)
                   }
                   ctx.stroke()
+                  ctx.setLineDash([])
                 }
 
-                if (l1) drawLabel(ctx, l1.x, l1.y, labels.bottom1, lineColor, hr, vr, false)
-                if (l2) drawLabel(ctx, l2.x, l2.y, labels.bottom2, lineColor, hr, vr, false)
+                const first = points[1]
+                const neckline = points[2]
+                const second = points[3]
+                if (first) drawLabel(ctx, first.x, first.y, isTop ? labels.top1 : labels.bottom1, lineColor, hr, vr, isTop)
+                if (second) drawLabel(ctx, second.x, second.y, isTop ? labels.top2 : labels.bottom2, lineColor, hr, vr, isTop)
 
-                if (l1 && l2 && h1) {
+                if (first && second && neckline) {
                   ctx.beginPath()
                   ctx.strokeStyle = lineColor
                   ctx.lineWidth = (confirmed ? 2 : 1.5) * hr
                   ctx.setLineDash([6 * hr, 4 * hr])
-                  ctx.moveTo(l1.x * hr, h1.y * vr)
-                  ctx.lineTo(l2.x * hr, h1.y * vr)
+                  ctx.moveTo(first.x * hr, neckline.y * vr)
+                  ctx.lineTo(second.x * hr, neckline.y * vr)
                   ctx.stroke()
                   ctx.setLineDash([])
 
-                  const midX = (l1.x + l2.x) / 2
-                  drawLabel(ctx, midX, h1.y, labels.neckline, lineColor, hr, vr, true)
+                  const midX = (first.x + second.x) / 2
+                  drawLabel(ctx, midX, neckline.y, labels.neckline, lineColor, hr, vr, !isTop)
                 }
               }
             })
