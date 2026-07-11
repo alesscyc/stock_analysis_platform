@@ -253,6 +253,7 @@ function toPricePattern(pattern) {
   return {
     id: pattern.id,
     type: pattern.type,
+    nameKey: isTop ? 'patternDoubleTop' : 'patternDoubleBottom',
     status: pattern.status,
     startIndex: first.index,
     color: isTop ? '#ef5350' : '#26a69a',
@@ -266,12 +267,7 @@ function toPricePattern(pattern) {
         ],
         style: 'dashed',
         width: pattern.status === 'confirmed' ? 2 : 1.5,
-        label: { key: 'patternNeckline', position: isTop ? 'below' : 'above' },
       },
-    ],
-    labels: [
-      { point: first, key: isTop ? 'patternTop1' : 'patternBottom1', position: isTop ? 'above' : 'below' },
-      { point: second, key: isTop ? 'patternTop2' : 'patternBottom2', position: isTop ? 'above' : 'below' },
     ],
     breakout: pattern.breakout,
     invalidated: pattern.invalidated,

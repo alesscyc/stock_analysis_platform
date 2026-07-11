@@ -68,6 +68,7 @@ export function detectHeadAndShoulders(data, options = {}) {
     patterns.push({
       id: `head-and-shoulders-${leftShoulder.index}-${head.index}-${rightShoulder.index}`,
       type: 'head-and-shoulders',
+      nameKey: 'patternHeadAndShoulders',
       status,
       startIndex: leftShoulder.index,
       color: '#ef5350',
@@ -85,13 +86,7 @@ export function detectHeadAndShoulders(data, options = {}) {
           ],
           style: 'dashed',
           width: status === 'confirmed' ? 2 : 1.5,
-          label: { key: 'patternNeckline', position: 'below' },
         },
-      ],
-      labels: [
-        { point: leftShoulder, key: 'patternLeftShoulder', position: 'above' },
-        { point: head, key: 'patternHead', position: 'above' },
-        { point: rightShoulder, key: 'patternRightShoulder', position: 'above' },
       ],
       breakout: status === 'confirmed' ? outcome : undefined,
       invalidated: status === 'failed' ? outcome : undefined,

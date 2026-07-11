@@ -90,6 +90,25 @@ export function createPricePatternPrimitive() {
                   ? '#8892a4'
                   : confirmed ? pattern.color : (pattern.pendingColor ?? pattern.color)
 
+                const area = pattern.lines.find(line => line.style === 'status')
+                  ?.points.map(point => coordinates(point.time, point.price))
+                let areaBounds = null
+                if (area?.every(Boolean)) {
+                  const xs = area.map(point => point.x)
+                  const ys = area.map(point => point.y)
+                  const left = Math.min(...xs)
+                  const top = Math.min(...ys)
+                  const right = Math.max(...xs)
+                  const bottom = Math.max(...ys)
+                  areaBounds = { left, top, right, bottom }
+
+                  ctx.save()
+                  ctx.fillStyle = lineColor
+                  ctx.globalAlpha = 0.08
+                  ctx.fillRect(left * hr, top * vr, (right - left) * hr, (bottom - top) * vr)
+                  ctx.restore()
+                }
+
                 for (const line of pattern.lines) {
                   const points = line.points.map(point => coordinates(point.time, point.price))
                   if (!points.every(Boolean)) continue
@@ -109,37 +128,20 @@ export function createPricePatternPrimitive() {
                   }
                   ctx.stroke()
                   ctx.setLineDash([])
-
-                  if (line.label) {
-                    const first = points[0]
-                    const last = points[points.length - 1]
-                    drawLabel(
-                      ctx,
-                      (first.x + last.x) / 2,
-                      (first.y + last.y) / 2,
-                      resolveLabel(line.label.key),
-                      lineColor,
-                      hr,
-                      vr,
-                      line.label.position === 'above',
-                    )
-                  }
                 }
 
-                for (const label of pattern.labels) {
-                  const point = coordinates(label.point.time, label.point.price)
-                  if (point) {
-                    drawLabel(
-                      ctx,
-                      point.x,
-                      point.y,
-                      resolveLabel(label.key),
-                      lineColor,
-                      hr,
-                      vr,
-                      label.position === 'above',
-                    )
-                  }
+                if (areaBounds) {
+                  const labelAtBottom = pattern.type.includes('bottom')
+                  drawLabel(
+                    ctx,
+                    (areaBounds.left + areaBounds.right) / 2,
+                    labelAtBottom ? areaBounds.bottom : areaBounds.top,
+                    resolveLabel(pattern.nameKey),
+                    lineColor,
+                    hr,
+                    vr,
+                    !labelAtBottom,
+                  )
                 }
               }
             })

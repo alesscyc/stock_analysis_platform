@@ -52,7 +52,9 @@ describe('double bottom', () => {
     })
 
     expect(detectDoubleBottoms(uptrend, options)).toEqual([])
-    expect(detectDoubleBottoms(downtrend, options)).toHaveLength(1)
+    expect(detectDoubleBottoms(downtrend, options)).toMatchObject([
+      { nameKey: 'patternDoubleBottom' },
+    ])
   })
 
   it('keeps a failed pattern with its invalidating candle', () => {
@@ -81,7 +83,7 @@ describe('double top', () => {
     expect(pattern.status).toBe('confirmed')
     expect(pattern.breakout.time).toBe(12)
     expect(pattern.lines).toHaveLength(2)
-    expect(pattern.labels.map(label => label.key)).toEqual(['patternTop1', 'patternTop2'])
+    expect(pattern.nameKey).toBe('patternDoubleTop')
   })
 
   it('keeps a failed pattern with its invalidating candle', () => {
@@ -125,11 +127,7 @@ describe('head and shoulders', () => {
     expect(pattern.status).toBe('confirmed')
     expect(pattern.breakout.time).toBe(11)
     expect(pattern.lines[0].points.map(point => point.time)).toEqual([5, 6, 7, 8, 9])
-    expect(pattern.labels.map(label => label.key)).toEqual([
-      'patternLeftShoulder',
-      'patternHead',
-      'patternRightShoulder',
-    ])
+    expect(pattern.nameKey).toBe('patternHeadAndShoulders')
 
     const flatHead = headAndShoulders.map(bar => bar.time === 7 ? candle(7, 112, 105) : bar)
     expect(detectHeadAndShoulders(flatHead, headOptions)).toEqual([])
@@ -148,7 +146,10 @@ describe('price patterns', () => {
       arcTo: vi.fn(),
       closePath: vi.fn(),
       fill: vi.fn(),
+      fillRect: vi.fn(),
       fillText: vi.fn(),
+      restore: vi.fn(),
+      save: vi.fn(),
     }
     const primitive = createPricePatternPrimitive()
     primitive.attached({
@@ -157,17 +158,19 @@ describe('price patterns', () => {
       requestUpdate: vi.fn(),
     })
     primitive.setLabelResolver(key => `translated:${key}`)
-    primitive.setPatterns([{
-      type: 'triangle',
+    const pattern = {
+      nameKey: 'patternName',
       status: 'confirmed',
       color: '#fff',
       lines: [{
         points: [{ time: 1, price: 10 }, { time: 2, price: 20 }],
-        style: 'solid',
-        label: { key: 'patternName', position: 'above' },
+        style: 'status',
       }],
-      labels: [],
-    }])
+    }
+    primitive.setPatterns([
+      { ...pattern, type: 'double-top' },
+      { ...pattern, type: 'double-bottom' },
+    ])
 
     primitive.paneViews()[0].renderer().draw({
       useBitmapCoordinateSpace: draw => draw({
@@ -179,6 +182,8 @@ describe('price patterns', () => {
 
     expect(ctx.moveTo).toHaveBeenCalledWith(1, 10)
     expect(ctx.lineTo).toHaveBeenCalledWith(2, 20)
-    expect(ctx.fillText).toHaveBeenCalledWith('translated:patternName', 1.5, 1)
+    expect(ctx.fillRect).toHaveBeenCalledWith(1, 10, 1, 10)
+    expect(ctx.fillText).toHaveBeenCalledWith('translated:patternName', 1.5, -4)
+    expect(ctx.fillText).toHaveBeenCalledWith('translated:patternName', 1.5, 34)
   })
 })
