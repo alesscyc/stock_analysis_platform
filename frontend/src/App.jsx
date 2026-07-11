@@ -114,7 +114,7 @@ function App() {
         const prediction = data.find(item => item.prediction)?.prediction;
         if (prediction) setAiPrediction(prediction);
       } else {
-        throw new Error(`No data found for ${stock.symbol}`);
+        throw new Error(t('noDataFound', { symbol: stock.symbol }));
       }
     } catch (fetchError) {
       console.error('Error fetching stock data:', fetchError);
@@ -253,12 +253,12 @@ function App() {
           <button
             className="btn-backtest"
             onClick={() => setActiveSidebar(prev => prev === 'backtest' ? null : 'backtest')}
-            aria-label="Backtest"
+            aria-label={t('backtest')}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
-            Backtest
+            {t('backtest')}
           </button>
           <button
             className="btn-watchlist"

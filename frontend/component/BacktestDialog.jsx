@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import './BacktestDialog.css';
 import { tradesToActions } from './backtestTrades';
+import { useTranslation } from '../src/i18n/useTranslation';
 
 const OPERATORS = ['>', '<', '>=', '<='];
 const MA_PERIOD_MIN = 2;
 const MA_PERIOD_MAX = 500;
 
 const OPERAND_OPTIONS = [
-  { value: 'Close', label: 'Close Price' },
-  { value: '__ma__', label: 'Moving Average' },
-  { value: '__number__', label: 'Fixed Number' },
+  { value: 'Close', labelKey: 'closePrice' },
+  { value: '__ma__', labelKey: 'movingAverage' },
+  { value: '__number__', labelKey: 'fixedNumber' },
 ];
 
 const DEFAULT_STRATEGY = {
@@ -53,7 +54,7 @@ function buildStrategyConfig(form) {
   const exitRight = resolveOperand(form.exitRight, form.exitRightNum);
 
   if ([entryLeft, entryRight, exitLeft, exitRight].some(v => v == null || v === '')) {
-    return { error: 'Fill all condition fields (use valid MA periods and numbers)' };
+    return { errorKey: 'fillAllConditionFields' };
   }
 
   const config = {
@@ -137,11 +138,11 @@ function migrateLegacyConfig(config) {
   };
 }
 
-function RuleRow({ label, left, leftNum, op, right, rightNum, onChange }) {
+function RuleRow({ label, left, leftNum, op, right, rightNum, onChange, t }) {
   const showLeftNum = left === '__number__' || left === '__ma__';
   const showRightNum = right === '__number__' || right === '__ma__';
-  const leftPlaceholder = left === '__ma__' ? 'Period' : 'Value';
-  const rightPlaceholder = right === '__ma__' ? 'Period' : 'Value';
+  const leftPlaceholder = left === '__ma__' ? t('period') : t('value');
+  const rightPlaceholder = right === '__ma__' ? t('period') : t('value');
 
   return (
     <div className="backtest-rule">
@@ -149,7 +150,7 @@ function RuleRow({ label, left, leftNum, op, right, rightNum, onChange }) {
       <div className="backtest-rule-row">
         <select value={left} onChange={e => onChange('left', e.target.value)}>
           {OPERAND_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+            <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
           ))}
         </select>
         {showLeftNum && (
@@ -171,7 +172,7 @@ function RuleRow({ label, left, leftNum, op, right, rightNum, onChange }) {
         </select>
         <select value={right} onChange={e => onChange('right', e.target.value)}>
           {OPERAND_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+            <option key={o.value} value={o.value}>{t(o.labelKey)}</option>
           ))}
         </select>
         {showRightNum && (
@@ -192,6 +193,7 @@ function RuleRow({ label, left, leftNum, op, right, rightNum, onChange }) {
 }
 
 export default function BacktestDialog({ isOpen, onClose, selectedSymbol, currentInterval, onTradesUpdate }) {
+  const { t } = useTranslation();
   const [strategy, setStrategy] = useState(loadStoredStrategy);
   const [capital, setCapital] = useState(10000);
   const [dateRange, setDateRange] = useState('2y');
@@ -220,11 +222,11 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
   };
 
   const runBacktest = async () => {
-    if (!selectedSymbol) { setError('Select a stock first'); return; }
+    if (!selectedSymbol) { setError(t('selectStockFirst')); return; }
 
-    const { config, error: buildError } = buildStrategyConfig(strategy);
-    if (buildError) {
-      setError(buildError);
+    const { config, errorKey } = buildStrategyConfig(strategy);
+    if (errorKey) {
+      setError(t(errorKey));
       return;
     }
 
@@ -246,7 +248,7 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
         }),
       });
       const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || 'Backtest failed');
+      if (!res.ok || data.error) throw new Error(data.error || t('backtestFailed'));
       setResult(data);
       onTradesUpdate?.(tradesToActions(data.trades));
     } catch (e) {
@@ -268,43 +270,45 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
   return (
     <div className={`backtest-dialog${isOpen ? '' : ' backtest-dialog-hidden'}`}>
       <div className="backtest-header">
-        <span className="backtest-title">BACKTEST</span>
-        <button className="backtest-close" onClick={onClose}>&times;</button>
+        <span className="backtest-title">{t('backtestBadge')}</span>
+        <button className="backtest-close" onClick={onClose} aria-label={t('close')}>&times;</button>
       </div>
 
       {!result ? (
         <>
           <div className="backtest-form">
             <RuleRow
-              label="Buy When"
+              label={t('buyWhen')}
               left={strategy.entryLeft}
               leftNum={strategy.entryLeftNum}
               op={strategy.entryOp}
               right={strategy.entryRight}
               rightNum={strategy.entryRightNum}
               onChange={updateEntry}
+              t={t}
             />
 
             <RuleRow
-              label="Sell When"
+              label={t('sellWhen')}
               left={strategy.exitLeft}
               leftNum={strategy.exitLeftNum}
               op={strategy.exitOp}
               right={strategy.exitRight}
               rightNum={strategy.exitRightNum}
               onChange={updateExit}
+              t={t}
             />
 
             <div className="backtest-section">
-              <span className="backtest-label">Exit Mode</span>
+              <span className="backtest-label">{t('exitMode')}</span>
               <div className="backtest-controls-row">
                 <div className="backtest-field">
                   <select
                     value={strategy.exitMode}
                     onChange={e => updateStrategy('exitMode', e.target.value)}
                   >
-                    <option value="immediate">Sell All Immediately</option>
-                    <option value="dca">DCA Out (Gradual)</option>
+                    <option value="immediate">{t('sellAllImmediately')}</option>
+                    <option value="dca">{t('dcaOut')}</option>
                   </select>
                 </div>
               </div>
@@ -313,7 +317,7 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
             {strategy.exitMode === 'dca' && (
               <div className="backtest-controls-row">
                 <div className="backtest-field">
-                  <label>DCA Periods</label>
+                  <label>{t('dcaPeriods')}</label>
                   <input
                     type="number"
                     value={strategy.dcaPeriods}
@@ -323,15 +327,15 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
                   />
                 </div>
                 <div className="backtest-field">
-                  <label>DCA Unit</label>
+                  <label>{t('dcaUnit')}</label>
                   <select
                     value={strategy.evalFrequency === 'monthly' ? 'month' : strategy.dcaUnit}
                     onChange={e => updateStrategy('dcaUnit', e.target.value)}
                     disabled={strategy.evalFrequency === 'monthly'}
                   >
-                    <option value="month">Monthly</option>
+                    <option value="month">{t('dcaMonthly')}</option>
                     {strategy.evalFrequency !== 'monthly' && (
-                      <option value="week">Weekly</option>
+                      <option value="week">{t('dcaWeekly')}</option>
                     )}
                   </select>
                 </div>
@@ -339,15 +343,15 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
             )}
 
             <div className="backtest-section">
-              <span className="backtest-label">Signal Check</span>
+              <span className="backtest-label">{t('signalCheck')}</span>
               <div className="backtest-controls-row">
                 <div className="backtest-field">
                   <select
                     value={strategy.evalFrequency}
                     onChange={e => updateStrategy('evalFrequency', e.target.value)}
                   >
-                    <option value="daily">Every Trading Day</option>
-                    <option value="monthly">Monthly (First Trading Day)</option>
+                    <option value="daily">{t('everyTradingDay')}</option>
+                    <option value="monthly">{t('monthlyFirstTradingDay')}</option>
                   </select>
                 </div>
               </div>
@@ -355,7 +359,7 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
 
             <div className="backtest-controls-row">
               <div className="backtest-field">
-                <label>Capital ($)</label>
+                <label>{t('capital')}</label>
                 <input
                   type="number"
                   value={capital}
@@ -365,12 +369,12 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
                 />
               </div>
               <div className="backtest-field">
-                <label>Range</label>
+                <label>{t('range')}</label>
                 <select value={dateRange} onChange={e => setDateRange(e.target.value)}>
-                  <option value="1y">1 Year</option>
-                  <option value="2y">2 Years</option>
-                  <option value="5y">5 Years</option>
-                  <option value="max">Max</option>
+                  <option value="1y">{t('oneYear')}</option>
+                  <option value="2y">{t('twoYears')}</option>
+                  <option value="5y">{t('fiveYears')}</option>
+                  <option value="max">{t('maxRange')}</option>
                 </select>
               </div>
             </div>
@@ -383,7 +387,7 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
             onClick={runBacktest}
             disabled={running || !selectedSymbol}
           >
-            {running ? 'Running...' : 'Run Backtest'}
+            {running ? t('running') : t('runBacktest')}
           </button>
         </>
       ) : (
@@ -391,35 +395,35 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
           <div className="backtest-metrics">
             <div className="backtest-metric good">
               <span className="backtest-metric-value">{(m?.totalReturn ?? 0) >= 0 ? '+' : ''}{m?.totalReturn ?? '-'}%</span>
-              <span className="backtest-metric-label">Return</span>
+              <span className="backtest-metric-label">{t('metricReturn')}</span>
             </div>
             <div className="backtest-metric">
               <span className="backtest-metric-value">{m?.sharpe ?? '-'}</span>
-              <span className="backtest-metric-label">Sharpe</span>
+              <span className="backtest-metric-label">{t('sharpe')}</span>
             </div>
             <div className="backtest-metric bad">
               <span className="backtest-metric-value">{(m?.maxDrawdown ?? 0) >= 0 ? '-' : ''}{Math.abs(m?.maxDrawdown ?? 0)}%</span>
-              <span className="backtest-metric-label">Max DD</span>
+              <span className="backtest-metric-label">{t('maxDD')}</span>
             </div>
             <div className="backtest-metric">
               <span className="backtest-metric-value">{m?.cagr ?? '-'}%</span>
-              <span className="backtest-metric-label">CAGR</span>
+              <span className="backtest-metric-label">{t('cagr')}</span>
             </div>
             <div className="backtest-metric">
               <span className="backtest-metric-value">{m?.winRate != null ? (m.winRate * 100).toFixed(0) + '%' : '-'}</span>
-              <span className="backtest-metric-label">Win Rate</span>
+              <span className="backtest-metric-label">{t('winRate')}</span>
             </div>
             <div className="backtest-metric">
               <span className="backtest-metric-value">{m?.profitFactor ?? '-'}</span>
-              <span className="backtest-metric-label">P/L Factor</span>
+              <span className="backtest-metric-label">{t('plFactor')}</span>
             </div>
             <div className="backtest-metric">
               <span className="backtest-metric-value">{m?.numTrades ?? '-'}</span>
-              <span className="backtest-metric-label">Trades</span>
+              <span className="backtest-metric-label">{t('trades')}</span>
             </div>
             <div className="backtest-metric">
               <span className="backtest-metric-value">{m?.avgReturn ?? '-'}%</span>
-              <span className="backtest-metric-label">Avg Return</span>
+              <span className="backtest-metric-label">{t('avgReturn')}</span>
             </div>
           </div>
 
@@ -428,10 +432,10 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
               <table>
                 <thead>
                   <tr>
-                    <th>Date</th>
-                    <th>Action</th>
-                    <th>Price</th>
-                    <th>PnL</th>
+                    <th>{t('date')}</th>
+                    <th>{t('action')}</th>
+                    <th>{t('price')}</th>
+                    <th>{t('pnl')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -441,7 +445,7 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
                     return (
                       <tr key={i} className={colorClass}>
                         <td>{a.date}</td>
-                        <td className={`backtest-side backtest-side-${a.side.toLowerCase()}`}>{a.side}</td>
+                        <td className={`backtest-side backtest-side-${a.side.toLowerCase()}`}>{t(a.side === 'BUY' ? 'buy' : 'sell')}</td>
                         <td>${a.price}</td>
                         <td className={colorClass}>
                           {isSell ? `$${(a.pnl ?? 0).toFixed(2)}` : '—'}
@@ -457,9 +461,9 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
           {error && <div className="backtest-error">{error}</div>}
 
           <div className="backtest-actions">
-            <button className="backtest-back" onClick={reset}>Edit Strategy</button>
+            <button className="backtest-back" onClick={reset}>{t('editStrategy')}</button>
             <button className="backtest-run" onClick={runBacktest} disabled={running}>
-              {running ? 'Running...' : 'Run Again'}
+              {running ? t('running') : t('runAgain')}
             </button>
           </div>
         </>

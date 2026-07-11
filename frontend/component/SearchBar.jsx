@@ -142,7 +142,7 @@ function SearchBar({ onStockSelect, loading }) {
                     onFocus={() => searchTerm.trim().length > 0 && setShowSuggestions(true)}
                     autoComplete="off"
                     spellCheck={false}
-                    aria-label="Search stock ticker"
+                    aria-label={t('search')}
                     disabled={loading}
                 />
 

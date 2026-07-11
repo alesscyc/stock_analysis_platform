@@ -264,7 +264,7 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect, onStockDataScanned }) 
   const symbols = parseSymbols(symbolsText);
 
   return (
-    <div id="screener-dialog-sidebar" className={isOpen ? '' : 'screener-hidden'} role="dialog" aria-modal="true" aria-label="Stock Screener">
+    <div id="screener-dialog-sidebar" className={isOpen ? '' : 'screener-hidden'} role="dialog" aria-modal="true" aria-label={t('screener')}>
       {/* Header */}
       <div id="screener-dialog-header">
         <div id="screener-header-left">

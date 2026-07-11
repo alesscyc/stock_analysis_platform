@@ -143,7 +143,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
 
         const data = await response.json();
         if (!response.ok || !data.success) {
-          throw new Error(data.error || 'Unknown error');
+          throw new Error(data.error || t('unknownError'));
         }
 
         setSuccessMsg(t('orderModified', {
@@ -194,7 +194,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
         setTakeProfitPrice('');
         setStopLossPrice('');
       } else {
-        setErrorMsg(t('failedSubmitOrder', { error: data.error || 'Unknown error' }));
+        setErrorMsg(t('failedSubmitOrder', { error: data.error || t('unknownError') }));
       }
     } catch (error) {
       if (isModifyMode && error.message) {

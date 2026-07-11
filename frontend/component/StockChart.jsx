@@ -955,7 +955,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
         color: '#4488ff',
         lineWidth: 1,
         dashed: false,
-        title: `Cost ${ibPosition.quantity}`,
+        title: t('costQty', { qty: ibPosition.quantity }),
       });
     }
 
@@ -971,7 +971,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
         dotted: true,
         draggable: canModify,
         order,
-        title: `${order.action} ${order.quantity}`,
+        title: `${t(order.action === 'BUY' ? 'buy' : 'sell')} ${order.quantity}`,
       });
     }
 
@@ -989,7 +989,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       axisLabelVisible: true,
       title: '',
     }));
-  }, [ibPosition, symbolOrders]);
+  }, [ibPosition, symbolOrders, t]);
 
   // ── Sync MA visibility with series ───────────────────────
   useEffect(() => {
