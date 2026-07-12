@@ -72,7 +72,6 @@ export function detectHeadAndShoulders(data, options = {}) {
       status,
       startIndex: leftShoulder.index,
       color: '#ef5350',
-      pendingColor: 'rgba(239, 83, 80, 0.55)',
       lines: [
         {
           points: [leftShoulder, leftTrough, head, rightTrough, rightShoulder],

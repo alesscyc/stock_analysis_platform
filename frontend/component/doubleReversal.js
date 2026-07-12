@@ -23,7 +23,6 @@
  * @property {'pending'|'confirmed'|'failed'} status
  * @property {number} startIndex
  * @property {string} color
- * @property {string} pendingColor
  * @property {Object[]} lines
  * @property {Object[]} labels
  * @property {Candle} [breakout]
@@ -257,7 +256,6 @@ function toPricePattern(pattern) {
     status: pattern.status,
     startIndex: first.index,
     color: isTop ? '#ef5350' : '#26a69a',
-    pendingColor: isTop ? 'rgba(239, 83, 80, 0.55)' : 'rgba(38, 166, 154, 0.55)',
     lines: [
       { points: path, style: 'status', width: 2 },
       {

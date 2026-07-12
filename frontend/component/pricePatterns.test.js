@@ -151,6 +151,8 @@ describe('price patterns', () => {
       restore: vi.fn(),
       save: vi.fn(),
     }
+    const strokeColors = []
+    Object.defineProperty(ctx, 'strokeStyle', { set: color => { strokeColors.push(color) } })
     const primitive = createPricePatternPrimitive()
     primitive.attached({
       chart: { timeScale: () => ({ timeToCoordinate: time => time }) },
@@ -168,8 +170,8 @@ describe('price patterns', () => {
       }],
     }
     primitive.setPatterns([
-      { ...pattern, type: 'double-top' },
-      { ...pattern, type: 'double-bottom' },
+      { ...pattern, type: 'double-top', status: 'failed', color: '#ef5350', pendingColor: '#bad' },
+      { ...pattern, type: 'double-bottom', status: 'pending', color: '#26a69a', pendingColor: '#bad' },
     ])
 
     primitive.paneViews()[0].renderer().draw({
@@ -185,5 +187,6 @@ describe('price patterns', () => {
     expect(ctx.fillRect).toHaveBeenCalledWith(1, 10, 1, 10)
     expect(ctx.fillText).toHaveBeenCalledWith('translated:patternName', 1.5, -4)
     expect(ctx.fillText).toHaveBeenCalledWith('translated:patternName', 1.5, 34)
+    expect(new Set(strokeColors)).toEqual(new Set(['#ef5350', '#26a69a']))
   })
 })

@@ -86,9 +86,7 @@ export function createPricePatternPrimitive() {
               for (const pattern of patterns) {
                 const confirmed = pattern.status === 'confirmed'
                 const failed = pattern.status === 'failed'
-                const lineColor = failed
-                  ? '#8892a4'
-                  : confirmed ? pattern.color : (pattern.pendingColor ?? pattern.color)
+                const lineColor = pattern.color
 
                 const area = pattern.lines.find(line => line.style === 'status')
                   ?.points.map(point => coordinates(point.time, point.price))
