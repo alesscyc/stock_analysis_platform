@@ -31,6 +31,12 @@ const FINNHUB_KEY = process.env.FINNHUB_KEY;
 // Python FastAPI microservice URL
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://127.0.0.1:8000';
 
+// OpenAI-compatible chat API
+const OPENAI_BASE_URL = String(process.env.OPENAI_BASE_URL || '').replace(/\/+$/, '');
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_MODEL = process.env.OPENAI_MODEL;
+const CHAT_MARKET_FIELDS = ['Open', 'High', 'Low', 'Close', 'Volume', '10MA', '20MA', '50MA', '150MA', '200MA'];
+
 const ib = new IB({
   host: IB_HOST,
   port: IB_PORT,
@@ -680,7 +686,7 @@ ib.on('openOrderEnd', () => {
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/stock/:symbol', async (req, res) => {
 
@@ -868,6 +874,155 @@ app.get('/api/fundamentals/:symbol', async (req, res) => {
   } catch (error) {
     console.error('[python-service] Fundamentals fetch failed:', error.message);
     res.status(502).json({ error: 'Could not reach Python analysis service' });
+  }
+});
+
+app.get('/api/chat/models', async (_req, res) => {
+  try {
+    if (!OPENAI_BASE_URL || !OPENAI_API_KEY || !OPENAI_MODEL) {
+      return res.status(503).json({ error: 'AI chat is not configured' });
+    }
+
+    const providerResponse = await fetch(`${OPENAI_BASE_URL}/models`, {
+      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+      signal: AbortSignal.timeout(30000),
+    });
+    const providerBody = await providerResponse.json().catch(() => ({}));
+
+    if (!providerResponse.ok) {
+      return res.status(502).json({
+        error: providerBody.error?.message || 'Could not load AI models',
+      });
+    }
+
+    const models = [...new Set(
+      (Array.isArray(providerBody.data) ? providerBody.data : [])
+        .map((item) => item?.id)
+        .filter((id) => typeof id === 'string' && id.trim())
+        // Zen's list also includes Responses, Anthropic, and Gemini transports.
+        .filter((id) => !OPENAI_BASE_URL.startsWith('https://opencode.ai/zen/v1')
+          || !/^(gpt-|claude-|gemini-|qwen)/.test(id))
+    )].sort();
+
+    if (models.length === 0) {
+      return res.status(502).json({ error: 'AI provider returned no models' });
+    }
+
+    res.json({ models, defaultModel: OPENAI_MODEL });
+  } catch (error) {
+    console.error('[ai-chat] Model list failed:', error.message);
+    res.status(502).json({ error: 'Could not reach AI provider' });
+  }
+});
+
+app.post('/api/chat', async (req, res) => {
+  try {
+    if (!OPENAI_BASE_URL || !OPENAI_API_KEY || !OPENAI_MODEL) {
+      return res.status(503).json({ error: 'AI chat is not configured' });
+    }
+
+    const body = req.body ?? {};
+    const symbol = String(body.symbol ?? '').trim().toUpperCase();
+    const interval = String(body.interval ?? '').trim();
+    const model = String(body.model || OPENAI_MODEL).trim();
+
+    if (!/^[A-Z0-9.\-]{1,20}$/.test(symbol)) {
+      return res.status(400).json({ error: 'Invalid symbol' });
+    }
+
+    if (!['1d', '1wk', '1mo'].includes(interval)) {
+      return res.status(400).json({ error: 'Invalid interval' });
+    }
+
+    if (!model || model.length > 200 || /[\r\n]/.test(model)) {
+      return res.status(400).json({ error: 'Invalid model' });
+    }
+
+    if (!Array.isArray(body.messages) || body.messages.length === 0 || body.messages.length > 10) {
+      return res.status(400).json({ error: 'Messages must contain 1 to 10 items' });
+    }
+
+    const messages = body.messages.map((message) => ({
+      role: message?.role,
+      content: typeof message?.content === 'string' ? message.content.trim() : '',
+    }));
+
+    if (messages.some((message) =>
+      !['user', 'assistant'].includes(message.role)
+      || !message.content
+      || message.content.length > 4000
+    )) {
+      return res.status(400).json({ error: 'Invalid chat message' });
+    }
+
+    if (!Array.isArray(body.stockData) || body.stockData.length === 0 || body.stockData.length > 2000) {
+      return res.status(400).json({ error: 'Stock data must contain 1 to 2000 rows' });
+    }
+
+    const marketRows = body.stockData.flatMap((row) => {
+      const date = String(row?.Date ?? '');
+      const close = Number(row?.Close);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(close)) return [];
+
+      return [[
+        date,
+        ...CHAT_MARKET_FIELDS.map((field) => {
+          const value = Number(row[field]);
+          return Number.isFinite(value) ? value : '';
+        }),
+      ].join(',')];
+    });
+
+    if (marketRows.length === 0) {
+      return res.status(400).json({ error: 'Stock data contains no valid rows' });
+    }
+
+    const context = [
+      'You answer questions about the currently displayed stock using only the supplied data.',
+      'Do not claim access to live prices, news, or outside information. If the data cannot answer a question, say so.',
+      'Explain uncertainty. Do not instruct the user to buy or sell; you may explain the supplied AI prediction.',
+      'Do not provide personalized financial advice or claim to place trades.',
+      'Use concise plain text with short paragraphs or simple bullets.',
+      `Symbol: ${symbol}`,
+      `Interval: ${interval}`,
+      `Fundamentals: ${JSON.stringify(body.fundamentals ?? null)}`,
+      `Existing AI prediction: ${JSON.stringify(body.aiPrediction ?? null)}`,
+      `Historical market data CSV (${marketRows.length} rows, oldest to newest):`,
+      `Date,${CHAT_MARKET_FIELDS.join(',')}`,
+      ...marketRows,
+    ].join('\n');
+
+    const providerResponse = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'system', content: context }, ...messages],
+        max_tokens: 800,
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+
+    const providerBody = await providerResponse.json().catch(() => ({}));
+    if (!providerResponse.ok) {
+      return res.status(502).json({
+        error: providerBody.error?.message || 'AI provider request failed',
+      });
+    }
+
+    const answer = providerBody.choices?.[0]?.message?.content;
+    if (typeof answer !== 'string' || !answer.trim()) {
+      return res.status(502).json({ error: 'AI provider returned an empty response' });
+    }
+
+    res.json({ answer: answer.trim() });
+  } catch (error) {
+    console.error('[ai-chat] Request failed:', error.message);
+    res.status(502).json({ error: 'Could not reach AI provider' });
   }
 });
 

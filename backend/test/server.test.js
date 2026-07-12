@@ -53,4 +53,21 @@ describe('Backend', () => {
       'Found hardcoded localhost URLs in server.js'
     );
   });
+
+  it('uses environment configuration for the OpenAI-compatible chat endpoint', () => {
+    const serverPath = path.resolve(__dirname, '..', 'server.js');
+    const src = fs.readFileSync(serverPath, 'utf-8');
+
+    assert.match(src, /process\.env\.OPENAI_BASE_URL/);
+    assert.match(src, /process\.env\.OPENAI_API_KEY/);
+    assert.match(src, /process\.env\.OPENAI_MODEL/);
+    assert.match(src, /app\.get\('\/api\/chat\/models'/);
+    assert.match(src, /\/models/);
+    assert.match(src, /app\.post\('\/api\/chat'/);
+    assert.match(src, /\/chat\/completions/);
+
+    const envExample = fs.readFileSync(path.resolve(__dirname, '..', '.env.example'), 'utf-8');
+    assert.match(envExample, /OPENAI_BASE_URL=https:\/\/opencode\.ai\/zen\/v1/);
+    assert.match(envExample, /OPENAI_MODEL=deepseek-v4-flash/);
+  });
 });

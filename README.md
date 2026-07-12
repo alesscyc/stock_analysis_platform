@@ -10,6 +10,7 @@ A local full-stack stock research and trading workspace with interactive charts,
 - Finnhub symbol search and a browser-local watchlist with live price polling
 - Configurable technical screener and strategy backtesting
 - Random Forest trade signals with per-symbol model caching
+- AI chat over the currently loaded chart data (OpenAI-compatible providers)
 - IB portfolio, limit/bracket order placement, modification, and cancellation
 - English and Traditional Chinese interface
 
@@ -58,9 +59,14 @@ IB_ORDER_ID_WAIT_TIMEOUT_MS=15000
 IB_OPEN_ORDERS_SYNC_TIMEOUT_MS=15000
 FINNHUB_KEY=your_finnhub_api_key
 PYTHON_SERVICE_URL=http://127.0.0.1:8000
+OPENAI_BASE_URL=https://api.example.com/v1
+OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=your-model-id
 ```
 
 `FINNHUB_KEY` is optional; symbol search returns no results without it. `PYTHON_SERVICE_URL` defaults to the value shown above.
+
+AI chat needs `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `OPENAI_MODEL`. Point `OPENAI_BASE_URL` at any OpenAI-compatible provider that exposes `/models` and `/chat/completions` (OpenAI, OpenCode Zen, local gateways, etc.). Without these vars, chat returns `503`.
 
 Run the frontend and backend in separate terminals:
 
@@ -82,6 +88,8 @@ The backend starts the FastAPI analysis service on port 8000 when needed.
 | `GET` | `/api/stock/:symbol` | Fetch OHLCV, indicators, and an optional prediction |
 | `GET` | `/api/price/:symbol` | Fetch a lightweight current-price snapshot |
 | `GET` | `/api/fundamentals/:symbol` | Fetch company fundamentals |
+| `GET` | `/api/chat/models` | List available chat models from the configured provider |
+| `POST` | `/api/chat` | Ask about the loaded symbol using supplied OHLCV/MA context |
 | `GET` | `/api/model/status/:symbol` | Inspect the cached model status |
 | `POST` | `/api/model/retrain/:symbol` | Retrain a symbol model |
 | `POST` | `/api/backtest` | Run a strategy backtest |
@@ -112,10 +120,12 @@ npm test
 - Orders reach the configured IB account. Use paper trading while testing.
 - Set `IB_CLIENT_ID=0` if the app must bind and display manually created TWS/IBKR open orders.
 - ML labels use a 22-trading-day forward return above 5%; trained models are cached per symbol for four hours under `analysis/model_cache/`.
+- AI chat uses only the chart payload already loaded in the UI (OHLCV, MAs, fundamentals, RF prediction). It does not fetch live news or place trades, and responses are informational only.
 - Python service output must remain valid JSON on stdout; write diagnostics to stderr.
 
 ## Data sources
 
 - Yahoo Finance through `yfinance` for market data
 - Finnhub for symbol search
+- OpenAI-compatible chat providers for AI chat
 - Interactive Brokers for portfolios and order execution

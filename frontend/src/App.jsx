@@ -8,6 +8,7 @@ import OrdersDialog from '../component/OrdersDialog';
 import WatchlistDialog from '../component/WatchlistDialog';
 import ScreenerDialog from '../component/ScreenerDialog';
 import BacktestDialog from '../component/BacktestDialog';
+import AIChat from '../component/AIChat';
 import { isGitHubPages } from './environment';
 import { generateNvdaMockData } from './mockData';
 import { useTranslation } from './i18n/useTranslation';
@@ -510,6 +511,17 @@ function App() {
           />
         </aside>
       </div>
+
+      {stockData.length > 0 && !isMock && (
+        <AIChat
+          key={selectedStock.symbol}
+          stockSymbol={selectedStock.symbol}
+          stockData={stockData}
+          currentInterval={currentInterval}
+          fundamentals={fundamentals}
+          aiPrediction={aiPrediction}
+        />
+      )}
     </div>
   );
 }
