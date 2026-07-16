@@ -4,7 +4,7 @@ import './AIChat.css';
 
 const MARKET_FIELDS = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume', '10MA', '20MA', '50MA', '150MA', '200MA'];
 
-function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPrediction }) {
+function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPrediction, onReviewDraft }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -67,7 +67,9 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
     if (!question || loading) return;
 
     const userMessage = { role: 'user', content: question };
-    const requestMessages = [...messages, userMessage].slice(-10);
+    const requestMessages = [...messages, userMessage]
+      .slice(-10)
+      .map(({ role, content }) => ({ role, content }));
     const compactStockData = stockData
       .filter((row) => row?.Date && row?.Close != null)
       .map((row) => Object.fromEntries(
@@ -102,7 +104,11 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || t('chatFailed'));
 
-      setMessages((current) => [...current, { role: 'assistant', content: data.answer }]);
+      setMessages((current) => [...current, {
+        role: 'assistant',
+        content: data.answer,
+        draftOrder: data.draftOrder,
+      }]);
     } catch (requestError) {
       if (requestError.name !== 'AbortError') {
         setError(requestError.message || t('chatFailed'));
@@ -175,7 +181,18 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
           {messages.map((message, index) => (
             <div key={`${message.role}-${index}`} className={`ai-chat-message ai-chat-${message.role}`}>
               <span className="ai-chat-role">{message.role === 'user' ? t('you') : 'AI'}</span>
-              <div>{message.content}</div>
+              <div>
+                {message.content}
+                {message.draftOrder && onReviewDraft && (
+                  <button
+                    type="button"
+                    className="ai-chat-draft-button"
+                    onClick={() => onReviewDraft(message.draftOrder)}
+                  >
+                    {t('reviewDraft')}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
 

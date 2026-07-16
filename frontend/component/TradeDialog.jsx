@@ -17,7 +17,7 @@ function rememberSubmittedOrderPrice(orderId, orderPrice) {
   }
 }
 
-function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, onModificationPriceChange, onModified }) {
+function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, draft, onModificationPriceChange, onModified }) {
   const { t } = useTranslation();
   const [action, setAction] = useState('BUY');
   const [price, setPrice] = useState('');
@@ -50,9 +50,13 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
     if (!isOpen) return;
 
     if (!modification?.order) {
-      setAction('BUY');
-      setPrice('');
-      setAmount('');
+      const draftPrice = Number(draft?.limitPrice);
+      const draftQuantity = Number(draft?.quantity);
+      setAction(draft?.action === 'SELL' ? 'SELL' : 'BUY');
+      setPrice(draft?.orderType === 'LMT' && Number.isFinite(draftPrice) && draftPrice > 0
+        ? draftPrice.toFixed(2)
+        : '');
+      setAmount(Number.isSafeInteger(draftQuantity) && draftQuantity > 0 ? String(draftQuantity) : '');
       setTif('DAY');
       setIsBracketOrder(false);
       setTakeProfitPrice('');
@@ -81,7 +85,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
     setStopLossError('');
     setSuccessMsg('');
     setErrorMsg('');
-  }, [isOpen, modification]);
+  }, [isOpen, modification, draft]);
 
   if (!isOpen) return null;
 

@@ -197,6 +197,23 @@
   text-transform: uppercase;
 }
 
+.ai-chat-draft-button {
+  display: block;
+  margin-top: var(--space-2);
+  padding: 6px 10px;
+  color: var(--accent-hover);
+  background: var(--accent-dim);
+  border: 1px solid rgba(61, 127, 255, 0.4);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ai-chat-draft-button:hover,
+.ai-chat-draft-button:focus-visible {
+  background: rgba(61, 127, 255, 0.24);
+}
+
 .ai-chat-thinking div span {
   display: inline-block;
   width: 4px;

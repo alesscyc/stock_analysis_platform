@@ -3,6 +3,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { buildChatIbContext, normalizeDraftOrder, parseChatResponse } = require('../chatSafety');
 
 describe('Backend', () => {
   it('server.js exists and is parseable', () => {
@@ -69,5 +70,120 @@ describe('Backend', () => {
     const envExample = fs.readFileSync(path.resolve(__dirname, '..', '.env.example'), 'utf-8');
     assert.match(envExample, /OPENAI_BASE_URL=https:\/\/opencode\.ai\/zen\/v1/);
     assert.match(envExample, /OPENAI_MODEL=deepseek-v4-flash/);
+  });
+
+  it('supplies only read-only, non-sensitive IB context to chat', () => {
+    const portfolio = [{
+      id: 'DU123:AAPL',
+      account: 'DU123',
+      symbol: 'AAPL',
+      type: 'buy',
+      quantity: 5,
+      avgCost: 100,
+      costBasis: 500,
+      currency: 'USD',
+      unrealizedPnL: 25,
+      cashBalance: 1000,
+      apiKey: 'secret',
+    }];
+    const orders = [{
+      id: 'perm:123',
+      orderId: 7,
+      permId: 123,
+      symbol: 'MSFT',
+      action: 'SELL',
+      orderType: 'LMT',
+      quantity: 2,
+      limitPrice: 450,
+      status: 'Submitted',
+      filled: 0,
+      remaining: 2,
+      tif: 'DAY',
+      IB_HOST: '127.0.0.1',
+    }];
+    const original = structuredClone({ portfolio, orders });
+
+    const context = buildChatIbContext(portfolio, orders);
+
+    assert.deepEqual({ portfolio, orders }, original);
+    assert.deepEqual(context, {
+      positions: [{
+        symbol: 'AAPL',
+        type: 'buy',
+        quantity: 5,
+        avgCost: 100,
+        costBasis: 500,
+        currency: 'USD',
+        unrealizedPnL: 25,
+        cashBalance: 1000,
+      }],
+      pendingOrders: [{
+        symbol: 'MSFT',
+        action: 'SELL',
+        orderType: 'LMT',
+        quantity: 2,
+        limitPrice: 450,
+        status: 'Submitted',
+        filled: 0,
+        remaining: 2,
+        tif: 'DAY',
+      }],
+    });
+    assert.doesNotMatch(JSON.stringify(context), /DU123|secret|127\.0\.0\.1/);
+
+    const src = fs.readFileSync(path.resolve(__dirname, '..', 'server.js'), 'utf-8');
+    const chatRoute = src.slice(src.indexOf("app.post('/api/chat'"), src.indexOf("app.get('/api/model/status"));
+    assert.doesNotMatch(chatRoute, /ib\.placeOrder|ib\.cancelOrder|\/api\/orders/);
+  });
+
+  it('normalizes valid AI order drafts', () => {
+    assert.deepEqual(normalizeDraftOrder({
+      symbol: ' aapl ',
+      action: ' buy ',
+      quantity: 5,
+      orderType: 'lmt',
+      limitPrice: 123.45,
+      stopPrice: null,
+    }), {
+      symbol: 'AAPL',
+      action: 'BUY',
+      quantity: 5,
+      orderType: 'LMT',
+      limitPrice: 123.45,
+      stopPrice: null,
+    });
+  });
+
+  it('turns malformed or unsupported AI order drafts into null', () => {
+    const valid = {
+      symbol: 'AAPL',
+      action: 'BUY',
+      quantity: 5,
+      orderType: 'LMT',
+      limitPrice: 123.45,
+      stopPrice: null,
+    };
+    const invalidDrafts = [
+      { ...valid, tif: 'GTC' },
+      { ...valid, action: 'HOLD' },
+      { ...valid, quantity: '5' },
+      { ...valid, quantity: true },
+      { ...valid, quantity: 1.5 },
+      { ...valid, orderType: 'STP', limitPrice: null, stopPrice: 120 },
+      { ...valid, limitPrice: 0 },
+      { ...valid, limitPrice: '123.45' },
+      { ...valid, limitPrice: true },
+      { ...valid, stopPrice: 120 },
+      'BUY 5 AAPL',
+    ];
+
+    for (const draft of invalidDrafts) {
+      assert.equal(normalizeDraftOrder(draft), null);
+      assert.equal(parseChatResponse(JSON.stringify({ answer: 'Review this.', draftOrder: draft })).draftOrder, null);
+    }
+    assert.deepEqual(parseChatResponse('Plain answer only.'), {
+      answer: 'Plain answer only.',
+      draftOrder: null,
+    });
   });
 });

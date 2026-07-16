@@ -28,6 +28,7 @@ function App() {
   const [fundamentals, setFundamentals] = useState(null);
   const [showFundamentals, setShowFundamentals] = useState(false);
   const [orderModification, setOrderModification] = useState(null);
+  const [orderDraft, setOrderDraft] = useState(null);
   const [ordersRefreshToken, setOrdersRefreshToken] = useState(0);
   const [backtestTrades, setBacktestTrades] = useState(null);
   const stockDataCacheRef = useRef(new Map());
@@ -142,6 +143,7 @@ function App() {
   };
 
   const handleStockSelect = async (stock) => {
+    setOrderDraft(null);
     setSelectedStock(stock);
     setStockData([]);
     setError(null);
@@ -165,6 +167,7 @@ function App() {
 
   const handleOrderPriceDrag = useCallback((order, price) => {
     orderModificationCommittedRef.current = false;
+    setOrderDraft(null);
     setOrderModification({ order, price });
     setActiveSidebar('trade');
   }, []);
@@ -180,6 +183,7 @@ function App() {
 
   const handleTradeClose = useCallback(() => {
     setActiveSidebar(null);
+    setOrderDraft(null);
     setOrderModification(prev => {
       if (prev && !orderModificationCommittedRef.current) {
         setOrdersRefreshToken(token => token + 1);
@@ -195,9 +199,23 @@ function App() {
     }
 
     orderModificationCommittedRef.current = false;
+    setOrderDraft(null);
     setOrderModification(null);
     setActiveSidebar(prev => (prev === 'trade' && !orderModification ? null : 'trade'));
   }, [orderModification]);
+
+  const handleReviewDraft = (draft) => {
+    if (orderModification && !orderModificationCommittedRef.current) {
+      setOrdersRefreshToken(token => token + 1);
+    }
+    orderModificationCommittedRef.current = false;
+    setOrderModification(null);
+    if (selectedStock?.symbol !== draft.symbol) {
+      void handleStockSelect({ symbol: draft.symbol });
+    }
+    setOrderDraft(draft);
+    setActiveSidebar('trade');
+  };
 
   // Derive latest close from stockData for the instrument header
   const latestClose = useMemo(() => {
@@ -490,6 +508,7 @@ function App() {
             stockSymbol={selectedStock?.symbol}
             ibConnected={ibConnected}
             modification={orderModification}
+            draft={orderDraft}
             onModificationPriceChange={handleOrderModificationPriceChange}
             onModified={handleOrderModified}
           />
@@ -520,6 +539,7 @@ function App() {
           currentInterval={currentInterval}
           fundamentals={fundamentals}
           aiPrediction={aiPrediction}
+          onReviewDraft={handleReviewDraft}
         />
       )}
     </div>

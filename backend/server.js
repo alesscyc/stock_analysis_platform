@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const { spawn } = require('child_process');
 const path = require('path');
+const { buildChatIbContext, parseChatResponse } = require('./chatSafety');
 
 const IB = require('ib');
 
@@ -977,49 +978,103 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'Stock data contains no valid rows' });
     }
 
+    let portfolioRows = [];
+    let pendingOrders = [];
+    let positionsAvailable = false;
+    let pendingOrdersAvailable = false;
+
+    if (ibConnected) {
+      const [portfolioResult, ordersResult] = await Promise.allSettled([
+        waitForPortfolioSnapshot(),
+        waitForOpenOrdersSnapshot(IB_OPEN_ORDERS_SYNC_TIMEOUT_MS, true),
+      ]);
+      if (portfolioResult.status === 'fulfilled') {
+        portfolioRows = portfolioResult.value.map(serializePortfolioRow);
+        positionsAvailable = true;
+      }
+      if (ordersResult.status === 'fulfilled') {
+        pendingOrders = ordersResult.value;
+        pendingOrdersAvailable = true;
+      }
+    }
+
+    const ibContext = {
+      positionsAvailable,
+      pendingOrdersAvailable,
+      ...buildChatIbContext(portfolioRows, pendingOrders),
+    };
     const context = [
       'You answer questions about the currently displayed stock using only the supplied data.',
       'Do not claim access to live prices, news, or outside information. If the data cannot answer a question, say so.',
-      'Explain uncertainty. Do not instruct the user to buy or sell; you may explain the supplied AI prediction.',
-      'Do not provide personalized financial advice or claim to place trades.',
+      'Explain uncertainty and do not provide personalized financial advice.',
+      'You may analyze the supplied read-only IB portfolio and pending orders and draft one limit order for review.',
+      'You cannot submit, modify, or cancel any order. Never claim that an order was placed, changed, cancelled, or executed.',
+      'A draft has no IB side effect and the user must review it and manually submit it in the existing order ticket.',
       'Use concise plain text with short paragraphs or simple bullets.',
       `Symbol: ${symbol}`,
       `Interval: ${interval}`,
       `Fundamentals: ${JSON.stringify(body.fundamentals ?? null)}`,
       `Existing AI prediction: ${JSON.stringify(body.aiPrediction ?? null)}`,
+      `Read-only IB context: ${JSON.stringify(ibContext)}`,
       `Historical market data CSV (${marketRows.length} rows, oldest to newest):`,
       `Date,${CHAT_MARKET_FIELDS.join(',')}`,
       ...marketRows,
-    ].join('\n');
+    ];
 
-    const providerResponse = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'system', content: context }, ...messages],
-        max_tokens: 800,
-        stream: false,
-      }),
-      signal: AbortSignal.timeout(60000),
-    });
+    const requestChatCompletion = async (useStructuredOutput) => {
+      const outputInstructions = useStructuredOutput
+        ? [
+          'Return valid JSON with exactly this shape: {"answer":"text","draftOrder":null}.',
+          'If the user asks for a draft, draftOrder may instead contain exactly symbol, action, quantity, orderType, limitPrice, and stopPrice.',
+          'Only draft BUY or SELL whole-share LMT orders with a positive limitPrice and null stopPrice. Otherwise use null.',
+        ]
+        : ['Return plain text only. Do not return an order draft because structured output is unavailable for this model.'];
+      const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'system', content: [...context, ...outputInstructions].join('\n') }, ...messages],
+          max_tokens: 800,
+          stream: false,
+          ...(useStructuredOutput && { response_format: { type: 'json_object' } }),
+        }),
+        signal: AbortSignal.timeout(60000),
+      });
+      return { response, body: await response.json().catch(() => ({})) };
+    };
 
-    const providerBody = await providerResponse.json().catch(() => ({}));
+    let structuredOutput = /^deepseek-/i.test(model);
+    let { response: providerResponse, body: providerBody } = await requestChatCompletion(structuredOutput);
+    const structuredContent = providerBody.choices?.[0]?.message?.content;
+    if (structuredOutput && (
+      [400, 422].includes(providerResponse.status)
+      || (providerResponse.ok && (typeof structuredContent !== 'string' || !structuredContent.trim()))
+    )) {
+      structuredOutput = false;
+      ({ response: providerResponse, body: providerBody } = await requestChatCompletion(false));
+    }
+
     if (!providerResponse.ok) {
       return res.status(502).json({
         error: providerBody.error?.message || 'AI provider request failed',
       });
     }
 
-    const answer = providerBody.choices?.[0]?.message?.content;
-    if (typeof answer !== 'string' || !answer.trim()) {
+    const content = providerBody.choices?.[0]?.message?.content;
+    const chatResponse = structuredOutput
+      ? parseChatResponse(content)
+      : (typeof content === 'string' && content.trim()
+        ? { answer: content.trim(), draftOrder: null }
+        : null);
+    if (!chatResponse) {
       return res.status(502).json({ error: 'AI provider returned an empty response' });
     }
 
-    res.json({ answer: answer.trim() });
+    res.json(chatResponse);
   } catch (error) {
     console.error('[ai-chat] Request failed:', error.message);
     res.status(502).json({ error: 'Could not reach AI provider' });
