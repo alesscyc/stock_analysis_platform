@@ -531,10 +531,9 @@ function App() {
         </aside>
       </div>
 
-      {stockData.length > 0 && !isMock && (
+      {!isMock && (
         <AIChat
-          key={selectedStock.symbol}
-          stockSymbol={selectedStock.symbol}
+          stockSymbol={selectedStock?.symbol}
           stockData={stockData}
           currentInterval={currentInterval}
           fundamentals={fundamentals}

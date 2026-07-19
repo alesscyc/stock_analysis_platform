@@ -61,10 +61,17 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
     }
   };
 
+  const hasChart = Boolean(stockSymbol)
+    && Array.isArray(stockData)
+    && stockData.some((row) => row?.Date && row?.Close != null);
+  const promptLabel = hasChart
+    ? t('chatPlaceholder', { symbol: stockSymbol })
+    : t('selectStockFirst');
+
   const sendMessage = async (event) => {
     event.preventDefault();
     const question = input.trim();
-    if (!question || loading) return;
+    if (!question || loading || !hasChart) return;
 
     const userMessage = { role: 'user', content: question };
     const requestMessages = [...messages, userMessage]
@@ -147,7 +154,7 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
             <div className="ai-chat-title-row">
               <span className="ai-chat-pulse" />
               <h2>{t('aiChat')}</h2>
-              <span className="ai-chat-symbol">{stockSymbol}</span>
+              {stockSymbol && <span className="ai-chat-symbol">{stockSymbol}</span>}
             </div>
             <span className="ai-chat-grounded">{t('loadedDataOnly')}</span>
           </div>
@@ -174,7 +181,7 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
           {messages.length === 0 && (
             <div className="ai-chat-empty">
               <span className="ai-chat-empty-mark">AI</span>
-              <p>{t('askAboutStock', { symbol: stockSymbol })}</p>
+              <p>{hasChart ? t('askAboutStock', { symbol: stockSymbol }) : t('selectStockFirst')}</p>
             </div>
           )}
 
@@ -211,13 +218,13 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={t('chatPlaceholder', { symbol: stockSymbol })}
-            aria-label={t('chatPlaceholder', { symbol: stockSymbol })}
+            placeholder={promptLabel}
+            aria-label={promptLabel}
             maxLength={4000}
             rows={2}
-            disabled={loading}
+            disabled={loading || !hasChart}
           />
-          <button type="submit" disabled={loading || !input.trim()} aria-label={t('send')}>
+          <button type="submit" disabled={loading || !hasChart || !input.trim()} aria-label={t('send')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m22 2-7 20-4-9-9-4Z" />
               <path d="M22 2 11 13" />
