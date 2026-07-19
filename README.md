@@ -5,7 +5,7 @@ A local full-stack stock research and trading workspace with interactive charts,
 ## Features
 
 - Candlestick and volume charts with 10/20/50/150/200-day moving averages
-- Price-pattern overlays for double bottoms, double tops, and head-and-shoulders patterns
+- Price-pattern overlays for double bottoms and double tops
 - Persistent per-symbol trend lines, swing zones, trade markers, and IB order lines
 - Finnhub symbol search and a browser-local watchlist with live price polling
 - Configurable technical screener and strategy backtesting

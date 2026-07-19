@@ -1,13 +1,14 @@
 import { detectDoubleBottoms, detectDoubleTops } from './doubleReversal'
-import { detectHeadAndShoulders } from './headAndShoulders'
 
 export { detectDoubleBottoms, detectDoubleTops } from './doubleReversal'
-export { detectHeadAndShoulders } from './headAndShoulders'
 
-const PRICE_PATTERN_DETECTORS = [detectDoubleBottoms, detectDoubleTops, detectHeadAndShoulders]
+const PRICE_PATTERN_DETECTORS = [
+  detectDoubleBottoms,
+  detectDoubleTops,
+]
 
-export function detectPricePatterns(data) {
+export function detectPricePatterns(data, options) {
   return PRICE_PATTERN_DETECTORS
-    .flatMap(detect => detect(data))
+    .flatMap(detect => detect(data, options))
     .sort((a, b) => a.startIndex - b.startIndex)
 }

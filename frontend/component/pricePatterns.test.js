@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { detectDoubleBottoms, detectDoubleTops, detectHeadAndShoulders } from './pricePatterns'
+import {
+  detectDoubleBottoms,
+  detectDoubleTops,
+  detectPricePatterns,
+} from './pricePatterns'
 import { createPricePatternPrimitive } from './pricePatternChart'
 
 const candle = (time, high, low, close = high - 1) => ({
@@ -97,44 +101,17 @@ describe('double top', () => {
   })
 })
 
-describe('head and shoulders', () => {
-  const headAndShoulders = [
-    candle(0, 88, 80),
-    candle(1, 96, 88),
-    candle(2, 90, 84),
-    candle(3, 101, 90),
-    candle(4, 94, 87),
-    candle(5, 110, 98),
-    candle(6, 101, 92),
-    candle(7, 125, 105),
-    candle(8, 103, 93),
-    candle(9, 111, 100),
-    candle(10, 105, 95),
-    candle(11, 100, 89, 90),
-  ]
-  const headOptions = {
-    leftBars: 1,
-    rightBars: 1,
-    minBarsBetweenPeaks: 2,
-    maxBarsBetweenPeaks: 4,
-    minHeadHeight: 0.08,
-  }
-
-  it('finds three peaks after an uptrend and confirms below the sloped neckline', () => {
-    const [pattern] = detectHeadAndShoulders(headAndShoulders, headOptions)
-
-    expect(pattern.type).toBe('head-and-shoulders')
-    expect(pattern.status).toBe('confirmed')
-    expect(pattern.breakout.time).toBe(11)
-    expect(pattern.lines[0].points.map(point => point.time)).toEqual([5, 6, 7, 8, 9])
-    expect(pattern.nameKey).toBe('patternHeadAndShoulders')
-
-    const flatHead = headAndShoulders.map(bar => bar.time === 7 ? candle(7, 112, 105) : bar)
-    expect(detectHeadAndShoulders(flatHead, headOptions)).toEqual([])
-  })
-})
-
 describe('price patterns', () => {
+  it('keeps failed patterns as dotted overlays in the chart feed', () => {
+    const failed = downtrend.map(bar => bar.time === 12
+      ? candle(12, 105, 95, 99)
+      : bar)
+
+    expect(detectPricePatterns(failed, options)).toMatchObject([
+      { type: 'double-bottom', status: 'failed' },
+    ])
+  })
+
   it('renders normalized geometry without knowing the pattern type', () => {
     const ctx = {
       beginPath: vi.fn(),
