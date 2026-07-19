@@ -45,7 +45,14 @@ export const translations = {
 
     // StockChart.jsx
     vol20MA: 'Vol 20 MA',
+    drawingTools: 'Drawing tools',
+    drawCursor: 'Cursor',
     trendLine: 'Trend Line',
+    horizontalLine: 'Horizontal Line',
+    ray: 'Ray',
+    rectangle: 'Rectangle',
+    priceRange: 'Price Range',
+    clearDrawings: 'Clear all drawings',
     ai: 'AI:',
     confidence: 'confidence',
     insufficientData: 'Insufficient data for prediction',
@@ -311,7 +318,14 @@ export const translations = {
 
     // StockChart.jsx
     vol20MA: '成交量 20 MA',
+    drawingTools: '繪圖工具',
+    drawCursor: '游標',
     trendLine: '趨勢線',
+    horizontalLine: '水平線',
+    ray: '射線',
+    rectangle: '矩形',
+    priceRange: '價格區間',
+    clearDrawings: '清除所有繪圖',
     ai: 'AI:',
     confidence: '信心度',
     insufficientData: '數據不足，無法預測',

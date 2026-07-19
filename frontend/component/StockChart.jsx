@@ -12,9 +12,11 @@ import {
 } from 'lightweight-charts';
 import './StockChart.css';
 import { useTranslation } from '../src/i18n/useTranslation';
-import { createTrendLinesPrimitive, loadTrendLines, saveTrendLines } from './trendLines';
+import { createDrawingsPrimitive, loadDrawings, saveDrawings } from './drawings';
 import { detectPricePatterns } from './pricePatterns';
 import { createPricePatternPrimitive } from './pricePatternChart';
+
+const TWO_POINT_TOOLS = new Set(['trendline', 'ray', 'rect', 'pricerange']);
 
 // ── MA config: key → display label and colour ─────────────
 const MA_CONFIG = [
@@ -327,10 +329,10 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   const maSeriesRefs          = useRef({});
   const swingZonesPrimitiveRef = useRef(null);
   const pricePatternPrimitiveRef = useRef(null);
-  const trendLinesPrimitiveRef  = useRef(null);
+  const drawingsPrimitiveRef    = useRef(null);
   const drawingStartRef         = useRef(null);
-  const drawingModeRef          = useRef(false);
-  const skipTrendLineSaveRef    = useRef(true);
+  const activeToolRef           = useRef(null);
+  const skipDrawingsSaveRef     = useRef(true);
   const vol20maSeriesRef       = useRef(null);
   const ibLinesPrimitiveRef    = useRef(null);
   const ibPriceLinesRef        = useRef([]);
@@ -356,69 +358,76 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   const [watchlistAdded, setWatchlistAdded] = useState(false);
   const [ibPosition, setIbPosition] = useState(null);
   const [symbolOrders, setSymbolOrders] = useState([]);
-  const [drawingMode, setDrawingMode] = useState(false);
-  const [trendLines, setTrendLines] = useState(() => loadTrendLines(stockSymbol));
-  const [selectedTrendLine, setSelectedTrendLine] = useState(-1);
+  const [activeTool, setActiveTool] = useState(null);
+  const [drawings, setDrawings] = useState(() => loadDrawings(stockSymbol));
+  const [selectedDrawing, setSelectedDrawing] = useState(-1);
   const { t, language } = useTranslation();
 
   useEffect(() => {
-    drawingModeRef.current = drawingMode;
-    // Disable pan/zoom while trend-line tool active so drag draws, not scrolls
+    activeToolRef.current = activeTool;
+    // Disable pan/zoom while a draw tool is active so drag draws, not scrolls
     chartRef.current?.applyOptions({
-      handleScroll: !drawingMode,
-      handleScale: !drawingMode,
+      handleScroll: !activeTool,
+      handleScale: !activeTool,
     });
-  }, [drawingMode]);
+  }, [activeTool]);
 
   useEffect(() => {
-    skipTrendLineSaveRef.current = true;
-    setTrendLines(loadTrendLines(stockSymbol));
-    setSelectedTrendLine(-1);
-    setDrawingMode(false);
-    drawingModeRef.current = false;
+    skipDrawingsSaveRef.current = true;
+    setDrawings(loadDrawings(stockSymbol));
+    setSelectedDrawing(-1);
+    setActiveTool(null);
+    activeToolRef.current = null;
     drawingStartRef.current = null;
-    trendLinesPrimitiveRef.current?.setPreview(null);
+    drawingsPrimitiveRef.current?.setPreview(null);
   }, [stockSymbol]);
 
   useEffect(() => {
-    trendLinesPrimitiveRef.current?.setLines(trendLines, selectedTrendLine);
+    drawingsPrimitiveRef.current?.setDrawings(drawings, selectedDrawing);
 
-    if (skipTrendLineSaveRef.current) {
-      skipTrendLineSaveRef.current = false;
+    if (skipDrawingsSaveRef.current) {
+      skipDrawingsSaveRef.current = false;
       return;
     }
 
-    saveTrendLines(stockSymbol, trendLines);
-  }, [selectedTrendLine, stockSymbol, trendLines]);
+    saveDrawings(stockSymbol, drawings);
+  }, [selectedDrawing, stockSymbol, drawings]);
 
-  const cancelTrendLineDrawing = useCallback(() => {
-    if (!drawingModeRef.current) return false;
+  const cancelDrawing = useCallback(() => {
+    if (!activeToolRef.current) return false;
     drawingStartRef.current = null;
-    drawingModeRef.current = false;
-    setDrawingMode(false);
-    trendLinesPrimitiveRef.current?.setPreview(null);
+    activeToolRef.current = null;
+    setActiveTool(null);
+    drawingsPrimitiveRef.current?.setPreview(null);
     return true;
+  }, []);
+
+  const selectTool = useCallback((tool) => {
+    drawingStartRef.current = null;
+    setSelectedDrawing(-1);
+    drawingsPrimitiveRef.current?.setPreview(null);
+    setActiveTool(prev => (prev === tool ? null : tool));
   }, []);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape' && cancelTrendLineDrawing()) return;
+      if (event.key === 'Escape' && cancelDrawing()) return;
 
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
 
       const target = event.target;
       const tagName = target?.tagName?.toLowerCase();
       if (tagName === 'input' || tagName === 'textarea' || target?.isContentEditable) return;
-      if (selectedTrendLine < 0) return;
+      if (selectedDrawing < 0) return;
 
       event.preventDefault();
-      setTrendLines(prev => prev.filter((_, index) => index !== selectedTrendLine));
-      setSelectedTrendLine(-1);
+      setDrawings(prev => prev.filter((_, index) => index !== selectedDrawing));
+      setSelectedDrawing(-1);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cancelTrendLineDrawing, selectedTrendLine]);
+  }, [cancelDrawing, selectedDrawing]);
 
   useEffect(() => {
     onOrderPriceDragRef.current = onOrderPriceDrag;
@@ -739,10 +748,10 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     candleSeries.attachPrimitive(pricePatternPrimitive);
     pricePatternPrimitiveRef.current = pricePatternPrimitive;
 
-    // ── User-drawn trend lines primitive ─────────────────────
-    const trendLinesPrimitive = createTrendLinesPrimitive();
-    candleSeries.attachPrimitive(trendLinesPrimitive);
-    trendLinesPrimitiveRef.current = trendLinesPrimitive;
+    // ── User drawings primitive ──────────────────────────────
+    const drawingsPrimitive = createDrawingsPrimitive();
+    candleSeries.attachPrimitive(drawingsPrimitive);
+    drawingsPrimitiveRef.current = drawingsPrimitive;
 
     // ── Horizontal IB lines primitive (custom canvas lines) ───
     const ibLinesPrimitive = createHorizontalLinesPrimitive();
@@ -821,20 +830,37 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
 
     // Drag + click-click share one gesture: first press sets start; drag-release
     // or second click finishes. Tiny move on first click stays click-click.
+    // hline: one click (mousedown → mouseup) commits a price level.
     const DRAW_MOVE_PX = 4;
     let drawPointerDown = false;
     let drawMoved = false;
     let drawHadStartOnDown = false;
     let drawDownXY = null;
 
-    const finishTrendLine = (end) => {
-      const start = drawingStartRef.current;
+    const resetTool = () => {
       drawingStartRef.current = null;
-      drawingModeRef.current = false;
-      setDrawingMode(false);
-      trendLinesPrimitiveRef.current?.setPreview(null);
-      if (start && end && (end.time !== start.time || end.price !== start.price)) {
-        setTrendLines(prev => [...prev, { start, end }]);
+      activeToolRef.current = null;
+      setActiveTool(null);
+      drawingsPrimitiveRef.current?.setPreview(null);
+    };
+
+    const finishDrawing = (end) => {
+      const tool = activeToolRef.current;
+      const start = drawingStartRef.current;
+      resetTool();
+      if (!tool || !end) return;
+
+      if (tool === 'hline') {
+        setDrawings(prev => [...prev, { type: 'hline', price: end.price }]);
+        return;
+      }
+
+      if (
+        TWO_POINT_TOOLS.has(tool)
+        && start
+        && (end.time !== start.time || end.price !== start.price)
+      ) {
+        setDrawings(prev => [...prev, { type: tool, start, end }]);
       }
     };
 
@@ -843,21 +869,18 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       drawMoved = false;
       drawHadStartOnDown = false;
       drawDownXY = null;
-      drawingStartRef.current = null;
-      drawingModeRef.current = false;
-      setDrawingMode(false);
-      trendLinesPrimitiveRef.current?.setPreview(null);
+      resetTool();
     };
 
     const handleContextMenu = (e) => {
-      if (!drawingModeRef.current) return;
+      if (!activeToolRef.current) return;
       e.preventDefault();
       e.stopPropagation();
       cancelDrawingGesture();
     };
 
     const handleMouseDown = (e) => {
-      if (drawingModeRef.current) {
+      if (activeToolRef.current) {
         // Right/middle click cancels (incl. mid-drag). Only left starts/finishes.
         if (e.button !== 0) {
           e.preventDefault();
@@ -876,13 +899,13 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       }
 
       const point = getMousePoint(e);
-      const trendLineIndex = trendLinesPrimitiveRef.current?.lineIndexAt(point.x, point.y) ?? -1;
-      if (trendLineIndex >= 0) {
-        setSelectedTrendLine(trendLineIndex);
+      const drawingIndex = drawingsPrimitiveRef.current?.drawingIndexAt(point.x, point.y) ?? -1;
+      if (drawingIndex >= 0) {
+        setSelectedDrawing(drawingIndex);
         e.preventDefault();
         return;
       }
-      setSelectedTrendLine(-1);
+      setSelectedDrawing(-1);
 
       if (!ibLinesPrimitiveRef.current) return;
       const hit = ibLinesPrimitiveRef.current.hitTest(point.x, point.y);
@@ -896,17 +919,22 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     };
 
     const handleMouseUp = (e) => {
-      if (drawingModeRef.current && (drawPointerDown || drawingStartRef.current)) {
-        // Right/middle release must not commit a drag-in-progress line
+      const tool = activeToolRef.current;
+      if (tool && (drawPointerDown || drawingStartRef.current)) {
+        // Right/middle release must not commit a drag-in-progress shape
         if (e.button !== 0) {
           cancelDrawingGesture();
           return;
         }
         if (drawPointerDown && drawingStartRef.current) {
           drawPointerDown = false;
+          if (tool === 'hline') {
+            finishDrawing(getChartPoint(e));
+            return;
+          }
           // Second click, or drag past threshold → commit. Bare first click keeps start.
           if (drawHadStartOnDown || drawMoved) {
-            finishTrendLine(getChartPoint(e));
+            finishDrawing(getChartPoint(e));
           }
           return;
         }
@@ -923,8 +951,8 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     };
 
     const handleMouseMove = (e) => {
-      // Trend line drawing preview: update preview line from start point to cursor
-      if (drawingModeRef.current && drawingStartRef.current && trendLinesPrimitiveRef.current) {
+      const tool = activeToolRef.current;
+      if (tool && drawingsPrimitiveRef.current) {
         if (drawPointerDown && drawDownXY) {
           const cursor = getMousePoint(e);
           if (Math.hypot(cursor.x - drawDownXY.x, cursor.y - drawDownXY.y) > DRAW_MOVE_PX) {
@@ -932,8 +960,16 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
           }
         }
         const end = getChartPoint(e);
-        if (end) {
-          trendLinesPrimitiveRef.current.setPreview({
+        if (!end) return;
+
+        if (tool === 'hline') {
+          drawingsPrimitiveRef.current.setPreview({ type: 'hline', price: end.price });
+          return;
+        }
+
+        if (drawingStartRef.current && TWO_POINT_TOOLS.has(tool)) {
+          drawingsPrimitiveRef.current.setPreview({
+            type: tool,
             start: drawingStartRef.current,
             end,
           });
@@ -979,7 +1015,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       volumeSeriesRef.current      = null;
       maSeriesRefs.current         = {};
       swingZonesPrimitiveRef.current = null;
-      trendLinesPrimitiveRef.current = null;
+      drawingsPrimitiveRef.current = null;
       vol20maSeriesRef.current = null;
       ibLinesPrimitiveRef.current = null;
       ibPriceLinesRef.current = [];
@@ -1131,25 +1167,89 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
             ))}
           </div>
 
-          <button
-            id="trend-line-btn"
-            className={drawingMode ? 'active' : ''}
-            aria-pressed={drawingMode}
-            title={t('trendLine')}
-            onClick={() => {
-              setDrawingMode(prev => !prev);
-              drawingStartRef.current = null;
-              setSelectedTrendLine(-1);
-              trendLinesPrimitiveRef.current?.setPreview(null);
-            }}
-          >
-            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="4" y1="18" x2="20" y2="6" />
-              <circle cx="4" cy="18" r="2" />
-              <circle cx="20" cy="6" r="2" />
-            </svg>
-            {t('trendLine')}
-          </button>
+          <div id="drawing-toolbox" role="toolbar" aria-label={t('drawingTools')}>
+            <button
+              type="button"
+              className={`draw-tool-btn${!activeTool ? ' active' : ''}`}
+              aria-pressed={!activeTool}
+              aria-label={t('drawCursor')}
+              title={t('drawCursor')}
+              onClick={() => selectTool(null)}
+            >
+              <svg aria-hidden="true" className="filled-icon" viewBox="0 0 24 24"><path d="M4 3l12 8-5 1 2 7-3 1-2-7-4 3z"/></svg>
+            </button>
+            <button
+              type="button"
+              className={`draw-tool-btn${activeTool === 'trendline' ? ' active' : ''}`}
+              aria-pressed={activeTool === 'trendline'}
+              aria-label={t('trendLine')}
+              title={t('trendLine')}
+              onClick={() => selectTool('trendline')}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24"><line x1="4" y1="18" x2="20" y2="6"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="6" r="2"/></svg>
+            </button>
+            <button
+              type="button"
+              className={`draw-tool-btn${activeTool === 'hline' ? ' active' : ''}`}
+              aria-pressed={activeTool === 'hline'}
+              aria-label={t('horizontalLine')}
+              title={t('horizontalLine')}
+              onClick={() => selectTool('hline')}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24"><line x1="2" y1="12" x2="22" y2="12"/></svg>
+            </button>
+            <button
+              type="button"
+              className={`draw-tool-btn${activeTool === 'ray' ? ' active' : ''}`}
+              aria-pressed={activeTool === 'ray'}
+              aria-label={t('ray')}
+              title={t('ray')}
+              onClick={() => selectTool('ray')}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24"><line x1="4" y1="18" x2="14" y2="8"/><polyline points="14,8 20,5 17,11"/><circle cx="4" cy="18" r="2"/></svg>
+            </button>
+            <button
+              type="button"
+              className={`draw-tool-btn${activeTool === 'rect' ? ' active' : ''}`}
+              aria-pressed={activeTool === 'rect'}
+              aria-label={t('rectangle')}
+              title={t('rectangle')}
+              onClick={() => selectTool('rect')}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1"/></svg>
+            </button>
+            <button
+              type="button"
+              className={`draw-tool-btn${activeTool === 'pricerange' ? ' active' : ''}`}
+              aria-pressed={activeTool === 'pricerange'}
+              aria-label={t('priceRange')}
+              title={t('priceRange')}
+              onClick={() => selectTool('pricerange')}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <line x1="6" y1="5" x2="18" y2="5"/>
+                <line x1="6" y1="19" x2="18" y2="19"/>
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <polyline points="9,8 12,5 15,8"/>
+                <polyline points="9,16 12,19 15,16"/>
+              </svg>
+            </button>
+            <span className="toolbox-divider" aria-hidden="true" />
+            <button
+              type="button"
+              className="draw-tool-btn danger"
+              aria-label={t('clearDrawings')}
+              title={t('clearDrawings')}
+              onClick={() => {
+                setDrawings([]);
+                setSelectedDrawing(-1);
+                drawingStartRef.current = null;
+                drawingsPrimitiveRef.current?.setPreview(null);
+              }}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+            </button>
+          </div>
 
           {/* AI Recommendation */}
           {aiPrediction && (
@@ -1309,7 +1409,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
         <div
           ref={containerRef}
           id="lw-chart-container"
-          className={drawingMode ? 'drawing-trend-line' : ''}
+          className={activeTool ? 'drawing-active' : ''}
         />
       </div>
 

@@ -94,7 +94,7 @@ function renderChart() {
   )
 }
 
-describe('StockChart trend lines', () => {
+describe('StockChart drawings', () => {
   beforeEach(() => {
     localStorage.clear()
     chartMock.reset()
@@ -110,8 +110,9 @@ describe('StockChart trend lines', () => {
     fireEvent.mouseMove(container, { clientX: 30, clientY: 120 })
     fireEvent.mouseUp(window, { clientX: 30, clientY: 120 })
 
-    expect(JSON.parse(localStorage.getItem('stockai-trend-lines:AAPL'))).toEqual([
+    expect(JSON.parse(localStorage.getItem('stockai-drawings:AAPL'))).toEqual([
       {
+        type: 'trendline',
         start: { time: '2026-01-02', price: 100 },
         end: { time: '2026-01-03', price: 120 },
       },
@@ -123,7 +124,7 @@ describe('StockChart trend lines', () => {
     })
     fireEvent.keyDown(window, { key: 'Delete' })
 
-    expect(JSON.parse(localStorage.getItem('stockai-trend-lines:AAPL'))).toEqual([])
+    expect(JSON.parse(localStorage.getItem('stockai-drawings:AAPL'))).toEqual([])
   })
 
   it('draws a trend line with click-click', () => {
@@ -137,8 +138,9 @@ describe('StockChart trend lines', () => {
     fireEvent.mouseDown(container, { clientX: 30, clientY: 120 })
     fireEvent.mouseUp(window, { clientX: 30, clientY: 120 })
 
-    expect(JSON.parse(localStorage.getItem('stockai-trend-lines:AAPL'))).toEqual([
+    expect(JSON.parse(localStorage.getItem('stockai-drawings:AAPL'))).toEqual([
       {
+        type: 'trendline',
         start: { time: '2026-01-02', price: 100 },
         end: { time: '2026-01-03', price: 120 },
       },
@@ -158,7 +160,7 @@ describe('StockChart trend lines', () => {
     fireEvent.contextMenu(container)
 
     expect(btn).toHaveAttribute('aria-pressed', 'false')
-    expect(JSON.parse(localStorage.getItem('stockai-trend-lines:AAPL') ?? '[]')).toEqual([])
+    expect(JSON.parse(localStorage.getItem('stockai-drawings:AAPL') ?? '[]')).toEqual([])
   })
 
   it('cancels mid-drag trend line on right mouse button', () => {
@@ -174,12 +176,13 @@ describe('StockChart trend lines', () => {
     fireEvent.mouseUp(window, { clientX: 30, clientY: 120, button: 2 })
 
     expect(btn).toHaveAttribute('aria-pressed', 'false')
-    expect(JSON.parse(localStorage.getItem('stockai-trend-lines:AAPL') ?? '[]')).toEqual([])
+    expect(JSON.parse(localStorage.getItem('stockai-drawings:AAPL') ?? '[]')).toEqual([])
   })
 
   it('removes a selected trend line with Backspace', () => {
-    localStorage.setItem('stockai-trend-lines:AAPL', JSON.stringify([
+    localStorage.setItem('stockai-drawings:AAPL', JSON.stringify([
       {
+        type: 'trendline',
         start: { time: '2026-01-02', price: 100 },
         end: { time: '2026-01-03', price: 120 },
       },
@@ -192,7 +195,72 @@ describe('StockChart trend lines', () => {
     })
     fireEvent.keyDown(window, { key: 'Backspace' })
 
-    expect(JSON.parse(localStorage.getItem('stockai-trend-lines:AAPL'))).toEqual([])
+    expect(JSON.parse(localStorage.getItem('stockai-drawings:AAPL'))).toEqual([])
+  })
+
+  it('draws a horizontal line with one click', () => {
+    renderChart()
+
+    const container = document.getElementById('lw-chart-container')
+    fireEvent.click(screen.getByRole('button', { name: 'Horizontal Line' }))
+    fireEvent.mouseDown(container, { clientX: 10, clientY: 100 })
+    fireEvent.mouseUp(window, { clientX: 10, clientY: 100 })
+
+    expect(JSON.parse(localStorage.getItem('stockai-drawings:AAPL'))).toEqual([
+      { type: 'hline', price: 100 },
+    ])
+  })
+
+  it('draws a rectangle with two points', () => {
+    renderChart()
+
+    const container = document.getElementById('lw-chart-container')
+    fireEvent.click(screen.getByRole('button', { name: 'Rectangle' }))
+    fireEvent.mouseDown(container, { clientX: 10, clientY: 100 })
+    fireEvent.mouseMove(container, { clientX: 30, clientY: 120 })
+    fireEvent.mouseUp(window, { clientX: 30, clientY: 120 })
+
+    expect(JSON.parse(localStorage.getItem('stockai-drawings:AAPL'))).toEqual([
+      {
+        type: 'rect',
+        start: { time: '2026-01-02', price: 100 },
+        end: { time: '2026-01-03', price: 120 },
+      },
+    ])
+  })
+
+  it('draws a price range with two points', () => {
+    renderChart()
+
+    const container = document.getElementById('lw-chart-container')
+    fireEvent.click(screen.getByRole('button', { name: 'Price Range' }))
+    fireEvent.mouseDown(container, { clientX: 10, clientY: 100 })
+    fireEvent.mouseMove(container, { clientX: 30, clientY: 120 })
+    fireEvent.mouseUp(window, { clientX: 30, clientY: 120 })
+
+    expect(JSON.parse(localStorage.getItem('stockai-drawings:AAPL'))).toEqual([
+      {
+        type: 'pricerange',
+        start: { time: '2026-01-02', price: 100 },
+        end: { time: '2026-01-03', price: 120 },
+      },
+    ])
+  })
+
+  it('clears all drawings', () => {
+    localStorage.setItem('stockai-drawings:AAPL', JSON.stringify([
+      { type: 'hline', price: 100 },
+      {
+        type: 'trendline',
+        start: { time: '2026-01-02', price: 100 },
+        end: { time: '2026-01-03', price: 120 },
+      },
+    ]))
+    renderChart()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all drawings' }))
+
+    expect(JSON.parse(localStorage.getItem('stockai-drawings:AAPL'))).toEqual([])
   })
 })
 

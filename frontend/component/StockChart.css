@@ -198,31 +198,63 @@
   flex-shrink: 0;
 }
 
-#trend-line-btn {
+#drawing-toolbox {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
-  padding: 6px 12px;
+  gap: 2px;
+  padding: 3px;
   background: var(--bg-panel);
-  color: var(--text-secondary);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  font-size: 12px;
-  font-weight: 600;
+}
+
+.draw-tool-btn {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
-#trend-line-btn:hover,
-#trend-line-btn.active {
+.draw-tool-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.draw-tool-btn.active {
   color: var(--warning);
-  border-color: var(--warning);
   background: var(--warning-dim);
 }
 
-#trend-line-btn svg {
+.draw-tool-btn.danger:hover {
+  color: var(--red);
+}
+
+.draw-tool-btn svg {
+  width: 14px;
+  height: 14px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.draw-tool-btn svg.filled-icon {
+  fill: currentColor;
+  stroke: none;
+}
+
+.toolbox-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: var(--border-subtle);
 }
 
 /* ── Indicators Dropdown ───────────────────────────────── */
@@ -372,7 +404,7 @@
   cursor: ns-resize;
 }
 
-#lw-chart-container.drawing-trend-line {
+#lw-chart-container.drawing-active {
   cursor: crosshair;
 }
 
