@@ -7,6 +7,7 @@ import {
   LineSeries,
   CrosshairMode,
   LineStyle,
+  PriceScaleMode,
   createSeriesMarkers,
 } from 'lightweight-charts';
 import './StockChart.css';
@@ -688,6 +689,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
         },
       },
       rightPriceScale: {
+        mode:          PriceScaleMode.Logarithmic,
         borderColor:   '#2a2f45',
         textColor:     '#8892a4',
         scaleMargins:  { top: 0.05, bottom: 0.25 },
