@@ -363,6 +363,11 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
 
   useEffect(() => {
     drawingModeRef.current = drawingMode;
+    // Disable pan/zoom while trend-line tool active so drag draws, not scrolls
+    chartRef.current?.applyOptions({
+      handleScroll: !drawingMode,
+      handleScale: !drawingMode,
+    });
   }, [drawingMode]);
 
   useEffect(() => {
@@ -386,15 +391,18 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     saveTrendLines(stockSymbol, trendLines);
   }, [selectedTrendLine, stockSymbol, trendLines]);
 
+  const cancelTrendLineDrawing = useCallback(() => {
+    if (!drawingModeRef.current) return false;
+    drawingStartRef.current = null;
+    drawingModeRef.current = false;
+    setDrawingMode(false);
+    trendLinesPrimitiveRef.current?.setPreview(null);
+    return true;
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape' && drawingModeRef.current && drawingStartRef.current) {
-        drawingStartRef.current = null;
-        drawingModeRef.current = false;
-        setDrawingMode(false);
-        trendLinesPrimitiveRef.current?.setPreview(null);
-        return;
-      }
+      if (event.key === 'Escape' && cancelTrendLineDrawing()) return;
 
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
 
@@ -410,7 +418,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedTrendLine]);
+  }, [cancelTrendLineDrawing, selectedTrendLine]);
 
   useEffect(() => {
     onOrderPriceDragRef.current = onOrderPriceDrag;
@@ -736,31 +744,6 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     candleSeries.attachPrimitive(trendLinesPrimitive);
     trendLinesPrimitiveRef.current = trendLinesPrimitive;
 
-    const handleChartClick = (param) => {
-      if (!drawingModeRef.current || !param.point || param.time == null) return;
-
-      const price = candleSeries.coordinateToPrice(param.point.y);
-      if (!Number.isFinite(price)) return;
-
-      const point = {
-        time: param.time,
-        price: Math.round(price * 100) / 100,
-      };
-
-      if (!drawingStartRef.current) {
-        drawingStartRef.current = point;
-        return;
-      }
-
-      const start = drawingStartRef.current;
-      setTrendLines(prev => [...prev, { start, end: point }]);
-      drawingStartRef.current = null;
-      drawingModeRef.current = false;
-      setDrawingMode(false);
-      trendLinesPrimitiveRef.current?.setPreview(null);
-    };
-    chart.subscribeClick(handleChartClick);
-
     // ── Horizontal IB lines primitive (custom canvas lines) ───
     const ibLinesPrimitive = createHorizontalLinesPrimitive();
     candleSeries.attachPrimitive(ibLinesPrimitive);
@@ -828,8 +811,69 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       return Math.round(price * 100) / 100;
     };
 
+    const getChartPoint = (e) => {
+      const point = getMousePoint(e);
+      const time = chart.timeScale().coordinateToTime(point.x);
+      const price = candleSeries.coordinateToPrice(point.y);
+      if (time == null || !Number.isFinite(price)) return null;
+      return { time, price: Math.round(price * 100) / 100 };
+    };
+
+    // Drag + click-click share one gesture: first press sets start; drag-release
+    // or second click finishes. Tiny move on first click stays click-click.
+    const DRAW_MOVE_PX = 4;
+    let drawPointerDown = false;
+    let drawMoved = false;
+    let drawHadStartOnDown = false;
+    let drawDownXY = null;
+
+    const finishTrendLine = (end) => {
+      const start = drawingStartRef.current;
+      drawingStartRef.current = null;
+      drawingModeRef.current = false;
+      setDrawingMode(false);
+      trendLinesPrimitiveRef.current?.setPreview(null);
+      if (start && end && (end.time !== start.time || end.price !== start.price)) {
+        setTrendLines(prev => [...prev, { start, end }]);
+      }
+    };
+
+    const cancelDrawingGesture = () => {
+      drawPointerDown = false;
+      drawMoved = false;
+      drawHadStartOnDown = false;
+      drawDownXY = null;
+      drawingStartRef.current = null;
+      drawingModeRef.current = false;
+      setDrawingMode(false);
+      trendLinesPrimitiveRef.current?.setPreview(null);
+    };
+
+    const handleContextMenu = (e) => {
+      if (!drawingModeRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      cancelDrawingGesture();
+    };
+
     const handleMouseDown = (e) => {
-      if (drawingModeRef.current) return;
+      if (drawingModeRef.current) {
+        // Right/middle click cancels (incl. mid-drag). Only left starts/finishes.
+        if (e.button !== 0) {
+          e.preventDefault();
+          cancelDrawingGesture();
+          return;
+        }
+        const point = getChartPoint(e);
+        if (!point) return;
+        e.preventDefault();
+        drawPointerDown = true;
+        drawMoved = false;
+        drawDownXY = getMousePoint(e);
+        drawHadStartOnDown = Boolean(drawingStartRef.current);
+        if (!drawingStartRef.current) drawingStartRef.current = point;
+        return;
+      }
 
       const point = getMousePoint(e);
       const trendLineIndex = trendLinesPrimitiveRef.current?.lineIndexAt(point.x, point.y) ?? -1;
@@ -851,7 +895,24 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       containerEl.classList.add('dragging-order-line');
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e) => {
+      if (drawingModeRef.current && (drawPointerDown || drawingStartRef.current)) {
+        // Right/middle release must not commit a drag-in-progress line
+        if (e.button !== 0) {
+          cancelDrawingGesture();
+          return;
+        }
+        if (drawPointerDown && drawingStartRef.current) {
+          drawPointerDown = false;
+          // Second click, or drag past threshold → commit. Bare first click keeps start.
+          if (drawHadStartOnDown || drawMoved) {
+            finishTrendLine(getChartPoint(e));
+          }
+          return;
+        }
+      }
+      drawPointerDown = false;
+
       if (dragOrderRef.current) {
         const finalOrder = dragOrderRef.current;
         chart.applyOptions({ handleScroll: true });
@@ -864,13 +925,17 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     const handleMouseMove = (e) => {
       // Trend line drawing preview: update preview line from start point to cursor
       if (drawingModeRef.current && drawingStartRef.current && trendLinesPrimitiveRef.current) {
-        const point = getMousePoint(e);
-        const time = chart.timeScale().coordinateToTime(point.x);
-        const price = candleSeries.coordinateToPrice(point.y);
-        if (time != null && Number.isFinite(price)) {
+        if (drawPointerDown && drawDownXY) {
+          const cursor = getMousePoint(e);
+          if (Math.hypot(cursor.x - drawDownXY.x, cursor.y - drawDownXY.y) > DRAW_MOVE_PX) {
+            drawMoved = true;
+          }
+        }
+        const end = getChartPoint(e);
+        if (end) {
           trendLinesPrimitiveRef.current.setPreview({
             start: drawingStartRef.current,
-            end: { time, price: Math.round(price * 100) / 100 },
+            end,
           });
         }
         return;
@@ -898,13 +963,15 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     };
     containerEl.addEventListener('mousedown', handleMouseDown);
     containerEl.addEventListener('mousemove', handleMouseMove);
+    // Capture: chart canvas may swallow bubble-phase contextmenu
+    containerEl.addEventListener('contextmenu', handleContextMenu, true);
     window.addEventListener('mouseup', handleMouseUp);
 
     return () => {
       containerEl.removeEventListener('mousedown', handleMouseDown);
       containerEl.removeEventListener('mousemove', handleMouseMove);
+      containerEl.removeEventListener('contextmenu', handleContextMenu, true);
       window.removeEventListener('mouseup', handleMouseUp);
-      chart.unsubscribeClick(handleChartClick);
       ro.disconnect();
       chart.remove();
       chartRef.current = null;

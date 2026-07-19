@@ -1,10 +1,9 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../src/i18n/I18nContext.jsx'
 import StockChart from './StockChart'
 
 const chartMock = vi.hoisted(() => {
-  let clickHandler
   let chart
   let candleSeries
 
@@ -20,7 +19,6 @@ const chartMock = vi.hoisted(() => {
 
   return {
     reset() {
-      clickHandler = undefined
       candleSeries = createSeries()
       const timeScale = {
         setVisibleRange: vi.fn(),
@@ -28,6 +26,10 @@ const chartMock = vi.hoisted(() => {
           '2026-01-02': 10,
           '2026-01-03': 30,
         })[time] ?? null),
+        coordinateToTime: vi.fn(x => ({
+          10: '2026-01-02',
+          30: '2026-01-03',
+        })[x] ?? null),
         width: vi.fn(() => 400),
       }
       chart = {
@@ -48,17 +50,12 @@ const chartMock = vi.hoisted(() => {
         priceScale: vi.fn(() => ({ applyOptions: vi.fn() })),
         remove: vi.fn(),
         resize: vi.fn(),
-        subscribeClick: vi.fn(handler => {
-          clickHandler = handler
-        }),
+        subscribeClick: vi.fn(),
         timeScale: vi.fn(() => timeScale),
         unsubscribeClick: vi.fn(),
       }
     },
     createChart: vi.fn(() => chart),
-    click(params) {
-      clickHandler?.(params)
-    },
   }
 })
 
@@ -68,6 +65,7 @@ vi.mock('lightweight-charts', () => ({
   HistogramSeries: Symbol('HistogramSeries'),
   LineSeries: Symbol('LineSeries'),
   LineStyle: { Dotted: 1, Solid: 0 },
+  PriceScaleMode: { Normal: 0, Logarithmic: 1, Percentage: 2, IndexedTo100: 3 },
   createChart: chartMock.createChart,
   createSeriesMarkers: vi.fn(() => ({ setMarkers: vi.fn(), detach: vi.fn() })),
 }))
@@ -103,14 +101,14 @@ describe('StockChart trend lines', () => {
     globalThis.ResizeObserver = ResizeObserverStub
   })
 
-  it('draws, selects, and deletes a persisted trend line', () => {
+  it('draws by drag, selects, and deletes a persisted trend line', () => {
     renderChart()
 
+    const container = document.getElementById('lw-chart-container')
     fireEvent.click(screen.getByRole('button', { name: 'Trend Line' }))
-    act(() => {
-      chartMock.click({ point: { x: 10, y: 100 }, time: '2026-01-02' })
-      chartMock.click({ point: { x: 30, y: 120 }, time: '2026-01-03' })
-    })
+    fireEvent.mouseDown(container, { clientX: 10, clientY: 100 })
+    fireEvent.mouseMove(container, { clientX: 30, clientY: 120 })
+    fireEvent.mouseUp(window, { clientX: 30, clientY: 120 })
 
     expect(JSON.parse(localStorage.getItem('stockai-trend-lines:AAPL'))).toEqual([
       {
@@ -119,13 +117,64 @@ describe('StockChart trend lines', () => {
       },
     ])
 
-    fireEvent.mouseDown(document.getElementById('lw-chart-container'), {
+    fireEvent.mouseDown(container, {
       clientX: 20,
       clientY: 110,
     })
     fireEvent.keyDown(window, { key: 'Delete' })
 
     expect(JSON.parse(localStorage.getItem('stockai-trend-lines:AAPL'))).toEqual([])
+  })
+
+  it('draws a trend line with click-click', () => {
+    renderChart()
+
+    const container = document.getElementById('lw-chart-container')
+    fireEvent.click(screen.getByRole('button', { name: 'Trend Line' }))
+    fireEvent.mouseDown(container, { clientX: 10, clientY: 100 })
+    fireEvent.mouseUp(window, { clientX: 10, clientY: 100 })
+    fireEvent.mouseMove(container, { clientX: 30, clientY: 120 })
+    fireEvent.mouseDown(container, { clientX: 30, clientY: 120 })
+    fireEvent.mouseUp(window, { clientX: 30, clientY: 120 })
+
+    expect(JSON.parse(localStorage.getItem('stockai-trend-lines:AAPL'))).toEqual([
+      {
+        start: { time: '2026-01-02', price: 100 },
+        end: { time: '2026-01-03', price: 120 },
+      },
+    ])
+  })
+
+  it('cancels in-progress trend line drawing on right-click', () => {
+    renderChart()
+
+    const container = document.getElementById('lw-chart-container')
+    const btn = screen.getByRole('button', { name: 'Trend Line' })
+    fireEvent.click(btn)
+    expect(btn).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.mouseDown(container, { clientX: 10, clientY: 100 })
+    fireEvent.mouseUp(window, { clientX: 10, clientY: 100 })
+    fireEvent.contextMenu(container)
+
+    expect(btn).toHaveAttribute('aria-pressed', 'false')
+    expect(JSON.parse(localStorage.getItem('stockai-trend-lines:AAPL') ?? '[]')).toEqual([])
+  })
+
+  it('cancels mid-drag trend line on right mouse button', () => {
+    renderChart()
+
+    const container = document.getElementById('lw-chart-container')
+    const btn = screen.getByRole('button', { name: 'Trend Line' })
+    fireEvent.click(btn)
+    fireEvent.mouseDown(container, { clientX: 10, clientY: 100, button: 0 })
+    fireEvent.mouseMove(container, { clientX: 30, clientY: 120 })
+    // Right-click during drag used to commit via mouseup; must cancel instead
+    fireEvent.mouseDown(container, { clientX: 30, clientY: 120, button: 2 })
+    fireEvent.mouseUp(window, { clientX: 30, clientY: 120, button: 2 })
+
+    expect(btn).toHaveAttribute('aria-pressed', 'false')
+    expect(JSON.parse(localStorage.getItem('stockai-trend-lines:AAPL') ?? '[]')).toEqual([])
   })
 
   it('removes a selected trend line with Backspace', () => {
