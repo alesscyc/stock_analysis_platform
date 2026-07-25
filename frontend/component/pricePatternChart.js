@@ -130,6 +130,7 @@ export function createPricePatternPrimitive() {
 
                 if (areaBounds) {
                   const labelAtBottom = pattern.type.includes('bottom')
+                    || pattern.type.includes('inverse')
                   drawLabel(
                     ctx,
                     (areaBounds.left + areaBounds.right) / 2,
