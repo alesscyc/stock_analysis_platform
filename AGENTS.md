@@ -146,3 +146,14 @@ When testing UI features or debugging:
 - **ESLint**: Flat config in `frontend/eslint.config.js`. `no-unused-vars` ignores `^[A-Z_]` pattern.
 - **Vite**: v7.0.4 (frontend devDependency).
 - **Finnhub symbol search**: Query trimmed to 50 chars max, results capped at 10, cached with same 5-min TTL.
+
+## Cursor Cloud specific instructions
+
+Dependency install is handled by the startup update script (`pip install -r analysis/requirements.txt` with `--break-system-packages`, plus `npm install` in `frontend/` and `backend/`). Standard lint/test/build/run commands live in `README.md`, `frontend/package.json`, and `backend/package.json`.
+
+Non-obvious caveats for this environment:
+- **`python` must resolve to python3**: `backend/server.js` spawns the analysis service with a bare `python` (`spawn('python', ...)`). This VM only ships `python3`, so setup created `/usr/local/bin/python -> /usr/bin/python3` (one-off, captured in the snapshot). If the backend logs `spawn python ENOENT`, recreate it: `ln -sf /usr/bin/python3 /usr/local/bin/python`.
+- **Backend auto-starts the Python service**: `cd backend && npm run dev` (port 3001) spawns the FastAPI analysis service (port 8000) as a child and restarts it on exit. Do NOT start `python analysis/stock_data.py serve` separately — the root README's "3 terminals / cmd.exe" note is Windows-oriented and stale. Only two dev processes are needed on this VM: backend (3001) and `cd frontend && npm run dev` (5173).
+- **Frontend talks to backend via Vite proxy**: `frontend/vite.config.js` proxies `/api` → `http://localhost:3001`; components use relative `/api/...` paths (the root doc's "hard-coded localhost:3001" note is outdated). No CORS or env config needed for local dev.
+- **No `.env` required for charting**: Without `backend/.env`, the backend runs and charts/search/backtest/ML all work; it just logs harmless `[ib] Connecting ... undefined:NaN` reconnect noise. IB trading (portfolio/orders/order placement) needs a real IB Gateway (unavailable here). Finnhub key is optional — autocomplete stays empty without it, but typing a ticker and pressing Enter still loads the chart. AI chat and Finnhub/IB features need keys in `backend/.env` (see `backend/.env.example`).
+- **Network egress**: `yfinance` (Yahoo Finance) must reach the internet for market data; this works in the cloud VM.
