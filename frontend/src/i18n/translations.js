@@ -36,6 +36,10 @@ export const translations = {
     unableToLoad: 'Unable to load {{symbol}}',
     loadingMarketData: 'Loading market data…',
     failedToLoadStockData: 'Failed to load stock data',
+    aiAnalyzing: 'AI analyzing…',
+    loadingOlderHistory: 'Loading older history…',
+    historyPartiallyLoaded: 'History partially loaded',
+    recentRefreshFailed: 'Recent data refresh failed',
 
     // SearchBar.jsx
     searchTickerPlaceholder: 'Search ticker (AAPL, TSLA…)',
@@ -311,6 +315,10 @@ export const translations = {
     unableToLoad: '無法載入 {{symbol}}',
     loadingMarketData: '正在載入市場數據…',
     failedToLoadStockData: '載入股票數據失敗',
+    aiAnalyzing: 'AI 分析中…',
+    loadingOlderHistory: '正在載入較舊歷史數據…',
+    historyPartiallyLoaded: '歷史數據僅部分載入',
+    recentRefreshFailed: '最新數據重新整理失敗',
 
     // SearchBar.jsx
     searchTickerPlaceholder: '搜尋股票代號 (AAPL, TSLA…)',

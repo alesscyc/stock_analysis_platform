@@ -72,6 +72,16 @@ describe('Backend', () => {
     assert.match(envExample, /OPENAI_MODEL=deepseek-v4-flash/);
   });
 
+  it('caches only successful prediction responses', () => {
+    const src = fs.readFileSync(path.resolve(__dirname, '..', 'server.js'), 'utf-8');
+    const predictionRoute = src.slice(
+      src.indexOf("app.get('/api/prediction/:symbol'"),
+      src.indexOf("app.get('/api/chat/models'"),
+    );
+
+    assert.match(predictionRoute, /if \(result\.status === 'success'\)/);
+  });
+
   it('supplies only read-only, non-sensitive IB context to chat', () => {
     const portfolio = [{
       id: 'DU123:AAPL',

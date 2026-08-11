@@ -320,6 +320,7 @@ function saveWatchlist(list) {
 function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick, onOrderPriceDrag, orderModification, ibConnected, ordersRefreshToken, backtestTrades }) {
   const containerRef = useRef(null);
   const chartRef     = useRef(null);
+  const dataContextRef = useRef(null);
   const onOrderPriceDragRef = useRef(onOrderPriceDrag);
   const dragOrderRef = useRef(null);
 
@@ -1033,6 +1034,11 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
   useEffect(() => {
     if (!candleSeriesRef.current || candleData.length === 0) return;
 
+    const timeScale = chartRef.current?.timeScale();
+    const dataContext = `${stockSymbol}-${currentInterval}`;
+    const preserveViewport = dataContextRef.current === dataContext;
+    const previousRange = preserveViewport ? timeScale?.getVisibleRange?.() : null;
+
     candleSeriesRef.current.setData(candleData);
     volumeSeriesRef.current?.setData(volumeData);
 
@@ -1042,11 +1048,13 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
 
     vol20maSeriesRef.current?.setData(vol20maData ?? []);
 
-    // Set initial visible range
-    if (visibleRange) {
-      chartRef.current?.timeScale().setVisibleRange(visibleRange);
+    if (previousRange) {
+      timeScale?.setVisibleRange(previousRange);
+    } else if (visibleRange) {
+      timeScale?.setVisibleRange(visibleRange);
     }
-  }, [candleData, volumeData, maData, vol20maData, visibleRange]);
+    dataContextRef.current = dataContext;
+  }, [candleData, volumeData, maData, vol20maData, visibleRange, stockSymbol, currentInterval]);
 
   // ── Draw / update IB horizontal lines on candlestick series ──
   useEffect(() => {

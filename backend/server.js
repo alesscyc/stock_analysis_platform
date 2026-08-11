@@ -14,6 +14,7 @@ const port = 3001;
 // Simple in-memory cache
 const cache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const HISTORICAL_CACHE_TTL = 24 * 60 * 60 * 1000;
 const ALLOWED_ORDER_ACTIONS = new Set(['BUY', 'SELL']);
 const ALLOWED_TIME_IN_FORCE = new Set(['DAY', 'GTC', 'IOC', 'FOK']);
 const TERMINAL_ORDER_STATUSES = new Set(['Filled', 'Cancelled', 'ApiCancelled', 'Rejected']);
@@ -693,7 +694,14 @@ app.get('/api/stock/:symbol', async (req, res) => {
 
   try {
     const { symbol } = req.params;
-    const { date_range = 'max', interval = '1d', auto_predict = 'false' } = req.query;
+    const {
+      date_range = 'max',
+      interval = '1d',
+      auto_predict = 'false',
+      start_date,
+      end_date,
+      chart_only = 'false',
+    } = req.query;
     
     // Input validation / whitelist
     const ALLOWED_DATE_RANGES = new Set(['max', '1y', '2y', '5y']);
@@ -712,12 +720,38 @@ app.get('/api/stock/:symbol', async (req, res) => {
       return res.status(400).json({ error: 'Invalid interval. Allowed: 1d, 1wk, 1mo' });
     }
 
-    const sanitizedAutoPredict = auto_predict === 'true' ? 'true' : 'false';
-    
-    const cacheKey = `${sanitizedSymbol}-${date_range}-${interval}-${sanitizedAutoPredict}`;
-    const cachedData = cache.get(cacheKey);
+    const hasWindow = start_date != null || end_date != null;
+    const validDate = value => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return false;
+      const parsed = new Date(`${value}T00:00:00Z`);
+      return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+    };
+    if (hasWindow && (
+      interval !== '1d'
+      || !validDate(start_date)
+      || !validDate(end_date)
+      || start_date >= end_date
+    )) {
+      return res.status(400).json({ error: 'Daily date windows require valid start_date before end_date' });
+    }
 
-    if (cachedData && (Date.now() - cachedData.timestamp < CACHE_TTL)) {
+    const sanitizedAutoPredict = auto_predict === 'true' ? 'true' : 'false';
+
+    const cacheKey = [
+      sanitizedSymbol,
+      date_range,
+      interval,
+      sanitizedAutoPredict,
+      start_date || '',
+      end_date || '',
+      chart_only === 'true' ? 'chart' : 'full',
+    ].join('-');
+    const cachedData = cache.get(cacheKey);
+    const isHistoricalWindow = Boolean(end_date)
+      && Date.parse(`${end_date}T00:00:00Z`) < Date.now() - (2 * 24 * 60 * 60 * 1000);
+    const cacheTtl = isHistoricalWindow ? HISTORICAL_CACHE_TTL : CACHE_TTL;
+
+    if (cachedData && (Date.now() - cachedData.timestamp < cacheTtl)) {
       console.log('Returning cached data for:', cacheKey);
       return res.json(cachedData.data);
     }
@@ -730,6 +764,9 @@ app.get('/api/stock/:symbol', async (req, res) => {
         date_range,
         interval,
         auto_predict: sanitizedAutoPredict === 'true',
+        start_date: start_date || null,
+        end_date: end_date || null,
+        include_market_cap: chart_only !== 'true',
       }),
     });
 
@@ -742,8 +779,10 @@ app.get('/api/stock/:symbol', async (req, res) => {
     const result = await pyRes.json();
     console.log('[python-service] Response received, items:', Array.isArray(result) ? result.length : 'N/A');
 
-    // Cache the result
-    cache.set(cacheKey, { timestamp: Date.now(), data: result });
+    // Empty history can be a transient provider miss; let the next request retry it.
+    if (!Array.isArray(result) || result.length > 0) {
+      cache.set(cacheKey, { timestamp: Date.now(), data: result });
+    }
 
     res.json(result);
 
@@ -874,6 +913,40 @@ app.get('/api/fundamentals/:symbol', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('[python-service] Fundamentals fetch failed:', error.message);
+    res.status(502).json({ error: 'Could not reach Python analysis service' });
+  }
+});
+
+app.get('/api/prediction/:symbol', async (req, res) => {
+  try {
+    const symbol = String(req.params.symbol).trim().toUpperCase();
+    if (!/^[A-Z0-9.\-]{1,20}$/.test(symbol)) {
+      return res.status(400).json({ error: 'Invalid symbol' });
+    }
+
+    const cacheKey = `prediction-${symbol}`;
+    const cachedData = cache.get(cacheKey);
+    if (cachedData && Date.now() - cachedData.timestamp < CACHE_TTL) {
+      return res.json(cachedData.data);
+    }
+
+    const pyRes = await fetch(`${PYTHON_SERVICE_URL}/prediction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol }),
+    });
+    if (!pyRes.ok) {
+      const errBody = await pyRes.json().catch(() => ({}));
+      return res.status(502).json({ error: errBody.detail || 'Python service error' });
+    }
+
+    const result = await pyRes.json();
+    if (result.status === 'success') {
+      cache.set(cacheKey, { timestamp: Date.now(), data: result });
+    }
+    res.json(result);
+  } catch (error) {
+    console.error('[python-service] Prediction failed:', error.message);
     res.status(502).json({ error: 'Could not reach Python analysis service' });
   }
 });

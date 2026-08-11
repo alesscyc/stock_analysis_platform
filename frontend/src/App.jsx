@@ -12,6 +12,21 @@ import AIChat from '../component/AIChat';
 import { isGitHubPages } from './environment';
 import { generateNvdaMockData } from './mockData';
 import { useTranslation } from './i18n/useTranslation';
+import { mergeStockData, olderDailyWindow, recentDailyWindow } from './chartLoading';
+
+const RECENT_CACHE_TTL = 5 * 60 * 1000;
+const HISTORY_FLOOR_DATE = '1900-01-01';
+
+function stockDataCacheKey(symbol, interval) {
+  return `${String(symbol || '').trim().toUpperCase()}-${interval}`;
+}
+
+async function fetchJson(url, signal) {
+  const response = await fetch(url, { signal });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.error || 'Request failed');
+  return data;
+}
 
 function App() {
   const { t, language, setLanguage } = useTranslation();
@@ -23,6 +38,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [aiPrediction, setAiPrediction] = useState(null);
+  const [aiLoadState, setAiLoadState] = useState('idle');
+  const [historyLoadState, setHistoryLoadState] = useState('idle');
+  const [recentLoadState, setRecentLoadState] = useState('idle');
   const [isMock, setIsMock] = useState(false);
   const [ibConnected, setIbConnected] = useState(false);
   const [fundamentals, setFundamentals] = useState(null);
@@ -32,134 +50,235 @@ function App() {
   const [ordersRefreshToken, setOrdersRefreshToken] = useState(0);
   const [backtestTrades, setBacktestTrades] = useState(null);
   const stockDataCacheRef = useRef(new Map());
+  const loadAbortRef = useRef(null);
   const orderModificationCommittedRef = useRef(false);
 
-  // ponytail: 'max' can be 40y+/10k+ rows — slower fetch + chart; user asked full history
-  const DEFAULT_DATE_RANGE = 'max';
-
-  const getStockDataCacheKey = useCallback((symbol, interval = '1d', autoPredict = false) => {
-    return `${String(symbol || '').trim().toUpperCase()}-${DEFAULT_DATE_RANGE}-${interval}-${autoPredict ? 'true' : 'false'}`;
-  }, []);
-
-  const rememberStockData = useCallback((symbol, data, meta = {}) => {
+  const rememberStockData = (symbol, interval, data, meta = {}) => {
     if (!symbol || !Array.isArray(data) || data.length === 0) return;
-
-    const key = getStockDataCacheKey(symbol, meta.interval || '1d', meta.autoPredict === true);
-    stockDataCacheRef.current.set(key, {
+    const entry = {
       data,
-      timestamp: Date.now(),
-    });
-  }, [getStockDataCacheKey]);
+      recentTimestamp: meta.recentTimestamp ?? Date.now(),
+      complete: meta.complete === true,
+    };
+    stockDataCacheRef.current.set(stockDataCacheKey(symbol, interval), entry);
+    return entry;
+  };
 
-  const fetchStockData = async (stock, interval = '1d', autoPredictEnabled = true) => {
-    setLoading(true);
-    setError(null);
+  const fetchFundamentals = async (stock, signal) => {
+    if (isGitHubPages()) return;
     try {
-      // On GitHub Pages: use mock NVDA data (ignores the searched symbol)
+      const data = await fetchJson(`/api/fundamentals/${stock.symbol}`, signal);
+      if (!signal.aborted) setFundamentals(data);
+    } catch {
+      if (!signal.aborted) setFundamentals(null);
+    }
+  };
+
+  const fetchPrediction = async (symbol, signal) => {
+    setAiLoadState('loading');
+    try {
+      const prediction = await fetchJson(`/api/prediction/${symbol}`, signal);
+      if (signal.aborted) return;
+      setAiPrediction(prediction);
+      setAiLoadState(prediction.status === 'success' ? 'idle' : 'error');
+    } catch (fetchError) {
+      if (signal.aborted) return;
+      setAiPrediction({ status: 'prediction_error', error: fetchError.message });
+      setAiLoadState('error');
+    }
+  };
+
+  const fetchBackfill = async (symbol, interval, seedData, signal, recentTimestamp) => {
+    setHistoryLoadState('loading');
+    let merged = seedData;
+    let beforeDate = merged[0]?.Date;
+    let sameWindowAttempts = 0;
+    let emptyWindows = 0;
+
+    try {
+      while (beforeDate && !signal.aborted) {
+        const window = olderDailyWindow(beforeDate);
+        const startDate = emptyWindows >= 2 || window.startDate < HISTORY_FLOOR_DATE
+          ? HISTORY_FLOOR_DATE
+          : window.startDate;
+        const endDate = window.endDate;
+        const atHistoryFloor = startDate === HISTORY_FLOOR_DATE;
+        const params = new URLSearchParams({
+          date_range: 'max',
+          interval,
+          auto_predict: 'false',
+          chart_only: 'true',
+          start_date: startDate,
+          end_date: endDate,
+        });
+        const batch = await fetchJson(`/api/stock/${symbol}?${params}`, signal);
+        if (signal.aborted) return;
+        const next = Array.isArray(batch) ? mergeStockData(batch, merged) : merged;
+        if (!Array.isArray(batch) || batch.length === 0 || next.length === merged.length) {
+          sameWindowAttempts += 1;
+          if (sameWindowAttempts < 2) continue;
+          sameWindowAttempts = 0;
+          if (atHistoryFloor) {
+            if (signal.aborted) return;
+            rememberStockData(symbol, interval, merged, { recentTimestamp, complete: true });
+            if (signal.aborted) return;
+            setHistoryLoadState('idle');
+            return;
+          }
+          emptyWindows += 1;
+          beforeDate = startDate;
+          continue;
+        }
+        sameWindowAttempts = 0;
+        emptyWindows = 0;
+        merged = next;
+        beforeDate = merged[0].Date;
+        if (signal.aborted) return;
+        setStockData(merged);
+        if (signal.aborted) return;
+        const complete = atHistoryFloor;
+        rememberStockData(symbol, interval, merged, { recentTimestamp, complete });
+        if (complete) {
+          if (signal.aborted) return;
+          setHistoryLoadState('idle');
+          return;
+        }
+      }
+
+      if (!signal.aborted) setHistoryLoadState('error');
+    } catch {
+      if (!signal.aborted) setHistoryLoadState('error');
+    }
+  };
+
+  const fetchStockData = async (stock, interval = '1d', includeFundamentals = false) => {
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
+    const { signal } = controller;
+
+    setError(null);
+    setCurrentInterval(interval);
+    setAiPrediction(null);
+    setAiLoadState('idle');
+    setHistoryLoadState('idle');
+    setRecentLoadState('idle');
+    if (includeFundamentals) void fetchFundamentals(stock, signal);
+
+    try {
       if (isGitHubPages()) {
         const mockData = generateNvdaMockData();
         setStockData(mockData);
-        setCurrentInterval(interval);
         setIsMock(true);
         const prediction = mockData.find(item => item.prediction)?.prediction;
         if (prediction) setAiPrediction(prediction);
+        setLoading(false);
         return;
       }
 
-      if (
+      const suppliedData = (
         Array.isArray(stock?.chartData) &&
         stock.chartData.length > 0 &&
         stock.chartDataMeta?.interval === interval
-      ) {
-        setStockData(stock.chartData);
-        setCurrentInterval(interval);
-        setIsMock(false);
-        rememberStockData(stock.symbol, stock.chartData, stock.chartDataMeta);
-        const prediction = stock.chartData.find(item => item.prediction)?.prediction;
-        if (prediction) setAiPrediction(prediction);
-        return;
+      ) ? mergeStockData(stock.chartData) : null;
+      const suppliedPrediction = stock?.chartData?.find(item => item.prediction)?.prediction;
+      let cached = stockDataCacheRef.current.get(stockDataCacheKey(stock.symbol, interval));
+
+      if (suppliedData?.length) {
+        cached = rememberStockData(stock.symbol, interval, suppliedData, {
+          complete: stock.chartDataMeta?.dateRange === 'max',
+        });
+        if (suppliedPrediction) setAiPrediction(suppliedPrediction);
       }
 
-      const cached = !autoPredictEnabled
-        ? stockDataCacheRef.current.get(getStockDataCacheKey(stock.symbol, interval, false))
-        : null;
-
-      if (cached?.data?.length > 0) {
+      setIsMock(false);
+      if (cached?.data?.length) {
         setStockData(cached.data);
-        setCurrentInterval(interval);
-        setIsMock(false);
-        const prediction = cached.data.find(item => item.prediction)?.prediction;
-        if (prediction) setAiPrediction(prediction);
-        return;
+        setLoading(false);
+      } else {
+        setStockData([]);
+        setLoading(true);
       }
 
-      // Normal API call (local dev)
-      const autoPredictParam = autoPredictEnabled ? 'true' : 'false';
-      const response = await fetch(
-        `/api/stock/${stock.symbol}?date_range=${DEFAULT_DATE_RANGE}&interval=${interval}&auto_predict=${autoPredictParam}`
-      );
-      const data = await response.json();
-      if (!response.ok || data.error) {
-        throw new Error(data.error || t('failedToLoadStockData'));
+      const cacheIsFresh = cached
+        && Date.now() - cached.recentTimestamp < RECENT_CACHE_TTL;
+      let loaded = cached;
+
+      if (!cacheIsFresh) {
+        const params = new URLSearchParams({
+          date_range: interval === '1d' ? '2y' : 'max',
+          interval,
+          auto_predict: 'false',
+          chart_only: 'true',
+        });
+        if (interval === '1d') {
+          const { startDate, endDate } = recentDailyWindow();
+          params.set('start_date', startDate);
+          params.set('end_date', endDate);
+        }
+
+        const recent = await fetchJson(`/api/stock/${stock.symbol}?${params}`, signal);
+        if (signal.aborted) return;
+        if (!Array.isArray(recent) || recent.length === 0) {
+          throw new Error(t('noDataFound', { symbol: stock.symbol }));
+        }
+
+        const merged = mergeStockData(cached?.data, recent);
+        loaded = rememberStockData(stock.symbol, interval, merged, {
+          complete: interval !== '1d' || cached?.complete,
+        });
+        setStockData(merged);
+        setLoading(false);
       }
-      if (Array.isArray(data) && data.length > 0) {
-        setStockData(data);
-        setCurrentInterval(interval);
-        setIsMock(false);
-        rememberStockData(stock.symbol, data, { interval, autoPredict: autoPredictEnabled });
-        // Only update the prediction when the API actually returned one.
-        // This keeps the last known prediction visible during interval changes.
-        const prediction = data.find(item => item.prediction)?.prediction;
-        if (prediction) setAiPrediction(prediction);
-      } else {
-        throw new Error(t('noDataFound', { symbol: stock.symbol }));
+
+      if (signal.aborted || !loaded?.data?.length) return;
+      void fetchPrediction(stock.symbol, signal);
+      if (interval === '1d' && !loaded.complete) {
+        void fetchBackfill(
+          stock.symbol,
+          interval,
+          loaded.data,
+          signal,
+          loaded.recentTimestamp,
+        );
       }
     } catch (fetchError) {
+      if (signal.aborted) return;
       console.error('Error fetching stock data:', fetchError);
-      setStockData([]);
-      setError(fetchError.message || t('failedToLoadStockData'));
-    } finally {
+      const fallback = stockDataCacheRef.current.get(stockDataCacheKey(stock.symbol, interval));
+      if (fallback?.data?.length) {
+        setRecentLoadState('error');
+        void fetchPrediction(stock.symbol, signal);
+        if (interval === '1d' && !fallback.complete) {
+          void fetchBackfill(stock.symbol, interval, fallback.data, signal, fallback.recentTimestamp);
+        }
+      } else {
+        setStockData([]);
+        setError(fetchError.message || t('failedToLoadStockData'));
+      }
       setLoading(false);
     }
   };
 
-  const fetchFundamentals = async (stock) => {
-    if (isGitHubPages()) return;
-    try {
-      const res = await fetch(`/api/fundamentals/${stock.symbol}`);
-      const data = await res.json();
-      if (res.ok && !data.error) {
-        setFundamentals(data);
-      } else {
-        setFundamentals(null);
-      }
-    } catch {
-      setFundamentals(null);
-    }
-  };
-
-  const handleStockSelect = async (stock) => {
+  const handleStockSelect = (stock) => {
     setOrderDraft(null);
     setSelectedStock(stock);
-    setStockData([]);
     setError(null);
     setAiPrediction(null);
     setFundamentals(null);
     setShowFundamentals(false);
     setBacktestTrades(null);
-    // Fire both requests in parallel — fundamentals don't depend on stock data
-    await Promise.all([
-      fetchStockData(stock, currentInterval),
-      fetchFundamentals(stock),
-    ]);
+    void fetchStockData(stock, currentInterval, true);
   };
 
-  const handleIntervalChange = async (interval) => {
+  const handleIntervalChange = (interval) => {
     setBacktestTrades(null);
     if (selectedStock) {
-      await fetchStockData(selectedStock, interval, false);
+      void fetchStockData(selectedStock, interval);
     }
   };
+
+  useEffect(() => () => loadAbortRef.current?.abort(), []);
 
   const handleOrderPriceDrag = useCallback((order, price) => {
     orderModificationCommittedRef.current = false;
@@ -363,6 +482,16 @@ function App() {
                 </div>
               )}
 
+              {(aiLoadState !== 'idle' || historyLoadState !== 'idle' || recentLoadState !== 'idle') && (
+                <div className="chart-load-status" role="status" aria-live="polite">
+                  {aiLoadState === 'loading' && <span>{t('aiAnalyzing')}</span>}
+                  {aiLoadState === 'error' && <span className="is-warning">{t('aiUnavailable')}</span>}
+                  {historyLoadState === 'loading' && <span>{t('loadingOlderHistory')}</span>}
+                  {historyLoadState === 'error' && <span className="is-warning">{t('historyPartiallyLoaded')}</span>}
+                  {recentLoadState === 'error' && <span className="is-warning">{t('recentRefreshFailed')}</span>}
+                </div>
+              )}
+
               {fundamentals && (
                 <button
                   className="btn-fundamentals-toggle"
@@ -515,7 +644,12 @@ function App() {
             isOpen={activeSidebar === 'screener'}
             onClose={() => setActiveSidebar(null)}
             onStockSelect={handleStockSelect}
-            onStockDataScanned={rememberStockData}
+            onStockDataScanned={(symbol, data, meta) => rememberStockData(
+              symbol,
+              meta?.interval || '1d',
+              data,
+              { complete: meta?.dateRange === 'max' },
+            )}
           />
           <BacktestDialog
             isOpen={activeSidebar === 'backtest'}

@@ -7,6 +7,7 @@ import os
 import pickle
 import math
 from datetime import datetime, timedelta
+from typing import Optional
 
 # ── Model cache ──────────────────────────────────────────────────────────────
 MODEL_CACHE_TTL_HOURS = 4
@@ -75,20 +76,36 @@ def _set_cached_model(symbol, model_data):
     _save_model_to_disk(symbol, entry)
 
 
-def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predict=False): 
+def get_stock_price_history(
+    symbol,
+    date_range='max',
+    interval='1d',
+    auto_predict=False,
+    start_date=None,
+    end_date=None,
+    include_market_cap=True,
+):
     try:
         # Use yfinance to get stock data
         ticker = yf.Ticker(symbol)
-        
-        # Fetch market cap from ticker info (static per symbol)
-        try:
-            info = ticker.info
-            market_cap = info.get('marketCap') if info else None
-        except Exception:
-            market_cap = None
-        
+
         # Map date range to yfinance periods or calculate dates
-        if date_range == 'max':
+        target_start = None
+        if start_date or end_date:
+            if not start_date or not end_date:
+                return {"error": "Both start_date and end_date are required"}
+            target_start = datetime.strptime(start_date, '%Y-%m-%d')
+            target_end = datetime.strptime(end_date, '%Y-%m-%d')
+            if target_start >= target_end:
+                return {"error": "start_date must be before end_date"}
+            # Warm up rolling indicators before trimming to the requested window.
+            fetch_start = target_start - timedelta(days=400 if interval == '1d' else 0)
+            hist = ticker.history(
+                start=fetch_start.strftime('%Y-%m-%d'),
+                end=target_end.strftime('%Y-%m-%d'),
+                interval=interval,
+            )
+        elif date_range == 'max':
             hist = ticker.history(period="max", interval=interval)
         elif date_range in ['1y', '2y', '5y']:
             hist = ticker.history(period=date_range, interval=interval)
@@ -98,7 +115,15 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
         
         # Check if data is available
         if hist.empty:
-            return {"error": f"No data found for symbol: {symbol}"}
+            return [] if target_start else {"error": f"No data found for symbol: {symbol}"}
+
+        market_cap = None
+        if include_market_cap:
+            try:
+                info = ticker.info
+                market_cap = info.get('marketCap') if info else None
+            except Exception:
+                pass
         
         hist['200MA'] = hist['Close'].rolling(window=200, min_periods=200).mean()
         hist['150MA'] = hist['Close'].rolling(window=150, min_periods=150).mean()
@@ -207,6 +232,10 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
             # Create buy/sell label: 1 = buy (price up by more than 5%), 0 = sell (price up by 5% or less)
             hist['Label'] = (hist['Future_Return'] > 0.05).astype(int)
 
+        if target_start:
+            hist = hist[hist.index.date >= target_start.date()]
+            if hist.empty:
+                return []
 
         # Convert to list of dictionaries
         stock_data = []
@@ -237,8 +266,9 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
                 "50MA": round(float(row['50MA']), 2) if pd.notna(row['50MA']) else None,
                 "20MA": round(float(row['20MA']), 2) if pd.notna(row['20MA']) else None,
                 "10MA": round(float(row['10MA']), 2) if pd.notna(row['10MA']) else None,
-                "MarketCap": market_cap
             }
+            if include_market_cap:
+                data_point["MarketCap"] = market_cap
             if auto_predict and interval == '1d':
                 data_point["MA50_above_MA150"] = int(row['MA50_above_MA150']) if pd.notna(row['MA50_above_MA150']) else None
                 data_point["MA150_above_MA200"] = int(row['MA150_above_MA200']) if pd.notna(row['MA150_above_MA200']) else None
@@ -326,6 +356,24 @@ def get_stock_price_history(symbol, date_range='max', interval='1d', auto_predic
         
     except Exception as e:
         return {"error": f"Error fetching data: {str(e)}"}
+
+
+def get_stock_prediction(symbol):
+    result = get_stock_price_history(
+        symbol,
+        date_range='max',
+        interval='1d',
+        auto_predict=True,
+        include_market_cap=False,
+    )
+    if isinstance(result, dict):
+        return result
+    prediction = next((row['prediction'] for row in result if 'prediction' in row), None)
+    return prediction or {
+        "symbol": symbol,
+        "status": "prediction_error",
+        "error": "Prediction did not return a result",
+    }
 
 
 def get_current_stock_price(symbol):
@@ -955,6 +1003,9 @@ def _make_fastapi_app():
         date_range: str = 'max'
         interval: str = '1d'
         auto_predict: bool = False
+        start_date: Optional[str] = None
+        end_date: Optional[str] = None
+        include_market_cap: bool = True
 
     class PriceRequest(BaseModel):
         symbol: str
@@ -972,8 +1023,23 @@ def _make_fastapi_app():
 
     @service.post("/stock_history")
     def stock_history(req: HistoryRequest):
-        result = get_stock_price_history(req.symbol, req.date_range, req.interval, req.auto_predict)
+        result = get_stock_price_history(
+            req.symbol,
+            req.date_range,
+            req.interval,
+            req.auto_predict,
+            req.start_date,
+            req.end_date,
+            req.include_market_cap,
+        )
         if isinstance(result, dict) and "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+        return result
+
+    @service.post("/prediction")
+    def prediction(req: PriceRequest):
+        result = get_stock_prediction(req.symbol)
+        if isinstance(result, dict) and result.get("error") and not result.get("status"):
             raise HTTPException(status_code=500, detail=result["error"])
         return result
 

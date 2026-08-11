@@ -6,6 +6,7 @@ import StockChart from './StockChart'
 const chartMock = vi.hoisted(() => {
   let chart
   let candleSeries
+  let timeScale
 
   const createSeries = () => ({
     applyOptions: vi.fn(),
@@ -20,7 +21,8 @@ const chartMock = vi.hoisted(() => {
   return {
     reset() {
       candleSeries = createSeries()
-      const timeScale = {
+      timeScale = {
+        getVisibleRange: vi.fn(() => null),
         setVisibleRange: vi.fn(),
         timeToCoordinate: vi.fn(time => ({
           '2026-01-02': 10,
@@ -56,6 +58,7 @@ const chartMock = vi.hoisted(() => {
       }
     },
     createChart: vi.fn(() => chart),
+    getTimeScale: () => timeScale,
   }
 })
 
@@ -80,18 +83,22 @@ const stockData = [
   { Date: '2026-01-03', Open: 105, High: 125, Low: 100, Close: 120, Volume: 1200 },
 ]
 
-function renderChart() {
-  return render(
+function chartElement(data = stockData) {
+  return (
     <I18nProvider>
       <StockChart
-        stockData={stockData}
+        stockData={data}
         stockSymbol="AAPL"
         currentInterval="1d"
         onIntervalChange={vi.fn()}
         ibConnected={false}
       />
-    </I18nProvider>,
+    </I18nProvider>
   )
+}
+
+function renderChart(data) {
+  return render(chartElement(data))
 }
 
 describe('StockChart drawings', () => {
@@ -296,5 +303,26 @@ describe('StockChart indicators', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Indicators/i }))
     expect(screen.getByRole('checkbox', { name: 'Price Pattern' })).not.toBeChecked()
+  })
+})
+
+describe('StockChart progressive data', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    chartMock.reset()
+    globalThis.ResizeObserver = ResizeObserverStub
+  })
+
+  it('preserves the visible dates when older candles are prepended', () => {
+    const visibleRange = { from: '2026-01-02', to: '2026-01-03' }
+    const { rerender } = renderChart()
+    chartMock.getTimeScale().getVisibleRange.mockReturnValue(visibleRange)
+
+    rerender(chartElement([
+      { Date: '2025-01-02', Open: 80, High: 90, Low: 75, Close: 85, Volume: 900 },
+      ...stockData,
+    ]))
+
+    expect(chartMock.getTimeScale().setVisibleRange).toHaveBeenLastCalledWith(visibleRange)
   })
 })
