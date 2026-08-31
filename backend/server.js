@@ -1,15 +1,22 @@
 // server.js
-require('dotenv').config();
+require('dotenv').config(process.env.ENV_FILE ? { path: process.env.ENV_FILE } : undefined);
 const express = require('express');
 const cors = require('cors');
 const { spawn } = require('child_process');
 const path = require('path');
 const { buildChatIbContext, parseChatResponse } = require('./chatSafety');
+const { readSettings, saveSettings } = require('./settingsEnv');
 
 const IB = require('ib');
 
 const app = express();
 const port = 3001;
+
+// Desktop mode (packaged Electron app): bind loopback only and skip the
+// permissive CORS used for the browser-based web workflow.
+const DESKTOP_MODE = process.env.DESKTOP_MODE === '1';
+const BIND_HOST = process.env.BIND_HOST;
+const ENV_FILE = process.env.ENV_FILE;
 
 // Simple in-memory cache
 const cache = new Map();
@@ -687,8 +694,26 @@ ib.on('openOrderEnd', () => {
   console.log(`[ib] Open orders snapshot complete with ${getOpenOrders().length} order(s) at ${updatedAt}`);
 });
 
-app.use(cors());
+if (!DESKTOP_MODE) app.use(cors());
 app.use(express.json({ limit: '1mb' }));
+
+app.get('/api/settings', (_req, res) => {
+  if (!DESKTOP_MODE || !ENV_FILE) return res.status(404).json({ error: 'Desktop settings are unavailable' });
+  try {
+    res.json(readSettings(ENV_FILE, process.env));
+  } catch (error) {
+    res.status(500).json({ error: `Could not read settings: ${error.message}` });
+  }
+});
+
+app.put('/api/settings', (req, res) => {
+  if (!DESKTOP_MODE || !ENV_FILE) return res.status(404).json({ error: 'Desktop settings are unavailable' });
+  try {
+    res.json({ ...saveSettings(ENV_FILE, req.body), restartRequired: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
 
 app.get('/api/stock/:symbol', async (req, res) => {
 
@@ -1642,6 +1667,7 @@ app.post('/api/backtest', async (req, res) => {
 
 // ── Python FastAPI service manager ───────────────────────────────────────────
 const PYTHON_SCRIPT = path.join(__dirname, '../analysis/stock_data.py');
+const PYTHON_SERVICE_EXE = process.env.PYTHON_SERVICE_EXE;
 let pythonProcess = null;
 let pythonExiting = false;
 
@@ -1649,9 +1675,11 @@ function startPythonService() {
   if (pythonExiting) return;
 
   console.log('[python-service] Starting FastAPI service...');
-  pythonProcess = spawn('python', [PYTHON_SCRIPT, 'serve'], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  // Packaged desktop apps ship a PyInstaller bundle via PYTHON_SERVICE_EXE;
+  // otherwise fall back to the system Python interpreter (dev mode).
+  pythonProcess = PYTHON_SERVICE_EXE
+    ? spawn(PYTHON_SERVICE_EXE, ['serve'], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
+    : spawn('python', [PYTHON_SCRIPT, 'serve'], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
 
   pythonProcess.stdout.on('data', (data) => {
     process.stdout.write(`[python-service] ${data}`);
@@ -1695,6 +1723,17 @@ process.on('SIGINT',  () => shutdown('SIGINT'));
 
 startPythonService();
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-});
+// ── Serve the built frontend (single-origin desktop app) ─────────────────────
+// The packaged Electron app loads the UI straight from this Express server so
+// the renderer and /api share an origin (no CORS, no absolute API URLs).
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+if (BIND_HOST) {
+  app.listen(port, BIND_HOST, () => {
+    console.log(`Server running at http://${BIND_HOST}:${port}`);
+  });
+} else {
+  app.listen(port, () => {
+    console.log(`Server running at http://localhost:${port}`);
+  });
+}

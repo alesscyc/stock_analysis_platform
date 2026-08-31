@@ -4,6 +4,19 @@ import './AIChat.css';
 
 const MARKET_FIELDS = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume', '10MA', '20MA', '50MA', '150MA', '200MA'];
 
+async function readApiJson(response, fallbackMessage) {
+  const status = Number.isInteger(response.status) ? ` (HTTP ${response.status})` : '';
+  const contentType = response.headers?.get?.('content-type') || '';
+  if (contentType && !contentType.includes('json')) {
+    throw new Error(`${fallbackMessage}${status}`);
+  }
+  try {
+    return await response.json();
+  } catch {
+    throw new Error(`${fallbackMessage}${status}`);
+  }
+}
+
 function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPrediction, onReviewDraft }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -41,7 +54,7 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
 
     try {
       const response = await fetch('/api/chat/models', { signal: controller.signal });
-      const data = await response.json();
+      const data = await readApiJson(response, t('modelsFailed'));
       if (!response.ok) throw new Error(data.error || t('modelsFailed'));
 
       const availableModels = Array.isArray(data.models) ? data.models : [];
@@ -79,6 +92,7 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
       .map(({ role, content }) => ({ role, content }));
     const compactStockData = stockData
       .filter((row) => row?.Date && row?.Close != null)
+      .slice(-500)
       .map((row) => Object.fromEntries(
         MARKET_FIELDS
           .filter((field) => row[field] != null)
@@ -108,7 +122,7 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
           aiPrediction,
         }),
       });
-      const data = await response.json();
+      const data = await readApiJson(response, t('chatFailed'));
       if (!response.ok) throw new Error(data.error || t('chatFailed'));
 
       setMessages((current) => [...current, {

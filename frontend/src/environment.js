@@ -10,6 +10,10 @@ export function isGitHubPages() {
   );
 }
 
+export function isDesktopApp() {
+  return typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
+}
+
 /**
  * Returns the base URL for API calls.
  * On GitHub Pages, API calls won't work, so we return null.

@@ -115,6 +115,42 @@ cd ../backend
 npm test
 ```
 
+## Windows desktop app (Electron)
+
+The repository ships an optional Electron shell in `electron/` that bundles the
+React frontend, the Express backend, and the Python analysis service into a
+single Windows installer. End users do not need Node.js or Python installed:
+the Electron binary runs Express via `ELECTRON_RUN_AS_NODE`, and PyInstaller
+provides a standalone `analysis-service.exe`.
+
+```bash
+cd electron
+npm install                 # one-time: electron + electron-builder
+npm run dist                # one command: builds the Windows NSIS installer
+```
+
+The installer is written to `electron/dist/`. It packages:
+
+- `frontend/dist` — built by Vite, then served by Express on `http://127.0.0.1:3001/` (same origin as `/api`).
+- `backend/` — only the runtime source (`server.js`, `chatSafety.js`, `package.json`) plus production deps installed with `npm ci --omit=dev`; Express runs via the Electron binary in Node mode and starts/stops the analysis service with the app.
+- `analysis/stock_data.py` — bundled with PyInstaller as `analysis-service.exe`; Express spawns it via `PYTHON_SERVICE_EXE`.
+
+Run the app unpackaged during development:
+
+```bash
+cd electron
+npm start                   # loads the built frontend (run `npm run build` in frontend/ first)
+```
+
+Notes:
+
+- Open **Settings** in the desktop top bar to configure IB Gateway/TWS, Finnhub, and the OpenAI-compatible provider. Values are saved to `%APPDATA%\Stock Analysis Platform\.env` and take effect after restarting the app.
+- API keys are write-only in the Settings panel: saved values are never returned to the renderer. Leaving a key blank preserves it. The installer never bundles local secrets or model artifacts.
+- Settings in development continue to come from `backend/.env`; the settings API is disabled outside the loopback-only desktop mode.
+- Model cache and backtests work the same in the packaged app: models are stored under `<userData>\model_cache`.
+- In desktop mode the backend binds `127.0.0.1` and disables permissive CORS; the browser-based web workflow keeps its original `0.0.0.0`/CORS behavior.
+- `npm run dist` installs PyInstaller and `electron/` dependencies automatically on first run.
+
 ## Important notes
 
 - The API has no authentication and is intended for local development.

@@ -24,3 +24,7 @@ skills-lock.json
 .clinerules/
 .windsurf/
 .codegraph/
+electron/node_modules/
+electron/dist/
+electron/resources/
+electron/build/

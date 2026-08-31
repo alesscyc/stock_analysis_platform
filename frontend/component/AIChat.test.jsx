@@ -105,6 +105,43 @@ describe('AIChat', () => {
     expect(body.stockData[0]).not.toHaveProperty('Label');
   });
 
+  it('sends only the latest 500 market rows', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => ({
+      ok: true,
+      json: async () => url === '/api/chat/models'
+        ? { models: ['test-model'], defaultModel: 'test-model' }
+        : { answer: 'Done.' },
+    }));
+    const stockData = Array.from({ length: 501 }, (_, index) => ({
+      Date: `2026-01-${String((index % 28) + 1).padStart(2, '0')}`,
+      Close: index,
+    }));
+
+    render(
+      <I18nProvider>
+        <AIChat
+          stockSymbol="AAPL"
+          stockData={stockData}
+          currentInterval="1d"
+          fundamentals={null}
+          aiPrediction={null}
+        />
+      </I18nProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open AI chat' }));
+    await screen.findByRole('combobox', { name: 'Model' });
+    fireEvent.change(screen.getByPlaceholderText(/Ask about AAPL/), { target: { value: 'Review it' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await screen.findByText('Done.');
+
+    const chatCall = fetchMock.mock.calls.find(([url]) => url === '/api/chat');
+    const body = JSON.parse(chatCall[1].body);
+    expect(body.stockData).toHaveLength(500);
+    expect(body.stockData[0].Close).toBe(1);
+    expect(body.stockData[499].Close).toBe(500);
+  });
+
   it('opens the existing TradeDialog only when a validated draft is reviewed', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
       if (url === '/api/chat/models') {
@@ -155,5 +192,42 @@ describe('AIChat', () => {
     expect(fetchMock.mock.calls.some(([url, options]) =>
       url === '/api/orders' && options?.method === 'POST'
     )).toBe(false);
+  });
+
+  it('turns an HTML API response into a useful error instead of a JSON parse error', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (url === '/api/chat/models') {
+        return {
+          ok: true,
+          json: async () => ({ models: ['test-model'], defaultModel: 'test-model' }),
+        };
+      }
+      return {
+        ok: false,
+        status: 404,
+        headers: { get: () => 'text/html; charset=utf-8' },
+        json: async () => { throw new SyntaxError("Unexpected token '<'"); },
+      };
+    });
+
+    render(
+      <I18nProvider>
+        <AIChat
+          stockSymbol="AAPL"
+          stockData={[{ Date: '2026-08-28', Close: 100 }]}
+          currentInterval="1d"
+          fundamentals={null}
+          aiPrediction={null}
+        />
+      </I18nProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open AI chat' }));
+    await screen.findByRole('combobox', { name: 'Model' });
+    fireEvent.change(screen.getByPlaceholderText(/Ask about AAPL/), { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await screen.findByText('AI response failed (HTTP 404)');
+    expect(screen.queryByText(/Unexpected token/)).not.toBeInTheDocument();
   });
 });

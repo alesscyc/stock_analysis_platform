@@ -1,3 +1,6 @@
+import io
+import json
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -57,6 +60,46 @@ class StockHistoryWindowTest(unittest.TestCase):
             end_date='1991-01-01',
             include_market_cap=False,
         ), [])
+
+
+class IncompleteBarTicker(FakeTicker):
+    def __init__(self):
+        super().__init__()
+        self.frame.iloc[-1, self.frame.columns.get_indexer(['Open', 'High', 'Low', 'Close'])] = np.nan
+
+
+class IncompleteBarJsonTest(unittest.TestCase):
+    @patch.object(stock_data.yf, 'Ticker', return_value=IncompleteBarTicker())
+    def test_history_drops_nan_ohlc_bar(self, _ticker):
+        rows = stock_data.get_stock_price_history(
+            'TEST', date_range='1y', interval='1d', include_market_cap=False,
+        )
+        json.dumps(rows, allow_nan=False)
+        self.assertTrue(all(np.isfinite(row['Close']) for row in rows))
+
+    @patch.object(stock_data.yf, 'Ticker', return_value=IncompleteBarTicker())
+    def test_current_price_skips_nan_last_close(self, _ticker):
+        result = stock_data.get_current_stock_price('TEST')
+        json.dumps(result, allow_nan=False)
+        self.assertTrue(np.isfinite(result['price']))
+
+
+class BacktestWorkerTest(unittest.TestCase):
+    def test_cli_worker_reads_stdin_and_prints_json(self):
+        params = {
+            'symbol': 'TEST',
+            'strategy_config': {'entry': {'left': 'Close', 'op': '>', 'right': 'MA_200'}},
+            'capital': 10000,
+            'date_range': '1y',
+            'interval': '1d',
+        }
+        with patch.object(stock_data, 'run_backtest', return_value={'symbol': 'TEST', 'error': None}) as mock_run:
+            out = io.StringIO()
+            with patch.object(sys, 'stdin', io.StringIO(json.dumps(params))), \
+                 patch.object(sys, 'stdout', out):
+                stock_data.run_backtest_worker()
+        mock_run.assert_called_once_with(**params)
+        self.assertEqual(json.loads(out.getvalue()), {'symbol': 'TEST', 'error': None})
 
 
 if __name__ == '__main__':

@@ -9,7 +9,8 @@ import WatchlistDialog from '../component/WatchlistDialog';
 import ScreenerDialog from '../component/ScreenerDialog';
 import BacktestDialog from '../component/BacktestDialog';
 import AIChat from '../component/AIChat';
-import { isGitHubPages } from './environment';
+import SettingsDialog from '../component/SettingsDialog';
+import { isDesktopApp, isGitHubPages } from './environment';
 import { generateNvdaMockData } from './mockData';
 import { useTranslation } from './i18n/useTranslation';
 import { mergeStockData, olderDailyWindow, recentDailyWindow } from './chartLoading';
@@ -429,6 +430,20 @@ function App() {
 
           <div className="topbar-divider" />
 
+          {isDesktopApp() && (
+            <button
+              className="btn-orders"
+              onClick={() => setActiveSidebar(prev => prev === 'settings' ? null : 'settings')}
+              aria-label={t('settings')}
+            >
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.16.38.42.72.75.96.3.22.67.34 1.05.34h.09v4h-.09c-.38 0-.75.12-1.05.34-.33.24-.59.58-.75.96Z" />
+              </svg>
+              {t('settings')}
+            </button>
+          )}
+
           <button
             className="btn-language"
             onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
@@ -658,6 +673,7 @@ function App() {
             currentInterval={currentInterval}
             onTradesUpdate={setBacktestTrades}
           />
+          <SettingsDialog isOpen={activeSidebar === 'settings'} onClose={() => setActiveSidebar(null)} />
         </aside>
       </div>
 

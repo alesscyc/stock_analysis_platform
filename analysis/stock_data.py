@@ -13,8 +13,9 @@ from typing import Optional
 MODEL_CACHE_TTL_HOURS = 4
 _model_cache = {}  # symbol -> {'model_data': ..., 'trained_at': datetime}
 
-# Optional disk persistence directory (created on first use)
-MODEL_CACHE_DIR = os.path.join(os.path.dirname(__file__), 'model_cache')
+# Optional disk persistence directory (created on first use). The packaged
+# desktop app redirects this to Electron's userData dir via MODEL_CACHE_DIR.
+MODEL_CACHE_DIR = os.environ.get('MODEL_CACHE_DIR') or os.path.join(os.path.dirname(__file__), 'model_cache')
 
 
 def _get_cache_path(symbol):
@@ -113,7 +114,9 @@ def get_stock_price_history(
             # Default to 2 years if invalid range provided
             hist = ticker.history(period="2y", interval=interval)
         
-        # Check if data is available
+        # yfinance often emits a NaN last bar; Starlette JSON rejects NaN.
+        if not hist.empty:
+            hist = hist.dropna(subset=['Open', 'High', 'Low', 'Close'])
         if hist.empty:
             return [] if target_start else {"error": f"No data found for symbol: {symbol}"}
 
@@ -384,6 +387,7 @@ def get_current_stock_price(symbol):
         ticker = yf.Ticker(symbol)
         # Fetch 2 days to get previous close for day-change calculation
         hist = ticker.history(period="5d")
+        hist = hist.dropna(subset=['Close']) if not hist.empty else hist
         if hist.empty:
             return {"error": f"No price data found for symbol: {symbol}"}
 
@@ -798,6 +802,19 @@ def run_backtest(symbol, strategy_config, capital=10000, date_range='2y', interv
     except Exception as e:
         return {'error': f'Backtest failed: {str(e)}'}
 
+
+def run_backtest_worker():
+    """CLI worker mode: read backtest params (JSON) from stdin, print the
+    result (JSON) to stdout.
+
+    Invoked as `python stock_data.py backtest`. The FastAPI /backtest endpoint
+    spawns this as a killable subprocess. The same command works under a normal
+    Python interpreter and a frozen PyInstaller executable.
+    """
+    params = json.loads(sys.stdin.read())
+    print(json.dumps(run_backtest(**params)))
+
+
 def train_random_forest_model(stock_data):
     """
     Train a Random Forest model using pre-fetched stock data from a single symbol.
@@ -1059,16 +1076,13 @@ def _make_fastapi_app():
 
     @service.post("/backtest")
     def backtest(req: BacktestRequest):
-        import subprocess, os
-        # Run backtest in subprocess so we can kill on timeout
-        script = (
-            "import sys, json\n"
-            f"sys.path.insert(0, {json.dumps(os.path.dirname(__file__) or '.')})\n"
-            "from stock_data import run_backtest\n"
-            "params = json.loads(sys.stdin.read())\n"
-            "result = run_backtest(**params)\n"
-            "print(json.dumps(result))\n"
-        )
+        import subprocess
+        # Run the CLI worker in a subprocess so it can be killed on timeout.
+        # The same mode works under system Python and a frozen PyInstaller exe.
+        cmd = [sys.executable]
+        if not getattr(sys, 'frozen', False):
+            cmd.append(__file__)
+        cmd.append('backtest')
         params = {
             'symbol': req.symbol,
             'strategy_config': req.strategy_config,
@@ -1077,7 +1091,7 @@ def _make_fastapi_app():
             'interval': req.interval,
         }
         proc = subprocess.Popen(
-            [sys.executable, '-c', script],
+            cmd,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
         try:
@@ -1158,6 +1172,9 @@ if __name__ == "__main__":
             symbol = sys.argv[2]
             result = get_current_stock_price(symbol)
         print(json.dumps(result, separators=(',', ':')))
+
+    elif function_name == "backtest":
+        run_backtest_worker()
 
     else:
         print(json.dumps({"error": f"Unknown function: {function_name}"}, separators=(',', ':')))
