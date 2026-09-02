@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from './App'
 
@@ -216,5 +216,109 @@ describe('App', () => {
     })
 
     expect(screen.getByTestId('stock-chart')).toHaveTextContent('MSFT:1')
+  })
+})
+
+describe('sidebar resize', () => {
+  const stubFetch = () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(ok({ connected: false }))))
+  }
+
+  const stubPointerCapture = () => {
+    Element.prototype.setPointerCapture = () => {}
+    Element.prototype.hasPointerCapture = () => false
+    Element.prototype.releasePointerCapture = () => {}
+  }
+
+  const stubLayout = (aside) => {
+    Object.defineProperty(aside, 'offsetWidth', { value: 380, configurable: true })
+  }
+
+  const openSidebar = () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Watchlist' }))
+  }
+
+  beforeEach(() => {
+    stubFetch()
+    stubPointerCapture()
+  })
+
+  it('drags the handle to resize and commits width on pointer up', () => {
+    const { container } = render(<App />)
+    openSidebar()
+    const separator = screen.getByRole('separator', { name: /resize/i })
+    const aside = container.querySelector('.app-sidebar')
+    stubLayout(aside)
+
+    expect(separator).toHaveAttribute('aria-valuemax', '704')
+
+    act(() => { fireEvent.pointerDown(separator, { pointerId: 1, clientX: 500 }) })
+    act(() => { fireEvent.pointerMove(separator, { pointerId: 1, clientX: 400 }) })
+    expect(aside).toHaveStyle({ width: '480px' })
+
+    act(() => { fireEvent.pointerUp(separator, { pointerId: 1, clientX: 400 }) })
+    expect(aside).toHaveStyle({ width: '480px' })
+    expect(separator).toHaveAttribute('aria-valuenow', '480')
+  })
+
+  it('stops resizing after pointer cancel and ignores later moves', () => {
+    const { container } = render(<App />)
+    openSidebar()
+    const separator = screen.getByRole('separator', { name: /resize/i })
+    const aside = container.querySelector('.app-sidebar')
+    stubLayout(aside)
+
+    act(() => { fireEvent.pointerDown(separator, { pointerId: 1, clientX: 500 }) })
+    act(() => { fireEvent.pointerMove(separator, { pointerId: 1, clientX: 400 }) })
+    act(() => { fireEvent.pointerCancel(separator, { pointerId: 1 }) })
+    expect(separator).toHaveAttribute('aria-valuenow', '480')
+
+    act(() => { fireEvent.pointerMove(separator, { pointerId: 1, clientX: 300 }) })
+    expect(aside).toHaveStyle({ width: '480px' })
+  })
+
+  it('clamps keyboard resizing to min and viewport max', () => {
+    render(<App />)
+    openSidebar()
+    const separator = screen.getByRole('separator', { name: /resize/i })
+
+    for (let i = 0; i < 50; i += 1) {
+      act(() => { fireEvent.keyDown(separator, { key: 'ArrowRight' }) })
+    }
+    expect(separator).toHaveAttribute('aria-valuenow', '704')
+
+    for (let i = 0; i < 50; i += 1) {
+      act(() => { fireEvent.keyDown(separator, { key: 'ArrowLeft' }) })
+    }
+    expect(separator).toHaveAttribute('aria-valuenow', '280')
+  })
+
+  it('clamps width to the viewport on mount and window resize', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 500, configurable: true })
+    render(<App />)
+    openSidebar()
+    const separator = screen.getByRole('separator', { name: /resize/i })
+
+    expect(separator).toHaveAttribute('aria-valuenow', '280')
+    expect(separator).toHaveAttribute('aria-valuemax', '280')
+
+    Object.defineProperty(window, 'innerWidth', { value: 400, configurable: true })
+    act(() => { fireEvent(window, new Event('resize')) })
+    expect(separator).toHaveAttribute('aria-valuenow', '280')
+
+    Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true })
+  })
+
+  it('keeps the resize handle out of tab order when the sidebar is closed', () => {
+    const { container } = render(<App />)
+    const separator = container.querySelector('.app-sidebar-resizer')
+
+    expect(separator).toHaveAttribute('tabindex', '-1')
+    expect(separator).toHaveAttribute('aria-hidden', 'true')
+
+    openSidebar()
+    const visibleSeparator = screen.getByRole('separator', { name: /resize/i })
+    expect(visibleSeparator).toHaveAttribute('tabindex', '0')
+    expect(visibleSeparator).not.toHaveAttribute('aria-hidden')
   })
 })

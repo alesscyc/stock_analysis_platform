@@ -356,6 +356,7 @@
 
 /* ── Sidebar panel container ──────────────────────────── */
 .app-sidebar {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 380px;
@@ -373,6 +374,45 @@
     transform 0.22s ease,
     border-color 0.22s ease;
   will-change: width, opacity, transform;
+}
+
+.app-sidebar.app-sidebar-resizing {
+  transition: none;
+}
+
+/* ── Sidebar drag resize handle ──────────────────────── */
+.app-sidebar-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 20;
+}
+
+.app-sidebar-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.app-sidebar-resizer:hover::after,
+.app-sidebar-resizer:active::after,
+.app-sidebar-resizer:focus-visible::after {
+  background: var(--accent, #4488ff);
+}
+
+.app-sidebar-resizer:focus-visible {
+  outline: 2px solid var(--accent, #4488ff);
+  outline-offset: -2px;
+  border-radius: 2px;
 }
 
 /* ── Main workspace ────────────────────────────────────── */

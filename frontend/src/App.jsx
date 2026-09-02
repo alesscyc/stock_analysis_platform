@@ -17,6 +17,11 @@ import { mergeStockData, olderDailyWindow, recentDailyWindow } from './chartLoad
 
 const RECENT_CACHE_TTL = 5 * 60 * 1000;
 const HISTORY_FLOOR_DATE = '1900-01-01';
+const SIDEBAR_DEFAULT_WIDTH = 380;
+const SIDEBAR_MIN_WIDTH = 280;
+const SIDEBAR_MAX_WIDTH = 760;
+const SIDEBAR_MIN_MAIN_WIDTH = 320;
+const SIDEBAR_KEYBOARD_STEP = 10;
 
 function stockDataCacheKey(symbol, interval) {
   return `${String(symbol || '').trim().toUpperCase()}-${interval}`;
@@ -50,9 +55,78 @@ function App() {
   const [orderDraft, setOrderDraft] = useState(null);
   const [ordersRefreshToken, setOrdersRefreshToken] = useState(0);
   const [backtestTrades, setBacktestTrades] = useState(null);
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const [isSidebarResizing, setIsSidebarResizing] = useState(false);
   const stockDataCacheRef = useRef(new Map());
   const loadAbortRef = useRef(null);
   const orderModificationCommittedRef = useRef(false);
+  const sidebarRef = useRef(null);
+
+  const clampSidebarWidth = useCallback((width) => (
+    Math.min(
+      SIDEBAR_MAX_WIDTH,
+      Math.max(SIDEBAR_MIN_WIDTH, width),
+      Math.max(SIDEBAR_MIN_WIDTH, window.innerWidth - SIDEBAR_MIN_MAIN_WIDTH),
+    )
+  ), []);
+
+  const handleResizerPointerDown = useCallback((e) => {
+    e.preventDefault();
+    const resizer = e.currentTarget;
+    const startX = e.clientX;
+    const startWidth = sidebarRef.current?.offsetWidth ?? SIDEBAR_DEFAULT_WIDTH;
+    resizer.setPointerCapture(e.pointerId);
+    setIsSidebarResizing(true);
+
+    const applyWidth = (width) => {
+      const next = clampSidebarWidth(width);
+      const aside = sidebarRef.current;
+      if (aside) {
+        aside.style.width = `${next}px`;
+        aside.style.maxWidth = `${next}px`;
+      }
+      resizer.setAttribute('aria-valuenow', String(next));
+      return next;
+    };
+
+    const onMove = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
+      applyWidth(startWidth + startX - ev.clientX);
+    };
+
+    const teardown = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
+      resizer.removeEventListener('pointermove', onMove);
+      resizer.removeEventListener('pointerup', teardown);
+      resizer.removeEventListener('pointercancel', teardown);
+      resizer.removeEventListener('lostpointercapture', teardown);
+      if (resizer.hasPointerCapture?.(ev.pointerId)) resizer.releasePointerCapture(ev.pointerId);
+      const final = Math.round(parseFloat(sidebarRef.current?.style.width) || SIDEBAR_DEFAULT_WIDTH);
+      setSidebarWidth(final);
+      setIsSidebarResizing(false);
+    };
+
+    resizer.addEventListener('pointermove', onMove);
+    resizer.addEventListener('pointerup', teardown);
+    resizer.addEventListener('pointercancel', teardown);
+    resizer.addEventListener('lostpointercapture', teardown);
+  }, [clampSidebarWidth]);
+
+  const handleResizerKeyDown = useCallback((e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    setSidebarWidth(prev => clampSidebarWidth(prev + (e.key === 'ArrowRight' ? SIDEBAR_KEYBOARD_STEP : -SIDEBAR_KEYBOARD_STEP)));
+  }, [clampSidebarWidth]);
+
+  useEffect(() => {
+    const onWindowResize = () => {
+      const maxForViewport = Math.max(SIDEBAR_MIN_WIDTH, window.innerWidth - SIDEBAR_MIN_MAIN_WIDTH);
+      setSidebarWidth(prev => Math.min(prev, maxForViewport));
+    };
+    onWindowResize();
+    window.addEventListener('resize', onWindowResize);
+    return () => window.removeEventListener('resize', onWindowResize);
+  }, []);
 
   const rememberStockData = (symbol, interval, data, meta = {}) => {
     if (!symbol || !Array.isArray(data) || data.length === 0) return;
@@ -641,7 +715,24 @@ function App() {
           </main>
         </div>
 
-        <aside className={`app-sidebar${activeSidebar ? '' : ' app-sidebar-hidden'}`}>
+        <aside
+          ref={sidebarRef}
+          className={`app-sidebar${activeSidebar ? '' : ' app-sidebar-hidden'}${isSidebarResizing ? ' app-sidebar-resizing' : ''}`}
+          style={activeSidebar ? { width: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` } : undefined}
+        >
+          <div
+            className="app-sidebar-resizer"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t('resizeSidebar')}
+            aria-valuemin={SIDEBAR_MIN_WIDTH}
+            aria-valuemax={Math.max(SIDEBAR_MIN_WIDTH, window.innerWidth - SIDEBAR_MIN_MAIN_WIDTH)}
+            aria-valuenow={sidebarWidth}
+            aria-hidden={!activeSidebar || undefined}
+            tabIndex={activeSidebar ? 0 : -1}
+            onPointerDown={handleResizerPointerDown}
+            onKeyDown={handleResizerKeyDown}
+          />
           <TradeDialog
             isOpen={activeSidebar === 'trade'}
             onClose={handleTradeClose}

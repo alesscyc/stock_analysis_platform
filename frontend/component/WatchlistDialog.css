@@ -1,6 +1,6 @@
 /* ── Sidebar panel ─────────────────────────────────────── */
 #watchlist-dialog-sidebar {
-  width: 380px;
+  width: 100%;
   background: var(--bg-surface);
   border-left: 1px solid var(--border-subtle);
   box-sizing: border-box;
@@ -371,7 +371,7 @@
 /* ── Responsive ────────────────────────────────────────── */
 @media (max-width: 480px) {
   #watchlist-dialog-sidebar {
-    width: 100vw;
+    width: 100%;
     border-left: none;
     border-top: 1px solid var(--border-subtle);
     top: auto;
