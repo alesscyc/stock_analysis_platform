@@ -688,7 +688,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       layout: {
         background:  { color: '#131722' },
         textColor:   '#8892a4',
-        fontFamily:  "'Inter', 'Helvetica Neue', Arial, sans-serif",
+        fontFamily:  "'Noto Sans TC', 'Inter', 'Helvetica Neue', Arial, sans-serif",
         fontSize:    12,
       },
       grid: {

@@ -52,8 +52,8 @@
   --space-10: 40px;
 
   /* Typography */
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
-  --font-ui:   'Inter', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Noto Sans TC', ui-monospace, monospace;
+  --font-ui:   'Noto Sans TC', 'Inter', 'Helvetica Neue', Arial, 'Noto Sans CJK SC', 'Microsoft JhengHei', 'PingFang TC', sans-serif;
 
   /* Shadows */
   --shadow-sm:  0 1px 3px rgba(0,0,0,0.4);
