@@ -12,59 +12,6 @@
   flex-shrink: 0;
 }
 
-/* ── Header ────────────────────────────────────────────── */
-#orders-dialog-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-shrink: 0;
-}
-
-#orders-header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-#orders-type-badge {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--accent);
-  text-transform: uppercase;
-}
-
-#orders-dialog-title {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--text-primary);
-  line-height: 1.1;
-}
-
-#orders-dialog-close-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-normal);
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s, color 0.15s;
-  padding: 0;
-}
-
-#orders-dialog-close-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
-}
-
 /* ── Loading state ─────────────────────────────────────── */
 #orders-loading-state {
   display: flex;

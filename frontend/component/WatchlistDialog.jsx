@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from '../src/i18n/useTranslation';
+import PanelCloseButton from './PanelCloseButton';
 import './WatchlistDialog.css';
 
 const STORAGE_KEY = 'stockai-watchlist';
@@ -260,12 +261,7 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
             <div id="watchlist-type-badge">{t('watchlistBadge')}</div>
             <h2 id="watchlist-dialog-title">{t('watchlist')}</h2>
           </div>
-          <button id="watchlist-dialog-close-btn" onClick={handleClose} aria-label={t('closeWatchlist')}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
+          <PanelCloseButton onClick={handleClose} label={t('closeWatchlist')} />
         </div>
 
         {/* Search field with autocomplete */}

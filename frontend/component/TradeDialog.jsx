@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from '../src/i18n/useTranslation';
+import PanelCloseButton from './PanelCloseButton';
 import './TradeDialog.css';
 
 const SUBMITTED_ORDER_PRICES_KEY = 'stockai-submitted-order-prices';
@@ -243,12 +244,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
               <span id="trade-dialog-symbol">{stockSymbol}</span>
             </h2>
           </div>
-          <button id="trade-dialog-close-btn" onClick={handleClose} aria-label={t('close')}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
+          <PanelCloseButton onClick={handleClose} label={t('close')} />
         </div>
 
         {/* Order direction selector */}

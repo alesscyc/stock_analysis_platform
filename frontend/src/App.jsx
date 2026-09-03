@@ -10,6 +10,7 @@ import ScreenerDialog from '../component/ScreenerDialog';
 import BacktestDialog from '../component/BacktestDialog';
 import AIChat from '../component/AIChat';
 import SettingsDialog from '../component/SettingsDialog';
+import PanelCloseButton from '../component/PanelCloseButton';
 import { isDesktopApp, isGitHubPages } from './environment';
 import { generateNvdaMockData } from './mockData';
 import { useTranslation } from './i18n/useTranslation';
@@ -22,6 +23,12 @@ const SIDEBAR_MIN_WIDTH = 280;
 const SIDEBAR_MAX_WIDTH = 760;
 const SIDEBAR_MIN_MAIN_WIDTH = 320;
 const SIDEBAR_KEYBOARD_STEP = 10;
+const ACCOUNT_PANEL_DEFAULT_HEIGHT = 280;
+const ACCOUNT_PANEL_MIN_HEIGHT = 180;
+const ACCOUNT_PANEL_MAX_HEIGHT = 520;
+const ACCOUNT_PANEL_MIN_MAIN_HEIGHT = 240;
+const ACCOUNT_PANEL_KEYBOARD_STEP = 10;
+const APP_TOPBAR_HEIGHT = 56;
 
 function stockDataCacheKey(symbol, interval) {
   return `${String(symbol || '').trim().toUpperCase()}-${interval}`;
@@ -41,6 +48,8 @@ function App() {
   const [stockData, setStockData] = useState([]);
   const [currentInterval, setCurrentInterval] = useState('1d');
   const [activeSidebar, setActiveSidebar] = useState(null);
+  const [accountPanelTab, setAccountPanelTab] = useState('portfolio');
+  const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [aiPrediction, setAiPrediction] = useState(null);
@@ -57,10 +66,14 @@ function App() {
   const [backtestTrades, setBacktestTrades] = useState(null);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
+  const [accountPanelHeight, setAccountPanelHeight] = useState(ACCOUNT_PANEL_DEFAULT_HEIGHT);
+  const [isAccountPanelResizing, setIsAccountPanelResizing] = useState(false);
   const stockDataCacheRef = useRef(new Map());
   const loadAbortRef = useRef(null);
   const orderModificationCommittedRef = useRef(false);
   const sidebarRef = useRef(null);
+  const accountPanelRef = useRef(null);
+  const accountPanelToggleRef = useRef(null);
 
   const clampSidebarWidth = useCallback((width) => (
     Math.min(
@@ -118,6 +131,72 @@ function App() {
     setSidebarWidth(prev => clampSidebarWidth(prev + (e.key === 'ArrowRight' ? SIDEBAR_KEYBOARD_STEP : -SIDEBAR_KEYBOARD_STEP)));
   }, [clampSidebarWidth]);
 
+  const clampAccountPanelHeight = useCallback((height) => {
+    const maxForViewport = Math.max(
+      ACCOUNT_PANEL_MIN_HEIGHT,
+      window.innerHeight - APP_TOPBAR_HEIGHT - ACCOUNT_PANEL_MIN_MAIN_HEIGHT,
+    );
+    return Math.min(
+      ACCOUNT_PANEL_MAX_HEIGHT,
+      Math.max(ACCOUNT_PANEL_MIN_HEIGHT, height),
+      maxForViewport,
+    );
+  }, []);
+
+  const applyAccountPanelHeight = useCallback((height) => {
+    const next = clampAccountPanelHeight(height);
+    const panel = accountPanelRef.current;
+    panel?.style.setProperty('--account-panel-height', `${next}px`);
+    panel?.closest('#root')?.style.setProperty('--account-panel-height', `${next}px`);
+    return next;
+  }, [clampAccountPanelHeight]);
+
+  const handleAccountPanelResizePointerDown = useCallback((event) => {
+    event.preventDefault();
+    const resizer = event.currentTarget;
+    const startY = event.clientY;
+    const startHeight = accountPanelRef.current?.offsetHeight ?? ACCOUNT_PANEL_DEFAULT_HEIGHT;
+    resizer.setPointerCapture(event.pointerId);
+    setIsAccountPanelResizing(true);
+
+    const applyHeight = (height) => {
+      const next = applyAccountPanelHeight(height);
+      resizer.setAttribute('aria-valuenow', String(next));
+    };
+
+    const onMove = (moveEvent) => {
+      if (moveEvent.pointerId !== event.pointerId) return;
+      applyHeight(startHeight + startY - moveEvent.clientY);
+    };
+
+    const teardown = (endEvent) => {
+      if (endEvent.pointerId !== event.pointerId) return;
+      resizer.removeEventListener('pointermove', onMove);
+      resizer.removeEventListener('pointerup', teardown);
+      resizer.removeEventListener('pointercancel', teardown);
+      resizer.removeEventListener('lostpointercapture', teardown);
+      if (resizer.hasPointerCapture?.(endEvent.pointerId)) resizer.releasePointerCapture(endEvent.pointerId);
+      const finalHeight = Math.round(
+        parseFloat(accountPanelRef.current?.style.getPropertyValue('--account-panel-height')) || ACCOUNT_PANEL_DEFAULT_HEIGHT,
+      );
+      setAccountPanelHeight(finalHeight);
+      setIsAccountPanelResizing(false);
+    };
+
+    resizer.addEventListener('pointermove', onMove);
+    resizer.addEventListener('pointerup', teardown);
+    resizer.addEventListener('pointercancel', teardown);
+    resizer.addEventListener('lostpointercapture', teardown);
+  }, [applyAccountPanelHeight]);
+
+  const handleAccountPanelResizeKeyDown = useCallback((event) => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    setAccountPanelHeight((height) => clampAccountPanelHeight(
+      height + (event.key === 'ArrowUp' ? ACCOUNT_PANEL_KEYBOARD_STEP : -ACCOUNT_PANEL_KEYBOARD_STEP),
+    ));
+  }, [clampAccountPanelHeight]);
+
   useEffect(() => {
     const onWindowResize = () => {
       const maxForViewport = Math.max(SIDEBAR_MIN_WIDTH, window.innerWidth - SIDEBAR_MIN_MAIN_WIDTH);
@@ -127,6 +206,36 @@ function App() {
     window.addEventListener('resize', onWindowResize);
     return () => window.removeEventListener('resize', onWindowResize);
   }, []);
+
+  useEffect(() => {
+    applyAccountPanelHeight(accountPanelHeight);
+  }, [accountPanelHeight, applyAccountPanelHeight]);
+
+  useEffect(() => {
+    const onWindowResize = () => setAccountPanelHeight((height) => applyAccountPanelHeight(height));
+    window.addEventListener('resize', onWindowResize);
+    return () => window.removeEventListener('resize', onWindowResize);
+  }, [applyAccountPanelHeight]);
+
+  const toggleAccountPanel = () => {
+    if (!isAccountPanelOpen) {
+      setAccountPanelHeight((height) => applyAccountPanelHeight(height));
+    }
+    setIsAccountPanelOpen((open) => !open);
+  };
+
+  const closeAccountPanel = () => {
+    setIsAccountPanelOpen(false);
+    requestAnimationFrame(() => accountPanelToggleRef.current?.focus());
+  };
+
+  const handleAccountTabKeyDown = (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const nextTab = event.key === 'ArrowRight' || event.key === 'End' ? 'orders' : 'portfolio';
+    setAccountPanelTab(nextTab);
+    event.currentTarget.parentElement?.querySelector(`#${nextTab}-tab`)?.focus();
+  };
 
   const rememberStockData = (symbol, interval, data, meta = {}) => {
     if (!symbol || !Array.isArray(data) || data.length === 0) return;
@@ -450,7 +559,7 @@ function App() {
 
         <div className="topbar-actions">
           <button
-            className="btn-screener"
+            className={`btn-screener${activeSidebar === 'screener' ? ' is-active' : ''}`}
             onClick={() => setActiveSidebar(prev => prev === 'screener' ? null : 'screener')}
             aria-label={t('screener')}
           >
@@ -460,7 +569,7 @@ function App() {
             {t('screener')}
           </button>
           <button
-            className="btn-backtest"
+            className={`btn-backtest${activeSidebar === 'backtest' ? ' is-active' : ''}`}
             onClick={() => setActiveSidebar(prev => prev === 'backtest' ? null : 'backtest')}
             aria-label={t('backtest')}
           >
@@ -470,7 +579,7 @@ function App() {
             {t('backtest')}
           </button>
           <button
-            className="btn-watchlist"
+            className={`btn-watchlist${activeSidebar === 'watchlist' ? ' is-active' : ''}`}
             onClick={() => setActiveSidebar(prev => prev === 'watchlist' ? null : 'watchlist')}
             aria-label={t('watchlist')}
           >
@@ -480,9 +589,12 @@ function App() {
             {t('watchlist')}
           </button>
           <button
-            className="btn-portfolio"
-            onClick={() => setActiveSidebar(prev => prev === 'portfolio' ? null : 'portfolio')}
-            aria-label={t('portfolio')}
+            ref={accountPanelToggleRef}
+            className={`btn-portfolio${isAccountPanelOpen ? ' is-active' : ''}`}
+            onClick={toggleAccountPanel}
+            aria-label={`${t('portfolio')} / ${t('orders')}`}
+            aria-expanded={isAccountPanelOpen}
+            aria-controls="account-panel"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -490,23 +602,12 @@ function App() {
             </svg>
             {t('portfolio')}
           </button>
-          <button
-            className="btn-orders"
-            onClick={() => setActiveSidebar(prev => prev === 'orders' ? null : 'orders')}
-            aria-label={t('orders')}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 11l3 3L22 4"/>
-              <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            {t('orders')}
-          </button>
 
           <div className="topbar-divider" />
 
           {isDesktopApp() && (
             <button
-              className="btn-orders"
+              className={`btn-orders${activeSidebar === 'settings' ? ' is-active' : ''}`}
               onClick={() => setActiveSidebar(prev => prev === 'settings' ? null : 'settings')}
               aria-label={t('settings')}
             >
@@ -713,6 +814,73 @@ function App() {
               </div>
             )}
           </main>
+
+          <section
+            ref={accountPanelRef}
+            id="account-panel"
+            className={`account-panel${isAccountPanelOpen ? '' : ' account-panel-hidden'}${isAccountPanelResizing ? ' account-panel-resizing' : ''}`}
+            aria-label={`${t('portfolio')} / ${t('orders')}`}
+            aria-hidden={!isAccountPanelOpen}
+            inert={!isAccountPanelOpen}
+          >
+            <div
+              className="account-panel-resizer"
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label={t('resizeAccountPanel')}
+              aria-valuemin={ACCOUNT_PANEL_MIN_HEIGHT}
+              aria-valuemax={Math.min(
+                ACCOUNT_PANEL_MAX_HEIGHT,
+                Math.max(ACCOUNT_PANEL_MIN_HEIGHT, window.innerHeight - APP_TOPBAR_HEIGHT - ACCOUNT_PANEL_MIN_MAIN_HEIGHT),
+              )}
+              aria-valuenow={accountPanelHeight}
+              tabIndex={isAccountPanelOpen ? 0 : -1}
+              onPointerDown={handleAccountPanelResizePointerDown}
+              onKeyDown={handleAccountPanelResizeKeyDown}
+            />
+            <div className="account-panel-bar">
+              <div className="account-panel-tabs" role="tablist" aria-label={`${t('portfolio')} / ${t('orders')}`}>
+                <button
+                  id="portfolio-tab"
+                  className="account-panel-tab"
+                  role="tab"
+                  aria-selected={accountPanelTab === 'portfolio'}
+                  aria-controls="portfolio-dialog-sidebar"
+                  tabIndex={isAccountPanelOpen && accountPanelTab === 'portfolio' ? 0 : -1}
+                  onClick={() => setAccountPanelTab('portfolio')}
+                  onKeyDown={handleAccountTabKeyDown}
+                >
+                  {t('portfolio')}
+                </button>
+                <button
+                  id="orders-tab"
+                  className="account-panel-tab"
+                  role="tab"
+                  aria-selected={accountPanelTab === 'orders'}
+                  aria-controls="orders-dialog-sidebar"
+                  tabIndex={isAccountPanelOpen && accountPanelTab === 'orders' ? 0 : -1}
+                  onClick={() => setAccountPanelTab('orders')}
+                  onKeyDown={handleAccountTabKeyDown}
+                >
+                  {t('orders')}
+                </button>
+              </div>
+              <PanelCloseButton
+                onClick={closeAccountPanel}
+                label={accountPanelTab === 'portfolio' ? t('closePortfolio') : t('closeOrders')}
+              />
+            </div>
+            <div className="account-panel-content">
+              <PortfolioDialog
+                isOpen={isAccountPanelOpen && accountPanelTab === 'portfolio'}
+                onStockSelect={handleStockSelect}
+              />
+              <OrdersDialog
+                isOpen={isAccountPanelOpen && accountPanelTab === 'orders'}
+                onStockSelect={handleStockSelect}
+              />
+            </div>
+          </section>
         </div>
 
         <aside
@@ -743,8 +911,6 @@ function App() {
             onModificationPriceChange={handleOrderModificationPriceChange}
             onModified={handleOrderModified}
           />
-          <PortfolioDialog isOpen={activeSidebar === 'portfolio'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
-          <OrdersDialog isOpen={activeSidebar === 'orders'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
           <WatchlistDialog isOpen={activeSidebar === 'watchlist'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
           <ScreenerDialog
             isOpen={activeSidebar === 'screener'}
@@ -770,6 +936,7 @@ function App() {
 
       {!isMock && (
         <AIChat
+          accountPanelOpen={isAccountPanelOpen}
           stockSymbol={selectedStock?.symbol}
           stockData={stockData}
           currentInterval={currentInterval}

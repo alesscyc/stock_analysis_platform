@@ -43,28 +43,6 @@
   line-height: 1.1;
 }
 
-#screener-dialog-close-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-normal);
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s, color 0.15s;
-  padding: 0;
-}
-
-#screener-dialog-close-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
-}
-
 /* ── Symbol input ──────────────────────────────────────── */
 #screener-input-section {
   display: flex;

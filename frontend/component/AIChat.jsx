@@ -17,7 +17,7 @@ async function readApiJson(response, fallbackMessage) {
   }
 }
 
-function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPrediction, onReviewDraft }) {
+function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPrediction, onReviewDraft, accountPanelOpen = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -154,7 +154,7 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
   };
 
   return (
-    <div className={`ai-chat-shell${isOpen ? ' ai-chat-open' : ''}`}>
+    <div className={`ai-chat-shell${isOpen ? ' ai-chat-open' : ''}${accountPanelOpen ? ' account-panel-open' : ''}`}>
       <section
         id="ai-chat-panel"
         className="ai-chat-panel"

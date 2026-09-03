@@ -2,6 +2,7 @@ import { useState } from 'react';
 import './BacktestDialog.css';
 import { tradesToActions } from './backtestTrades';
 import { useTranslation } from '../src/i18n/useTranslation';
+import PanelCloseButton from './PanelCloseButton';
 
 const OPERATORS = ['>', '<', '>=', '<='];
 const MA_PERIOD_MIN = 2;
@@ -270,8 +271,11 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
   return (
     <div className={`backtest-dialog${isOpen ? '' : ' backtest-dialog-hidden'}`}>
       <div className="backtest-header">
-        <span className="backtest-title">{t('backtestBadge')}</span>
-        <button className="backtest-close" onClick={onClose} aria-label={t('close')}>&times;</button>
+        <div className="backtest-header-left">
+          <div className="backtest-badge">{t('backtestBadge')}</div>
+          <h2 className="backtest-title">{t('backtest')}</h2>
+        </div>
+        <PanelCloseButton onClick={onClose} label={t('close')} />
       </div>
 
       {!result ? (

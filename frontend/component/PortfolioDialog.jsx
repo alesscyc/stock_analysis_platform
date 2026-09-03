@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from '../src/i18n/useTranslation';
 import './PortfolioDialog.css';
 
-function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
+function PortfolioDialog({ isOpen, onStockSelect }) {
   const { t } = useTranslation();
   const [portfolio, setPortfolio] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -46,8 +46,6 @@ function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
     };
   }, [isOpen, t]);
 
-  if (!isOpen) return null;
-
   const totalValue = portfolio.reduce((sum, row) => {
     const avgCost = Number(row.avgCost ?? row.average_price ?? row.averagePrice ?? 0);
     const quantity = Number(row.quantity ?? 0);
@@ -77,22 +75,12 @@ function PortfolioDialog({ isOpen, onClose, onStockSelect }) {
   };
 
   return (
-    <div id="portfolio-dialog-sidebar" role="dialog" aria-modal="true" aria-label={t('portfolio')}>
-
-        {/* Header */}
-        <div id="portfolio-dialog-header">
-          <div id="portfolio-header-left">
-            <div id="portfolio-type-badge">{t('holdings')}</div>
-            <h2 id="portfolio-dialog-title">{t('portfolio')}</h2>
-          </div>
-          <button id="portfolio-dialog-close-btn" onClick={onClose} aria-label={t('closePortfolio')}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-
+    <div
+      id="portfolio-dialog-sidebar"
+      role="tabpanel"
+      aria-labelledby="portfolio-tab"
+      hidden={!isOpen}
+    >
         {/* Loading state */}
         {loading && (
           <div id="portfolio-loading-state">

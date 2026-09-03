@@ -9,6 +9,10 @@
   align-items: flex-end;
 }
 
+.ai-chat-shell.account-panel-open {
+  bottom: calc(var(--space-4) + var(--account-panel-height, 280px));
+}
+
 .ai-chat-panel {
   width: 100%;
   height: min(520px, calc(100vh - 120px));

@@ -14,7 +14,7 @@ function loadSubmittedOrderPrices() {
   }
 }
 
-function OrdersDialog({ isOpen, onClose, onStockSelect }) {
+function OrdersDialog({ isOpen, onStockSelect }) {
   const [orders, setOrders] = useState([]);
   const [submittedPrices, setSubmittedPrices] = useState(loadSubmittedOrderPrices);
   const [loading, setLoading] = useState(false);
@@ -60,8 +60,6 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
       controller.abort();
     };
   }, [isOpen, t]);
-
-  if (!isOpen) return null;
 
   const getStatusBadgeClass = (status) => {
     const statusMap = {
@@ -135,22 +133,12 @@ function OrdersDialog({ isOpen, onClose, onStockSelect }) {
   };
 
   return (
-    <div id="orders-dialog-sidebar" role="dialog" aria-modal="true" aria-label={t('pendingOrders')}>
-
-        {/* Header */}
-        <div id="orders-dialog-header">
-          <div id="orders-header-left">
-            <div id="orders-type-badge">{t('ordersBadge')}</div>
-            <h2 id="orders-dialog-title">{t('pendingOrders')}</h2>
-          </div>
-          <button id="orders-dialog-close-btn" onClick={onClose} aria-label={t('closeOrders')}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-
+    <div
+      id="orders-dialog-sidebar"
+      role="tabpanel"
+      aria-labelledby="orders-tab"
+      hidden={!isOpen}
+    >
         {/* Loading state */}
         {loading && (
           <div id="orders-loading-state">

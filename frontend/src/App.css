@@ -71,6 +71,13 @@
   margin-left: auto;
 }
 
+.topbar-actions button.is-active {
+  position: relative;
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
 /* Screener button */
 .btn-screener {
   display: flex;
@@ -425,6 +432,135 @@
   overflow: hidden;
 }
 
+/* ── Portfolio + orders bottom panel ─────────────────── */
+.account-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: var(--account-panel-height, 280px);
+  min-height: 0;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-normal);
+  transition: height 0.22s ease, opacity 0.16s ease;
+}
+
+.account-panel.account-panel-resizing {
+  transition: none;
+}
+
+.account-panel-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 8px;
+  cursor: row-resize;
+  touch-action: none;
+  z-index: 20;
+}
+
+.account-panel-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.account-panel-resizer:hover::after,
+.account-panel-resizer:active::after,
+.account-panel-resizer:focus-visible::after {
+  background: var(--accent);
+}
+
+.account-panel-resizer:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.account-panel-hidden {
+  height: 0;
+  opacity: 0;
+  border-top-color: transparent;
+  pointer-events: none;
+}
+
+.account-panel-bar {
+  height: 42px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding: 0 var(--space-4);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.account-panel-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.account-panel-tab {
+  position: relative;
+  min-width: 108px;
+  padding: 0 var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+}
+
+.account-panel-tab::after {
+  content: '';
+  position: absolute;
+  right: var(--space-3);
+  bottom: 0;
+  left: var(--space-3);
+  height: 2px;
+  background: transparent;
+}
+
+.account-panel-tab:hover {
+  color: var(--text-primary);
+}
+
+.account-panel-tab[aria-selected='true'] {
+  color: var(--accent);
+}
+
+.account-panel-tab[aria-selected='true']::after {
+  background: var(--accent);
+}
+
+.account-panel-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.account-panel-content {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.account-panel-content > #portfolio-dialog-sidebar,
+.account-panel-content > #orders-dialog-sidebar {
+  height: 100%;
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-left: 0;
+  overflow-y: auto;
+}
+
 /* ── Empty state ───────────────────────────────────────── */
 .app-empty-state {
   flex: 1;
@@ -495,7 +631,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .app-sidebar {
+  .app-sidebar,
+  .account-panel {
     transition: none;
   }
 }

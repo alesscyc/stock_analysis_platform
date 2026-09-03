@@ -1,0 +1,16 @@
+.panel-close-button {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.panel-close-button:hover {
+  color: var(--text-primary);
+}

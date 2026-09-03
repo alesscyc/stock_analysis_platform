@@ -1,11 +1,15 @@
 #settings-dialog-sidebar {
   width: 100%;
-  min-height: 100%;
-  padding: var(--space-5);
   background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
   box-sizing: border-box;
-  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
   overflow-y: auto;
+  flex-shrink: 0;
+  color: var(--text-primary);
 }
 
 #settings-dialog-header {
@@ -13,11 +17,16 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-2);
-  margin-bottom: var(--space-5);
+  flex-shrink: 0;
+}
+
+.settings-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .settings-badge {
-  margin-bottom: 4px;
   color: var(--accent);
   font-size: 10px;
   font-weight: 700;
@@ -28,10 +37,11 @@
 #settings-dialog-title {
   margin: 0;
   font-size: 22px;
+  font-weight: 800;
   line-height: 1.1;
+  color: var(--text-primary);
 }
 
-#settings-dialog-close,
 .settings-secret-toggle {
   min-width: 30px;
   min-height: 30px;
@@ -42,7 +52,6 @@
   color: var(--text-secondary);
 }
 
-#settings-dialog-close:hover,
 .settings-secret-toggle:hover {
   background: var(--bg-hover);
   color: var(--text-primary);

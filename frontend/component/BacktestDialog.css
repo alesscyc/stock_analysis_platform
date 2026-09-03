@@ -1,11 +1,14 @@
 .backtest-dialog {
+  width: 100%;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  padding: var(--space-4);
-  gap: var(--space-3);
+  gap: var(--space-4);
+  padding: var(--space-5);
   overflow-y: auto;
-  flex: 1;
-  min-height: 0;
+  flex-shrink: 0;
 }
 
 .backtest-dialog-hidden {
@@ -14,24 +17,32 @@
 
 .backtest-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.backtest-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.backtest-badge {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .backtest-title {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--text-muted);
-}
-
-.backtest-close {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 18px;
-  cursor: pointer;
-  padding: 0 4px;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
 }
 
 .backtest-label {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from '../src/i18n/useTranslation';
+import PanelCloseButton from './PanelCloseButton';
 import './SettingsDialog.css';
 
 const DEFAULT_SETTINGS = {
@@ -116,16 +117,11 @@ function SettingsDialog({ isOpen, onClose }) {
   return (
     <section id="settings-dialog-sidebar" role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title">
       <header id="settings-dialog-header">
-        <div>
+        <div className="settings-header-left">
           <div className="settings-badge">{t('configuration')}</div>
           <h2 id="settings-dialog-title">{t('settings')}</h2>
         </div>
-        <button id="settings-dialog-close" onClick={onClose} aria-label={t('closeSettings')}>
-          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        <PanelCloseButton onClick={onClose} label={t('closeSettings')} />
       </header>
 
       {loading ? (

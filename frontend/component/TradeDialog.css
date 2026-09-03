@@ -47,28 +47,6 @@
   letter-spacing: -0.5px;
 }
 
-#trade-dialog-close-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-normal);
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s, color 0.15s;
-  padding: 0;
-}
-
-#trade-dialog-close-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
-}
-
 /* ── Order type selector ───────────────────────────────── */
 #trade-order-type {
   display: flex;
