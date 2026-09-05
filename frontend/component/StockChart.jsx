@@ -33,7 +33,16 @@ const VOL_MA_CONFIG = [{ key: 'vol20MA', color: '#ffaa00' }];
 // lightweight-charts v5 uses ISeriesPrimitive for custom overlays.
 // Draws horizontal price lines with text labels centered on the chart.
 // Supports hover-to-front: hovered label is drawn last (on top) with stronger opacity.
-function createHorizontalLinesPrimitive() {
+function createHorizontalLinesPrimitive(container) {
+  const exitButtons = document.createElement('div');
+  exitButtons.className = 'chart-exit-buttons';
+  exitButtons.hidden = true;
+  for (const field of ['stopLossPrice', 'takeProfitPrice']) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.previewField = field;
+    exitButtons.appendChild(button);
+  }
   let lines = [];
   let chart = null;
   let series = null;
@@ -43,6 +52,18 @@ function createHorizontalLinesPrimitive() {
   return {
     setLines(newLines) {
       lines = newLines;
+      const entry = lines.find(line => line.previewField === 'price');
+      exitButtons.hidden = !entry;
+      if (entry) {
+        for (const button of exitButtons.children) {
+          const field = button.dataset.previewField;
+          const label = entry.exitLabels?.[field];
+          const title = entry.exitTitles?.[field];
+          button.textContent = label ?? '';
+          button.title = title ?? '';
+          button.setAttribute('aria-label', title ?? '');
+        }
+      }
       requestUpdate?.();
     },
 
@@ -88,9 +109,11 @@ function createHorizontalLinesPrimitive() {
       chart = params.chart;
       series = params.series;
       requestUpdate = params.requestUpdate;
+      container.appendChild(exitButtons);
     },
 
     detached() {
+      exitButtons.remove();
       chart = null;
       series = null;
       requestUpdate = null;
@@ -143,6 +166,10 @@ function createHorizontalLinesPrimitive() {
                   const cx = (left + right) / 2;
                   const boxX = cx - boxW / 2;
                   const boxY = yPx - boxH / 2;
+                  if (line.previewField === 'price') {
+                    exitButtons.style.left = `${(boxX + boxW) / hr + 8}px`;
+                    exitButtons.style.top = `${y}px`;
+                  }
 
                   ctx.fillStyle = isHovered ? line.color : '#1c2030';
                   ctx.strokeStyle = line.color;
@@ -160,8 +187,11 @@ function createHorizontalLinesPrimitive() {
 
                   ctx.fillStyle = isHovered ? '#ffffff' : line.color;
                   ctx.textAlign = 'center';
-                  ctx.textBaseline = 'middle';
-                  ctx.fillText(line.title, cx, yPx + 1 * vr);
+                  // Match the CSS buttons' centered line box using the font baseline.
+                  const ascent = metrics.fontBoundingBoxAscent ?? fontSize * 0.8;
+                  const descent = metrics.fontBoundingBoxDescent ?? fontSize * 0.2;
+                  ctx.textBaseline = 'alphabetic';
+                  ctx.fillText(line.title, cx, yPx + (ascent - descent) / 2);
                 }
 
               };
@@ -317,12 +347,14 @@ function saveWatchlist(list) {
   localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(list));
 }
 
-function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick, onOrderPriceDrag, orderModification, ibConnected, ordersRefreshToken, backtestTrades }) {
+function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick, onOrderPriceDrag, orderModification, orderPreview, onPreviewPriceDrag, ibConnected, ordersRefreshToken, backtestTrades }) {
   const containerRef = useRef(null);
   const chartRef     = useRef(null);
   const dataContextRef = useRef(null);
   const onOrderPriceDragRef = useRef(onOrderPriceDrag);
   const dragOrderRef = useRef(null);
+  const dragPreviewRef = useRef(null);
+  const previewDragContextRef = useRef(null);
 
   // series refs — held outside React state so we don't trigger re-renders
   const candleSeriesRef  = useRef(null);
@@ -429,6 +461,15 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [cancelDrawing, selectedDrawing]);
+
+  useEffect(() => {
+    previewDragContextRef.current = { orderPreview, onPreviewPriceDrag, stockSymbol };
+    if (!orderPreview || orderPreview.symbol !== stockSymbol) {
+      dragPreviewRef.current = null;
+      chartRef.current?.applyOptions({ handleScroll: !activeToolRef.current });
+      containerRef.current?.classList.remove('dragging-order-line');
+    }
+  }, [orderPreview, onPreviewPriceDrag, stockSymbol]);
 
   useEffect(() => {
     onOrderPriceDragRef.current = onOrderPriceDrag;
@@ -755,7 +796,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     drawingsPrimitiveRef.current = drawingsPrimitive;
 
     // ── Horizontal IB lines primitive (custom canvas lines) ───
-    const ibLinesPrimitive = createHorizontalLinesPrimitive();
+    const ibLinesPrimitive = createHorizontalLinesPrimitive(containerRef.current);
     candleSeries.attachPrimitive(ibLinesPrimitive);
     ibLinesPrimitiveRef.current = ibLinesPrimitive;
 
@@ -899,6 +940,17 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
         return;
       }
 
+      if (e.button !== 0) return;
+      const exitField = e.target.closest?.('[data-preview-field]')?.dataset.previewField;
+      const preview = previewDragContextRef.current?.orderPreview;
+      if (exitField && preview) {
+        e.preventDefault();
+        e.stopPropagation();
+        dragPreviewRef.current = { field: exitField };
+        chart.applyOptions({ handleScroll: false });
+        containerEl.classList.add('dragging-order-line');
+        return;
+      }
       const point = getMousePoint(e);
       const drawingIndex = drawingsPrimitiveRef.current?.drawingIndexAt(point.x, point.y) ?? -1;
       if (drawingIndex >= 0) {
@@ -911,6 +963,13 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       if (!ibLinesPrimitiveRef.current) return;
       const hit = ibLinesPrimitiveRef.current.hitTest(point.x, point.y);
       const line = ibLinesPrimitiveRef.current.getLine(hit);
+      if (line?.previewField && previewDragContextRef.current?.onPreviewPriceDrag) {
+        e.preventDefault();
+        dragPreviewRef.current = { field: line.previewField };
+        chart.applyOptions({ handleScroll: false });
+        containerEl.classList.add('dragging-order-line');
+        return;
+      }
       if (!line?.draggable || !line.order) return;
 
       e.preventDefault();
@@ -942,6 +1001,10 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       }
       drawPointerDown = false;
 
+      if (dragPreviewRef.current) {
+        dragPreviewRef.current = null;
+        chart.applyOptions({ handleScroll: !activeToolRef.current });
+      }
       if (dragOrderRef.current) {
         const finalOrder = dragOrderRef.current;
         chart.applyOptions({ handleScroll: true });
@@ -981,6 +1044,16 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       if (!ibLinesPrimitiveRef.current) return;
       const point = getMousePoint(e);
 
+      if (dragPreviewRef.current) {
+        const price = getPriceFromY(point.y);
+        const context = previewDragContextRef.current;
+        const preview = context?.orderPreview;
+        if (price == null || price <= 0 || !preview || preview.symbol !== context.stockSymbol) return;
+        const drag = dragPreviewRef.current;
+        context.onPreviewPriceDrag?.({ symbol: preview.symbol, field: drag.field, price });
+        return;
+      }
+
       if (dragOrderRef.current) {
         const nextPrice = getPriceFromY(point.y);
         if (nextPrice == null) return;
@@ -998,6 +1071,18 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       const line = ibLinesPrimitiveRef.current.getLine(hit);
       containerEl.classList.toggle('hovering-order-line', Boolean(line?.draggable));
     };
+    const handleExitKeyDown = (e) => {
+      const field = e.target.dataset?.previewField;
+      if (!field || !['ArrowUp', 'ArrowDown'].includes(e.key)) return;
+      const context = previewDragContextRef.current;
+      const preview = context?.orderPreview;
+      if (!preview) return;
+      e.preventDefault();
+      const current = Number(preview[field]) || Number(preview.price);
+      const price = Math.round((current + (e.key === 'ArrowUp' ? 0.01 : -0.01)) * 100) / 100;
+      if (price > 0) context.onPreviewPriceDrag?.({ symbol: preview.symbol, field, price });
+    };
+    containerEl.addEventListener('keydown', handleExitKeyDown);
     containerEl.addEventListener('mousedown', handleMouseDown);
     containerEl.addEventListener('mousemove', handleMouseMove);
     // Capture: chart canvas may swallow bubble-phase contextmenu
@@ -1005,6 +1090,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     window.addEventListener('mouseup', handleMouseUp);
 
     return () => {
+      containerEl.removeEventListener('keydown', handleExitKeyDown);
       containerEl.removeEventListener('mousedown', handleMouseDown);
       containerEl.removeEventListener('mousemove', handleMouseMove);
       containerEl.removeEventListener('contextmenu', handleContextMenu, true);
@@ -1088,6 +1174,22 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       });
     }
 
+    if (orderPreview?.symbol === stockSymbol) {
+      const levels = [
+        ['price', orderPreview.price, orderPreview.action === 'SELL' ? 'draftSell' : 'draftBuy', '#4488ff'],
+        ['stopLossPrice', orderPreview.stopLossPrice, 'draftStopLoss', '#ef5350'],
+        ['takeProfitPrice', orderPreview.takeProfitPrice, 'draftTakeProfit', '#00e5c8'],
+      ];
+      for (const [previewField, value, label, color] of levels) {
+        const price = Number(value);
+        if (!Number.isFinite(price) || price <= 0) continue;
+        lines.push({ price, color, previewField, draggable: true, lineWidth: 1, dashed: true, title: t(label),
+          exitLabels: { stopLossPrice: t('dragStopLoss'), takeProfitPrice: t('dragTakeProfit') },
+          exitTitles: { stopLossPrice: t('takeStopLossControl'), takeProfitPrice: t('takeProfitControl') },
+        });
+      }
+    }
+
     ibLinesPrimitiveRef.current.setLines(lines);
 
     for (const priceLine of ibPriceLinesRef.current) {
@@ -1098,11 +1200,11 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       price: line.price,
       color: line.color,
       lineWidth: 1,
-      lineStyle: line.dotted ? LineStyle.Dotted : LineStyle.Solid,
+      lineStyle: line.dotted ? LineStyle.Dotted : line.dashed ? LineStyle.Dashed : LineStyle.Solid,
       axisLabelVisible: true,
       title: '',
     }));
-  }, [ibPosition, symbolOrders, t]);
+  }, [ibPosition, symbolOrders, orderPreview, stockSymbol, t]);
 
   // ── Sync MA visibility with series ───────────────────────
   useEffect(() => {

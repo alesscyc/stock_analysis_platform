@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '../src/i18n/useTranslation';
 import PanelCloseButton from './PanelCloseButton';
 import './TradeDialog.css';
@@ -18,8 +18,12 @@ function rememberSubmittedOrderPrice(orderId, orderPrice) {
   }
 }
 
-function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, draft, onModificationPriceChange, onModified }) {
+function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, draft, onModificationPriceChange, onModified, onPreviewChange, previewPriceChange, currentPrice }) {
   const { t } = useTranslation();
+  const currentPriceRef = useRef(currentPrice);
+  useEffect(() => {
+    currentPriceRef.current = currentPrice;
+  }, [currentPrice]);
   const [action, setAction] = useState('BUY');
   const [price, setPrice] = useState('');
   const [amount, setAmount] = useState('');
@@ -52,11 +56,12 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
 
     if (!modification?.order) {
       const draftPrice = Number(draft?.limitPrice);
+      const defaultPrice = Number(currentPriceRef.current);
       const draftQuantity = Number(draft?.quantity);
       setAction(draft?.action === 'SELL' ? 'SELL' : 'BUY');
       setPrice(draft?.orderType === 'LMT' && Number.isFinite(draftPrice) && draftPrice > 0
         ? draftPrice.toFixed(2)
-        : '');
+        : Number.isFinite(defaultPrice) && defaultPrice > 0 ? defaultPrice.toFixed(2) : '');
       setAmount(Number.isSafeInteger(draftQuantity) && draftQuantity > 0 ? String(draftQuantity) : '');
       setTif('DAY');
       setIsBracketOrder(false);
@@ -86,7 +91,37 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
     setStopLossError('');
     setSuccessMsg('');
     setErrorMsg('');
-  }, [isOpen, modification, draft]);
+  }, [isOpen, modification, draft, stockSymbol]);
+
+  useEffect(() => {
+    onPreviewChange?.(isOpen && !isModifyMode ? {
+      symbol: stockSymbol, action, price,
+      takeProfitPrice: isBracketOrder ? takeProfitPrice : null,
+      stopLossPrice: isBracketOrder ? stopLossPrice : null,
+    } : null);
+  }, [isOpen, isModifyMode, stockSymbol, action, price, isBracketOrder,
+    takeProfitPrice, stopLossPrice, onPreviewChange]);
+
+  useEffect(() => {
+    if (!isOpen || isModifyMode || previewPriceChange?.symbol !== stockSymbol) return;
+    const value = Number(previewPriceChange.price);
+    if (!Number.isFinite(value) || value <= 0) return;
+    if (previewPriceChange.field === 'price') {
+      setPrice(value.toFixed(2));
+      setPriceError('');
+      return;
+    }
+    if (previewPriceChange.field === 'stopLossPrice') {
+      setStopLossPrice(value.toFixed(2));
+      setStopLossError('');
+    } else if (previewPriceChange.field === 'takeProfitPrice') {
+      setTakeProfitPrice(value.toFixed(2));
+      setTakeProfitError('');
+    } else return;
+    setIsBracketOrder(true);
+  // A chart gesture is applied once; reopening the ticket must not replay it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewPriceChange]);
 
   if (!isOpen) return null;
 
@@ -266,6 +301,8 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
             {t('sell')}
           </button>
         </div>
+
+        {!isModifyMode && <p className="trade-bracket-copy">{t('dragExitsHint')}</p>}
 
         <div id="trade-fields">
           {/* Price */}

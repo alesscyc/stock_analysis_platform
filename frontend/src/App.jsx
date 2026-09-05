@@ -62,6 +62,8 @@ function App() {
   const [showFundamentals, setShowFundamentals] = useState(false);
   const [orderModification, setOrderModification] = useState(null);
   const [orderDraft, setOrderDraft] = useState(null);
+  const [orderPreview, setOrderPreview] = useState(null);
+  const [previewPriceChange, setPreviewPriceChange] = useState(null);
   const [ordersRefreshToken, setOrdersRefreshToken] = useState(0);
   const [backtestTrades, setBacktestTrades] = useState(null);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
@@ -807,6 +809,8 @@ function App() {
                   onTradeClick={handleTradeButtonClick}
                   onOrderPriceDrag={handleOrderPriceDrag}
                   orderModification={orderModification}
+                  orderPreview={activeSidebar === 'trade' ? orderPreview : null}
+                  onPreviewPriceDrag={setPreviewPriceChange}
                   ibConnected={ibConnected}
                   ordersRefreshToken={ordersRefreshToken}
                   backtestTrades={backtestTrades}
@@ -910,6 +914,9 @@ function App() {
             draft={orderDraft}
             onModificationPriceChange={handleOrderModificationPriceChange}
             onModified={handleOrderModified}
+            onPreviewChange={setOrderPreview}
+            previewPriceChange={previewPriceChange}
+            currentPrice={loading ? null : latestClose}
           />
           <WatchlistDialog isOpen={activeSidebar === 'watchlist'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
           <ScreenerDialog

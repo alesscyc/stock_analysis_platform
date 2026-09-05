@@ -395,6 +395,7 @@
 
 /* lightweight-charts mount target — must fill the wrapper */
 #lw-chart-container {
+  position: relative;
   width: 100%;
   height: 100%;
 }
@@ -428,3 +429,35 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+.chart-exit-buttons {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+  transform: translateY(-50%);
+}
+.chart-exit-buttons[hidden] { display: none; }
+.chart-exit-buttons button {
+  --exit-color: #ef5350;
+  box-sizing: border-box;
+  height: 18px;
+  min-height: 0;
+  padding: 0 6px;
+  border: 1px solid var(--exit-color);
+  border-radius: 4px;
+  background: #1c2030;
+  color: var(--exit-color);
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  cursor: ns-resize;
+}
+.chart-exit-buttons button[data-preview-field="takeProfitPrice"] { --exit-color: #00e5c8; }
+.chart-exit-buttons button:hover {
+  background: var(--exit-color);
+  color: #ffffff;
+  box-shadow: 0 0 0 1px var(--exit-color);
+}
+.chart-exit-buttons button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }

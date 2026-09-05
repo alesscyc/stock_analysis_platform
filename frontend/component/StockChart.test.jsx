@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import TradeDialog from './TradeDialog'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../src/i18n/I18nContext.jsx'
@@ -59,6 +61,7 @@ const chartMock = vi.hoisted(() => {
     },
     createChart: vi.fn(() => chart),
     getTimeScale: () => timeScale,
+    getCandleSeries: () => candleSeries,
   }
 })
 
@@ -67,7 +70,7 @@ vi.mock('lightweight-charts', () => ({
   CrosshairMode: { Normal: 0 },
   HistogramSeries: Symbol('HistogramSeries'),
   LineSeries: Symbol('LineSeries'),
-  LineStyle: { Dotted: 1, Solid: 0 },
+  LineStyle: { Dotted: 1, Solid: 0, Dashed: 2 },
   PriceScaleMode: { Normal: 0, Logarithmic: 1, Percentage: 2, IndexedTo100: 3 },
   createChart: chartMock.createChart,
   createSeriesMarkers: vi.fn(() => ({ setMarkers: vi.fn(), detach: vi.fn() })),
@@ -324,5 +327,87 @@ describe('StockChart progressive data', () => {
     ]))
 
     expect(chartMock.getTimeScale().setVisibleRange).toHaveBeenLastCalledWith(visibleRange)
+  })
+})
+
+function OrderPreviewHarness() {
+  const [preview, setPreview] = useState(null)
+  const [open, setOpen] = useState(true)
+  const [priceChange, setPriceChange] = useState(null)
+  return <I18nProvider>
+    <StockChart stockData={stockData} stockSymbol="AAPL" currentInterval="1d"
+      ibConnected={false} orderPreview={open ? preview : null} onPreviewPriceDrag={setPriceChange} />
+    <TradeDialog isOpen={open} onClose={() => setOpen(false)} stockSymbol="AAPL"
+      ibConnected={false} onPreviewChange={setPreview} previewPriceChange={priceChange} />
+  </I18nProvider>
+}
+
+describe('draft order price lines', () => {
+  it('updates entry and bracket lines while typing and clears disabled or closed previews', () => {
+    localStorage.clear()
+    chartMock.reset()
+    globalThis.ResizeObserver = ResizeObserverStub
+    render(<OrderPreviewHarness />)
+    const series = chartMock.getCandleSeries()
+    const activePrices = () => series.createPriceLine.mock.calls
+      .filter((_, index) => !series.removePriceLine.mock.calls.some(
+        ([line]) => line === series.createPriceLine.mock.results[index].value,
+      )).map(([options]) => options.price)
+
+    fireEvent.change(screen.getByLabelText('Price (USD)'), { target: { value: '100' } })
+    expect(activePrices()).toEqual([100])
+    fireEvent.click(document.getElementById('trade-bracket-toggle-input'))
+    fireEvent.change(screen.getByLabelText('Take Profit (USD)'), { target: { value: '120' } })
+    fireEvent.change(screen.getByLabelText('Stop Loss (USD)'), { target: { value: '90' } })
+    expect(activePrices()).toEqual([100, 90, 120])
+    fireEvent.change(screen.getByLabelText('Price (USD)'), { target: { value: '105' } })
+    expect(activePrices()).toEqual([105, 90, 120])
+    fireEvent.change(screen.getByLabelText('Stop Loss (USD)'), { target: { value: '-1' } })
+    expect(activePrices()).toEqual([105, 120])
+    fireEvent.click(document.getElementById('trade-bracket-toggle-input'))
+    expect(activePrices()).toEqual([105])
+    fireEvent.click(screen.getByRole('button', { name: 'Close', exact: true }))
+    expect(activePrices()).toEqual([])
+  })
+})
+
+describe('drag draft exits', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    chartMock.reset()
+    globalThis.ResizeObserver = ResizeObserverStub
+  })
+
+  it.each(['Buy', 'Sell'])('creates and adjusts %s exits using buttons and changes entry by dragging its line', (action) => {
+    const submit = vi.fn()
+    vi.stubGlobal('fetch', submit)
+    render(<OrderPreviewHarness />)
+    fireEvent.click(screen.getByRole('button', { name: action.toUpperCase(), exact: true }))
+    fireEvent.change(screen.getByLabelText('Price (USD)'), { target: { value: '100' } })
+    const chart = document.getElementById('lw-chart-container')
+    const drag = (from, to) => {
+      fireEvent.mouseDown(chart, { clientX: 10, clientY: from, button: 0 })
+      fireEvent.mouseMove(chart, { clientX: 10, clientY: to })
+      fireEvent.mouseUp(window, { clientX: 10, clientY: to, button: 0 })
+    }
+    const loss = action === 'Buy' ? 80 : 120
+    const profit = action === 'Buy' ? 120 : 80
+    fireEvent.mouseDown(screen.getByRole('button', { name: /Drag to set stop loss/ }), { button: 0 })
+    fireEvent.mouseMove(chart, { clientX: 10, clientY: loss })
+    fireEvent.mouseUp(window, { button: 0 })
+    expect(screen.getByLabelText('Stop Loss (USD)')).toHaveValue(loss)
+    expect(document.getElementById('trade-bracket-toggle-input')).toBeChecked()
+    fireEvent.mouseDown(screen.getByRole('button', { name: /Drag to set take profit/ }), { button: 0 })
+    fireEvent.mouseMove(chart, { clientX: 10, clientY: profit })
+    fireEvent.mouseUp(window, { button: 0 })
+    expect(screen.getByLabelText('Take Profit (USD)')).toHaveValue(profit)
+    drag(loss, loss + 2)
+    expect(screen.getByLabelText('Stop Loss (USD)')).toHaveValue(loss + 2)
+    drag(100, 105)
+    expect(screen.getByLabelText('Price (USD)')).toHaveValue(105)
+    expect(screen.getByLabelText('Take Profit (USD)')).toHaveValue(profit)
+    expect(screen.getByLabelText('Stop Loss (USD)')).toHaveValue(loss + 2)
+    expect(submit).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
   })
 })
