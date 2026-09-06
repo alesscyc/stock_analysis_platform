@@ -45,6 +45,71 @@ describe('App', () => {
     expect(input).toBeInTheDocument()
   })
 
+  it('loads a ticker from the research workspace shortcut', async () => {
+    vi.stubGlobal('fetch', vi.fn(url => {
+      if (url === '/api/ib/status') return Promise.resolve(ok({ connected: false }))
+      if (url.startsWith('/api/stock/')) return Promise.resolve(ok([
+        { Date: '1900-01-01', Open: 10, High: 12, Low: 9, Close: 11, Volume: 100 },
+      ]))
+      return Promise.resolve(ok({}))
+    }))
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'AAPL' }))
+    expect(await screen.findByTestId('stock-chart')).toHaveTextContent('AAPL:1')
+  })
+
+  it('shows the selected symbol in the topbar after loading', async () => {
+    vi.stubGlobal('fetch', vi.fn(url => {
+      if (url === '/api/ib/status') return Promise.resolve(ok({ connected: false }))
+      if (url.startsWith('/api/stock/')) return Promise.resolve(ok([
+        { Date: '1900-01-01', Open: 10, High: 12, Low: 9, Close: 11, Volume: 100 },
+      ]))
+      return Promise.resolve(ok({}))
+    }))
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'AAPL' }))
+    await screen.findByTestId('stock-chart')
+    expect(screen.getByText('AAPL', { selector: '.instrument-symbol' })).toBeInTheDocument()
+  })
+
+  it('starts research tools from the welcome workspace and toggles them closed', () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(ok({ connected: false }))))
+    render(<App />)
+    const screenerCard = screen.getByRole('button', { name: /Find stocks that match your criteria/ })
+    expect(screenerCard).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(screenerCard)
+    expect(screenerCard).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screenerCard)
+    expect(screenerCard).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('closes the sidebar when a stock is picked on small screens', async () => {
+    vi.stubGlobal('fetch', vi.fn(url => {
+      if (url === '/api/ib/status') return Promise.resolve(ok({ connected: false }))
+      if (url.startsWith('/api/stock/')) return Promise.resolve(ok([
+        { Date: '1900-01-01', Open: 10, High: 12, Low: 9, Close: 11, Volume: 100 },
+      ]))
+      return Promise.resolve(ok({}))
+    }))
+    vi.stubGlobal('matchMedia', vi.fn(query => ({
+      matches: query === '(max-width: 700px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })))
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'Screener' }))
+    const sidebarSeparator = screen.getByRole('separator', { name: /resize sidebar/i })
+    expect(sidebarSeparator).toHaveAttribute('tabindex', '0')
+    fireEvent.click(screen.getByRole('button', { name: 'Select scanned stock' }))
+    expect(sidebarSeparator).toHaveAttribute('tabindex', '-1')
+    expect(await screen.findByTestId('stock-chart')).toHaveTextContent('MSFT:1')
+  })
+
   it('renders recent candles before AI and older history finish', async () => {
     let historyCalls = 0
     let predictionCalls = 0

@@ -1,22 +1,22 @@
 /* ── Design Tokens ─────────────────────────────────────── */
 :root {
   /* Surfaces */
-  --bg-base:        #0b0e11;
-  --bg-surface:     #131722;
-  --bg-elevated:    #1c2030;
-  --bg-panel:       #1e2336;
-  --bg-hover:       #252b3d;
+  --bg-base:        #0d131d;
+  --bg-surface:     #141e2c;
+  --bg-elevated:    #1c293a;
+  --bg-panel:       #202e40;
+  --bg-hover:       #29394d;
 
   /* Borders */
-  --border-subtle:  #2a2f45;
-  --border-normal:  #353c57;
-  --border-strong:  #4a5170;
+  --border-subtle:  #2b3a4e;
+  --border-normal:  #3b4c63;
+  --border-strong:  #58708c;
 
   /* Text */
   --text-primary:   #e8ecf0;
-  --text-secondary: #8892a4;
-  --text-muted:     #545d72;
-  --text-inverse:   #0b0e11;
+  --text-secondary: #a6b4c7;
+  --text-muted:     #8f9fb4;
+  --text-inverse:   #0d131d;
 
   /* Market accents */
   --green:          #26a69a;
@@ -140,3 +140,17 @@ input::placeholder {
 ::-webkit-scrollbar-track { background: var(--bg-surface); }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Keep market values aligned and all native controls keyboard-readable. */
+:root { font-variant-numeric: tabular-nums; }
+select, textarea { font-family: var(--font-ui); }
+a:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent-hover);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}

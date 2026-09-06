@@ -29,6 +29,12 @@ const ACCOUNT_PANEL_MAX_HEIGHT = 520;
 const ACCOUNT_PANEL_MIN_MAIN_HEIGHT = 240;
 const ACCOUNT_PANEL_KEYBOARD_STEP = 10;
 const APP_TOPBAR_HEIGHT = 56;
+// The topbar grows taller once its contents wrap, so measure the live element
+// instead of trusting the base constant when clamping panel sizes.
+const getTopbarHeight = () => {
+  const topbar = document.querySelector('.app-topbar');
+  return topbar ? topbar.offsetHeight : APP_TOPBAR_HEIGHT;
+};
 
 function stockDataCacheKey(symbol, interval) {
   return `${String(symbol || '').trim().toUpperCase()}-${interval}`;
@@ -136,7 +142,7 @@ function App() {
   const clampAccountPanelHeight = useCallback((height) => {
     const maxForViewport = Math.max(
       ACCOUNT_PANEL_MIN_HEIGHT,
-      window.innerHeight - APP_TOPBAR_HEIGHT - ACCOUNT_PANEL_MIN_MAIN_HEIGHT,
+      window.innerHeight - getTopbarHeight() - ACCOUNT_PANEL_MIN_MAIN_HEIGHT,
     );
     return Math.min(
       ACCOUNT_PANEL_MAX_HEIGHT,
@@ -457,6 +463,16 @@ function App() {
     void fetchStockData(stock, currentInterval, true);
   };
 
+  // Picking a stock from a sidebar dialog must reveal the chart: on small
+  // screens the layout hides .app-main while the sidebar is open, so the
+  // sidebar has to close on select there.
+  const handleSidebarStockSelect = (stock) => {
+    if (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 700px)').matches) {
+      setActiveSidebar(null);
+    }
+    handleStockSelect(stock);
+  };
+
   const handleIntervalChange = (interval) => {
     setBacktestTrades(null);
     if (selectedStock) {
@@ -553,17 +569,83 @@ function App() {
            <span className="app-brand-name">{t('brandName')}</span>
          </div>
 
-        <div className="topbar-divider" />
-
         <div className="topbar-search">
           <SearchBar onStockSelect={handleStockSelect} loading={loading} />
         </div>
+
+        {/* ── Instrument info (inside topbar to save chart space) ── */}
+        {selectedStock && (
+          <div className="topbar-instrument">
+            {isMock && (
+              <span className="mock-badge">{t('demo')}</span>
+            )}
+            <span className="instrument-symbol">{selectedStock.symbol}</span>
+
+            {latestClose != null && (
+              <span className="instrument-price">
+                ${latestClose.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            )}
+
+            <div className="instrument-stat">
+              <span className="instrument-label">{t('interval')}</span>
+              <span className="instrument-value">
+                {currentInterval === '1d' ? t('daily') : currentInterval === '1wk' ? t('weekly') : t('monthly')}
+              </span>
+            </div>
+
+            {aiPrediction && aiPrediction.status === 'success' && (
+              <div className="instrument-stat">
+                <span className="instrument-label">{t('aiSignal')}</span>
+                <span
+                  className="instrument-value"
+                  style={{ color: aiPrediction.recommendation === 'BUY' ? 'var(--green-bright)' : 'var(--red-bright)' }}
+                >
+                  {aiPrediction.recommendation} · {aiPrediction.confidence}%
+                </span>
+              </div>
+            )}
+
+            {stockData.length > 0 && (
+              <div className="instrument-stat">
+                <span className="instrument-label">{t('dataPoints')}</span>
+                <span className="instrument-value">{stockData.length.toLocaleString()}</span>
+              </div>
+            )}
+
+            {(aiLoadState !== 'idle' || historyLoadState !== 'idle' || recentLoadState !== 'idle') && (
+              <div className="chart-load-status" role="status" aria-live="polite">
+                {aiLoadState === 'loading' && <span>{t('aiAnalyzing')}</span>}
+                {aiLoadState === 'error' && <span className="is-warning">{t('aiUnavailable')}</span>}
+                {historyLoadState === 'loading' && <span>{t('loadingOlderHistory')}</span>}
+                {historyLoadState === 'error' && <span className="is-warning">{t('historyPartiallyLoaded')}</span>}
+                {recentLoadState === 'error' && <span className="is-warning">{t('recentRefreshFailed')}</span>}
+              </div>
+            )}
+
+            {fundamentals && (
+              <button
+                className="btn-fundamentals-toggle"
+                onClick={() => setShowFundamentals((p) => !p)}
+                aria-label={showFundamentals ? t('hideFundamentals') : t('showFundamentals')}
+              >
+                {t('fundamentals')}
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showFundamentals ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
+
+        {selectedStock && <div className="topbar-divider" />}
 
         <div className="topbar-actions">
           <button
             className={`btn-screener${activeSidebar === 'screener' ? ' is-active' : ''}`}
             onClick={() => setActiveSidebar(prev => prev === 'screener' ? null : 'screener')}
             aria-label={t('screener')}
+            aria-pressed={activeSidebar === 'screener'}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 6h18M3 12h18M3 18h18"/>
@@ -574,6 +656,7 @@ function App() {
             className={`btn-backtest${activeSidebar === 'backtest' ? ' is-active' : ''}`}
             onClick={() => setActiveSidebar(prev => prev === 'backtest' ? null : 'backtest')}
             aria-label={t('backtest')}
+            aria-pressed={activeSidebar === 'backtest'}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
@@ -584,6 +667,7 @@ function App() {
             className={`btn-watchlist${activeSidebar === 'watchlist' ? ' is-active' : ''}`}
             onClick={() => setActiveSidebar(prev => prev === 'watchlist' ? null : 'watchlist')}
             aria-label={t('watchlist')}
+            aria-pressed={activeSidebar === 'watchlist'}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/>
@@ -612,6 +696,7 @@ function App() {
               className={`btn-orders${activeSidebar === 'settings' ? ' is-active' : ''}`}
               onClick={() => setActiveSidebar(prev => prev === 'settings' ? null : 'settings')}
               aria-label={t('settings')}
+              aria-pressed={activeSidebar === 'settings'}
             >
               <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3" />
@@ -634,71 +719,6 @@ function App() {
 
       <div className="app-body">
         <div className="app-main">
-          {/* ── Instrument header (shows once symbol is loaded) ── */}
-          {selectedStock && (
-            <div className="instrument-header">
-              {isMock && (
-                <span className="mock-badge">{t('demo')}</span>
-              )}
-              <span className="instrument-symbol">{selectedStock.symbol}</span>
-
-              {latestClose != null && (
-                <span className="instrument-price">
-                  ${latestClose.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              )}
-
-              <div className="instrument-stat">
-                <span className="instrument-label">{t('interval')}</span>
-                <span className="instrument-value">
-                  {currentInterval === '1d' ? t('daily') : currentInterval === '1wk' ? t('weekly') : t('monthly')}
-                </span>
-              </div>
-
-              {aiPrediction && aiPrediction.status === 'success' && (
-                <div className="instrument-stat">
-                  <span className="instrument-label">{t('aiSignal')}</span>
-                  <span
-                    className="instrument-value"
-                    style={{ color: aiPrediction.recommendation === 'BUY' ? 'var(--green-bright)' : 'var(--red-bright)' }}
-                  >
-                    {aiPrediction.recommendation} · {aiPrediction.confidence}%
-                  </span>
-                </div>
-              )}
-
-              {stockData.length > 0 && (
-                <div className="instrument-stat">
-                  <span className="instrument-label">{t('dataPoints')}</span>
-                  <span className="instrument-value">{stockData.length.toLocaleString()}</span>
-                </div>
-              )}
-
-              {(aiLoadState !== 'idle' || historyLoadState !== 'idle' || recentLoadState !== 'idle') && (
-                <div className="chart-load-status" role="status" aria-live="polite">
-                  {aiLoadState === 'loading' && <span>{t('aiAnalyzing')}</span>}
-                  {aiLoadState === 'error' && <span className="is-warning">{t('aiUnavailable')}</span>}
-                  {historyLoadState === 'loading' && <span>{t('loadingOlderHistory')}</span>}
-                  {historyLoadState === 'error' && <span className="is-warning">{t('historyPartiallyLoaded')}</span>}
-                  {recentLoadState === 'error' && <span className="is-warning">{t('recentRefreshFailed')}</span>}
-                </div>
-              )}
-
-              {fundamentals && (
-                <button
-                  className="btn-fundamentals-toggle"
-                  onClick={() => setShowFundamentals((p) => !p)}
-                  aria-label={showFundamentals ? t('hideFundamentals') : t('showFundamentals')}
-                >
-                  {t('fundamentals')}
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: showFundamentals ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-                    <polyline points="6 9 12 15 18 9"/>
-                  </svg>
-                </button>
-              )}
-            </div>
-          )}
-
           {/* ── Fundamentals panel ── */}
           {selectedStock && showFundamentals && fundamentals && (
             <div className="fundamentals-panel">
@@ -764,11 +784,47 @@ function App() {
           {/* ── Main workspace ── */}
           <main className="app-workspace">
             {stockData.length === 0 && !loading && !error && !selectedStock && (
-              <div className="app-empty-state">
-                <div className="empty-state-icon">📈</div>
-                <div className="empty-state-title">{t('noInstrumentSelected')}</div>
+              <div className="app-empty-state research-start">
+                <div className="research-mark" aria-hidden="true">
+                  <svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 12v40h42" opacity=".35" />
+                    <path d="M20 39V23m0 5h6v8h-6m16 5V15m0 7h6v12h-6M49 30V10" />
+                  </svg>
+                </div>
+                <span className="research-eyebrow">{t('researchWorkspace')}</span>
+                <h1 className="empty-state-title">{t('noInstrumentSelected')}</h1>
                 <div className="empty-state-sub">
                   {t('searchForTicker')}
+                </div>
+                <div className="starter-tickers" role="group" aria-label={t('exploreTicker')}>
+                  {(isGitHubPages() ? ['NVDA'] : ['AAPL', 'MSFT', 'NVDA', 'SPY']).map(symbol => (
+                    <button key={symbol} onClick={() => handleStockSelect({ symbol })}>
+                      <span>{symbol}</span><span aria-hidden="true">↗</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="research-tools">
+                  <button
+                    onClick={() => setActiveSidebar(prev => prev === 'screener' ? null : 'screener')}
+                    aria-pressed={activeSidebar === 'screener'}
+                  >
+                    <span className="research-tool-title">{t('screener')} <span aria-hidden="true">↗</span></span>
+                    <span>{t('screenerHint')}</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveSidebar(prev => prev === 'backtest' ? null : 'backtest')}
+                    aria-pressed={activeSidebar === 'backtest'}
+                  >
+                    <span className="research-tool-title">{t('backtest')} <span aria-hidden="true">↗</span></span>
+                    <span>{t('backtestHint')}</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveSidebar(prev => prev === 'watchlist' ? null : 'watchlist')}
+                    aria-pressed={activeSidebar === 'watchlist'}
+                  >
+                    <span className="research-tool-title">{t('watchlist')} <span aria-hidden="true">↗</span></span>
+                    <span>{t('watchlistHint')}</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -835,7 +891,7 @@ function App() {
               aria-valuemin={ACCOUNT_PANEL_MIN_HEIGHT}
               aria-valuemax={Math.min(
                 ACCOUNT_PANEL_MAX_HEIGHT,
-                Math.max(ACCOUNT_PANEL_MIN_HEIGHT, window.innerHeight - APP_TOPBAR_HEIGHT - ACCOUNT_PANEL_MIN_MAIN_HEIGHT),
+                Math.max(ACCOUNT_PANEL_MIN_HEIGHT, window.innerHeight - getTopbarHeight() - ACCOUNT_PANEL_MIN_MAIN_HEIGHT),
               )}
               aria-valuenow={accountPanelHeight}
               tabIndex={isAccountPanelOpen ? 0 : -1}
@@ -918,11 +974,11 @@ function App() {
             previewPriceChange={previewPriceChange}
             currentPrice={loading ? null : latestClose}
           />
-          <WatchlistDialog isOpen={activeSidebar === 'watchlist'} onClose={() => setActiveSidebar(null)} onStockSelect={handleStockSelect} />
+          <WatchlistDialog isOpen={activeSidebar === 'watchlist'} onClose={() => setActiveSidebar(null)} onStockSelect={handleSidebarStockSelect} />
           <ScreenerDialog
             isOpen={activeSidebar === 'screener'}
             onClose={() => setActiveSidebar(null)}
-            onStockSelect={handleStockSelect}
+            onStockSelect={handleSidebarStockSelect}
             onStockDataScanned={(symbol, data, meta) => rememberStockData(
               symbol,
               meta?.interval || '1d',

@@ -152,6 +152,6 @@
 /* Responsive */
 @media (max-width: 768px) {
   .search-bar-inner input {
-    font-size: 14px; /* prevent iOS zoom */
+    font-size: 16px; /* prevent iOS zoom */
   }
 }
