@@ -6,6 +6,8 @@ import json
 import os
 import pickle
 import math
+import hashlib
+import tempfile
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -19,8 +21,9 @@ MODEL_CACHE_DIR = os.environ.get('MODEL_CACHE_DIR') or os.path.join(os.path.dirn
 
 
 def _get_cache_path(symbol):
-    safe = ''.join(c for c in symbol.upper() if c.isalnum())
-    return os.path.join(MODEL_CACHE_DIR, f'{safe}.pkl')
+    safe = hashlib.sha256(symbol.upper().encode('utf-8')).hexdigest()
+    # v2 invalidates models trained with unknown forward returns labeled SELL.
+    return os.path.join(MODEL_CACHE_DIR, f'v2-{safe}.pkl')
 
 
 def _load_model_from_disk(symbol):
@@ -35,13 +38,22 @@ def _load_model_from_disk(symbol):
 
 
 def _save_model_to_disk(symbol, cache_entry):
-    os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
     path = _get_cache_path(symbol)
+    temp_path = None
     try:
-        with open(path, 'wb') as f:
+        os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=MODEL_CACHE_DIR, delete=False) as f:
+            temp_path = f.name
             pickle.dump(cache_entry, f)
-    except Exception:
-        pass
+        os.replace(temp_path, path)
+    except Exception as error:
+        print(f'Model cache write failed: {error}', file=sys.stderr)
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
 
 
 def _get_cached_model(symbol):
@@ -49,23 +61,17 @@ def _get_cached_model(symbol):
     symbol = symbol.upper()
     now = datetime.now()
 
-    # Check in-memory cache first
     entry = _model_cache.get(symbol)
-    if entry:
+    if entry is None:
+        entry = _load_model_from_disk(symbol)
+    try:
         age = now - entry['trained_at']
-        if age < timedelta(hours=MODEL_CACHE_TTL_HOURS):
-            return entry['model_data']
-        # Stale — evict
-        del _model_cache[symbol]
-
-    # Try disk cache
-    entry = _load_model_from_disk(symbol)
-    if entry:
-        age = now - entry['trained_at']
-        if age < timedelta(hours=MODEL_CACHE_TTL_HOURS):
+        if timedelta(0) <= age < timedelta(hours=MODEL_CACHE_TTL_HOURS):
             _model_cache[symbol] = entry
             return entry['model_data']
-
+    except (KeyError, TypeError):
+        pass
+    _model_cache.pop(symbol, None)
     return None
 
 
@@ -233,7 +239,7 @@ def get_stock_price_history(
             hist['Future_Return'] = (hist['Future_Close'] - hist['Close']) / hist['Close']
             
             # Create buy/sell label: 1 = buy (price up by more than 5%), 0 = sell (price up by 5% or less)
-            hist['Label'] = (hist['Future_Return'] > 0.05).astype(int)
+            hist['Label'] = (hist['Future_Return'] > 0.05).astype(int).where(hist['Future_Close'].notna())
 
         if target_start:
             hist = hist[hist.index.date >= target_start.date()]
@@ -736,19 +742,43 @@ def run_backtest(symbol, strategy_config, capital=10000, date_range='2y', interv
 
     If strategy_config is a string, parse as JSON.
     """
-    if isinstance(strategy_config, str):
-        strategy_config = json.loads(strategy_config)
-
-    entry_rule = strategy_config['entry']
-    exit_rule = strategy_config.get('exit_condition', strategy_config.get('exit', {}))
-    exit_mode = strategy_config.get('exit_mode', 'immediate')
-    dca_periods = int(strategy_config.get('dca_periods', 3))
-    dca_unit = strategy_config.get('dca_unit', 'month')
-    eval_frequency = strategy_config.get('eval_frequency', 'daily')
-    if eval_frequency == 'monthly' and dca_unit == 'week':
-        dca_unit = 'month'
-
     try:
+        if isinstance(strategy_config, str):
+            strategy_config = json.loads(strategy_config)
+        if not isinstance(strategy_config, dict):
+            return {'error': 'Strategy config must be an object'}
+        if isinstance(capital, bool) or not isinstance(capital, (int, float)) or not math.isfinite(capital) or capital <= 0:
+            return {'error': 'Capital must be a positive finite number'}
+        if date_range not in ('max', '1y', '2y', '5y') or interval not in ('1d', '1wk', '1mo'):
+            return {'error': 'Invalid date range or interval'}
+
+        entry_rule = strategy_config.get('entry')
+        exit_rule = strategy_config.get('exit_condition', strategy_config.get('exit'))
+        for rule in (entry_rule, exit_rule):
+            if not isinstance(rule, dict) or rule.get('op') not in RULE_OPS:
+                return {'error': 'Entry and exit rules require a supported operator'}
+            for key in ('left', 'right'):
+                value = rule.get(key)
+                if type(value) in (int, float) and math.isfinite(value):
+                    continue
+                if isinstance(value, str):
+                    if value in ('Open', 'High', 'Low', 'Close', 'Volume'):
+                        continue
+                    if value.startswith('MA_') and value[3:].isdigit() and 2 <= int(value[3:]) <= 500:
+                        continue
+                return {'error': 'Rule operands must be prices, volume, finite numbers, or MA_2 through MA_500'}
+
+        exit_mode = strategy_config.get('exit_mode', 'immediate')
+        dca_periods = strategy_config.get('dca_periods', 3)
+        dca_unit = strategy_config.get('dca_unit', 'month')
+        eval_frequency = strategy_config.get('eval_frequency', 'daily')
+        if exit_mode not in ('immediate', 'dca') or eval_frequency not in ('daily', 'monthly'):
+            return {'error': 'Invalid exit mode or evaluation frequency'}
+        if type(dca_periods) is not int or not 1 <= dca_periods <= 24 or dca_unit not in ('month', 'week'):
+            return {'error': 'DCA requires 1 to 24 periods in months or weeks'}
+        if eval_frequency == 'monthly' and dca_unit == 'week':
+            dca_unit = 'month'
+
         raw = get_stock_price_history(symbol, date_range, interval, auto_predict=False)
         if isinstance(raw, dict) and 'error' in raw:
             return {'error': raw['error']}
@@ -822,14 +852,14 @@ def train_random_forest_model(stock_data):
     """
     try:
         from sklearn.ensemble import RandomForestClassifier
-        from sklearn.metrics import accuracy_score, classification_report
+        from sklearn.metrics import accuracy_score
         import numpy as np
         
         print("Training Random Forest model with single symbol data...", file=sys.stderr)
         
         # Filter for complete data points (no None values in features)
         complete_data = []
-        feature_fields = ['MA50_above_MA150', 'MA150_above_MA200', 'Price_above_MA50', 
+        feature_names = ['MA50_above_MA150', 'MA150_above_MA200', 'Price_above_MA50',
                         'Volume_20MA_uptrend', 'MA200_uptrend_past_month', 'MA200_uptrend_past_6months',
                         'MA200_uptrend_past_year', 'Price_above_52week_low_30pct', 
                         'Price_within_25pct_of_52week_high', 'Week_Price_Range', 'Month_Price_Range',
@@ -840,7 +870,7 @@ def train_random_forest_model(stock_data):
             if row.get('Label') is not None:  # Must have a label
                 # Check all feature fields are not None
                 features_complete = True
-                for field in feature_fields:
+                for field in feature_names:
                     if row.get(field) is None:
                         features_complete = False
                         break
@@ -856,13 +886,6 @@ def train_random_forest_model(stock_data):
         print(f"Using {len(complete_data)} data points for training (time-series ordered)", file=sys.stderr)
         
         # Prepare features and labels
-        feature_names = ['MA50_above_MA150', 'MA150_above_MA200', 'Price_above_MA50', 
-                        'Volume_20MA_uptrend', 'MA200_uptrend_past_month', 'MA200_uptrend_past_6months',
-                        'MA200_uptrend_past_year', 'Price_above_52week_low_30pct', 
-                        'Price_within_25pct_of_52week_high', 'Week_Price_Range', 'Month_Price_Range',
-                        'Price_Change_1D', 'Price_Change_1W', 'Price_Change_1M', 'Price_Change_3M',
-                        'Price_more_rise_than_fall_month']
-        
         X = []
         y = []
         
@@ -874,12 +897,10 @@ def train_random_forest_model(stock_data):
         X = np.array(X)
         y = np.array(y)
         
-        # Time-series split: train on first 80%, test on last 20%
-        # Data is sorted by date ascending, so this respects temporal order
-        # (no future data leaks into training)
+        # Purge the 22-bar label horizon so training outcomes do not use test prices.
         split_idx = int(len(X) * 0.8)
-        X_train, X_test = X[:split_idx], X[split_idx:]
-        y_train, y_test = y[:split_idx], y[split_idx:]
+        X_train, X_test = X[:split_idx - 22], X[split_idx:]
+        y_train, y_test = y[:split_idx - 22], y[split_idx:]
         
         # Train Random Forest
         print("Training Random Forest...", file=sys.stderr)
@@ -984,9 +1005,10 @@ def predict_stock_recommendation(stock_data, model_data):
         prediction = rf_model.predict(features_array)[0]
         prediction_proba = rf_model.predict_proba(features_array)[0]
         
-        # Get confidence scores
-        sell_confidence = prediction_proba[0] * 100
-        buy_confidence = prediction_proba[1] * 100
+        # A training window may contain only one class.
+        probabilities = dict(zip(rf_model.classes_, prediction_proba))
+        sell_confidence = probabilities.get(0, 0.0) * 100
+        buy_confidence = probabilities.get(1, 0.0) * 100
         
         recommendation = "BUY" if prediction == 1 else "SELL"
         confidence = max(sell_confidence, buy_confidence)
@@ -1113,9 +1135,9 @@ def _make_fastapi_app():
     @service.get("/model/status/{symbol}")
     def model_status(symbol: str):
         sym = symbol.upper()
-        entry = _model_cache.get(sym)
-        if entry:
-            cached = entry['model_data']
+        cached = _get_cached_model(sym)
+        if cached is not None:
+            entry = _model_cache[sym]
             return {
                 "symbol": sym,
                 "cached": True,

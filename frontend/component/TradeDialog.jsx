@@ -134,21 +134,21 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
     setSuccessMsg('');
     setErrorMsg('');
 
-    const entryPrice = parseFloat(price);
-    const profitPrice = parseFloat(takeProfitPrice);
-    const lossPrice = parseFloat(stopLossPrice);
+    const entryPrice = Number(price);
+    const profitPrice = Number(takeProfitPrice);
+    const lossPrice = Number(stopLossPrice);
 
-    if (!price || isNaN(price) || entryPrice <= 0) {
+    if (!Number.isFinite(entryPrice) || entryPrice <= 0) {
       setPriceError(t('enterValidPrice'));
       valid = false;
     }
-    if (!amount || isNaN(amount) || parseInt(amount) <= 0) {
+    if (!isModifyMode && (!Number.isSafeInteger(Number(amount)) || Number(amount) <= 0)) {
       setAmountError(t('enterValidShares'));
       valid = false;
     }
 
     if (isBracketOrder) {
-      if (!takeProfitPrice || isNaN(takeProfitPrice) || profitPrice <= 0) {
+      if (!Number.isFinite(profitPrice) || profitPrice <= 0) {
         setTakeProfitError(t('enterValidTakeProfit'));
         valid = false;
       } else if (Number.isFinite(entryPrice) && (action === 'BUY' ? profitPrice <= entryPrice : profitPrice >= entryPrice)) {
@@ -156,7 +156,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
         valid = false;
       }
 
-      if (!stopLossPrice || isNaN(stopLossPrice) || lossPrice <= 0) {
+      if (!Number.isFinite(lossPrice) || lossPrice <= 0) {
         setStopLossError(t('enterValidStopLoss'));
         valid = false;
       } else if (Number.isFinite(entryPrice) && (action === 'BUY' ? lossPrice >= entryPrice : lossPrice <= entryPrice)) {
@@ -178,7 +178,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
         const response = await fetch(`/api/orders/${encodeURIComponent(orderRef)}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ price: parseFloat(price) }),
+          body: JSON.stringify({ price: Number(price) }),
         });
 
         const data = await response.json();
@@ -198,16 +198,16 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
 
       const orderPayload = {
         symbol: stockSymbol,
-        price: parseFloat(price),
-        quantity: parseInt(amount),
+        price: Number(price),
+        quantity: Number(amount),
         action,
         tif,
       };
 
       if (isBracketOrder) {
         orderPayload.bracket = {
-          takeProfitPrice: parseFloat(takeProfitPrice),
-          stopLossPrice: parseFloat(stopLossPrice),
+          takeProfitPrice: Number(takeProfitPrice),
+          stopLossPrice: Number(stopLossPrice),
         };
       }
 
@@ -218,7 +218,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
       });
 
       const data = await response.json();
-      if (data.success) {
+      if (response.ok && data.success) {
         rememberSubmittedOrderPrice(data.orderId, data.price ?? price);
         setSuccessMsg(t('orderSubmitted', {
           type: data.orderType === 'BRACKET' ? t('bracketOrder') : t('order'),
@@ -264,8 +264,9 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
     onClose();
   };
 
-  const totalValue = price && amount && !isNaN(price) && !isNaN(amount)
-    ? (parseFloat(price) * parseInt(amount)).toFixed(2)
+  const totalValue = Number.isFinite(Number(price)) && Number(price) > 0
+    && Number.isSafeInteger(Number(amount)) && Number(amount) > 0
+    ? (Number(price) * Number(amount)).toFixed(2)
     : null;
 
   return (

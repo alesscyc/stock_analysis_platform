@@ -9,14 +9,13 @@ function SearchBar({ onStockSelect, loading }) {
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
-    const debounceTimer = useRef(null);
     const suggestionsRef = useRef(null);
 
     // Debounced fetch for suggestions
     useEffect(() => {
-        if (debounceTimer.current) {
-            clearTimeout(debounceTimer.current);
-        }
+        const controller = new AbortController();
+        setSuggestions([]);
+        setHighlightedIndex(-1);
 
         if (searchTerm.trim().length === 0) {
             setSuggestions([]);
@@ -25,25 +24,28 @@ function SearchBar({ onStockSelect, loading }) {
             return;
         }
 
-        debounceTimer.current = setTimeout(async () => {
+        const timer = setTimeout(async () => {
             try {
                 const response = await fetch(
-                    `/api/symbols?q=${encodeURIComponent(searchTerm)}`
+                    `/api/symbols?q=${encodeURIComponent(searchTerm)}`,
+                    { signal: controller.signal }
                 );
+                if (!response.ok) throw new Error('Symbol search failed');
                 const data = await response.json();
+                if (controller.signal.aborted) return;
                 setSuggestions(Array.isArray(data) ? data : []);
                 setShowSuggestions(true);
                 setHighlightedIndex(-1);
             } catch (error) {
+                if (controller.signal.aborted) return;
                 console.error('Error fetching suggestions:', error);
                 setSuggestions([]);
             }
         }, 300); // 300ms debounce
 
         return () => {
-            if (debounceTimer.current) {
-                clearTimeout(debounceTimer.current);
-            }
+            clearTimeout(timer);
+            controller.abort();
         };
     }, [searchTerm]);
 

@@ -41,8 +41,8 @@ function resolveOperand(selectVal, numVal) {
   if (selectVal === '__ma__') {
     const raw = String(numVal ?? '').trim();
     if (raw === '') return null;
-    const period = Number.parseInt(raw, 10);
-    if (!Number.isFinite(period) || period < MA_PERIOD_MIN || period > MA_PERIOD_MAX) return null;
+    const period = Number(raw);
+    if (!Number.isInteger(period) || period < MA_PERIOD_MIN || period > MA_PERIOD_MAX) return null;
     return `MA_${period}`;
   }
   return selectVal;
@@ -94,9 +94,9 @@ function normalizeFormStrategy(form) {
 }
 
 function loadStoredStrategy() {
-  const stored = localStorage.getItem('bt_strategy');
-  if (!stored) return DEFAULT_STRATEGY;
   try {
+    const stored = localStorage.getItem('bt_strategy');
+    if (!stored) return DEFAULT_STRATEGY;
     const parsed = JSON.parse(stored);
     if (parsed.entry && typeof parsed.entry === 'object') {
       return normalizeFormStrategy(migrateLegacyConfig(parsed));
@@ -231,7 +231,11 @@ export default function BacktestDialog({ isOpen, onClose, selectedSymbol, curren
       return;
     }
 
-    localStorage.setItem('bt_strategy', JSON.stringify(strategy));
+    try {
+      localStorage.setItem('bt_strategy', JSON.stringify(strategy));
+    } catch {
+      // A storage failure must not prevent running a backtest.
+    }
     setRunning(true);
     setError(null);
     setResult(null);

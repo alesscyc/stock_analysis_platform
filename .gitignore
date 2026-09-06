@@ -6,6 +6,7 @@ stock_rf_model.pkl
 .opencode/*
 docs/roadmap/Council_Features_Roadmap.md
 __pycache__/
+.tmp/
 *.pyc
 analysis/model_cache/
 run-project.bat

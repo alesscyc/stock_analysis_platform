@@ -60,7 +60,7 @@ function validateSettings(input) {
   const normalized = {};
   for (const [key, value] of Object.entries(input)) {
     const field = SETTINGS_FIELDS[key];
-    if (!field) throw new Error(`Unsupported setting: ${key}`);
+    if (!Object.hasOwn(SETTINGS_FIELDS, key)) throw new Error(`Unsupported setting: ${key}`);
     if (typeof value !== 'string') throw new Error(`${key} must be text`);
     const trimmed = field.secret ? value : value.trim();
     if (field.secret && trimmed === '') continue;
@@ -71,19 +71,27 @@ function validateSettings(input) {
   return normalized;
 }
 
+function quoteEnvValue(value) {
+  for (const quote of ['"', "'", '`']) {
+    const quoted = `${quote}${value}${quote}`;
+    if (dotenv.parse(`VALUE=${quoted}`).VALUE === value) return quoted;
+  }
+  throw new Error('Setting cannot be represented safely in an env file');
+}
+
 function updateEnvText(existingText, updates) {
   const remaining = new Map(Object.entries(updates));
   const lines = existingText ? existingText.replace(/\r\n/g, '\n').split('\n') : [];
   const updated = lines.map(line => {
-    const match = line.match(/^\s*([A-Z][A-Z0-9_]*)\s*=/);
+    const match = line.match(/^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=/);
     if (!match || !Object.hasOwn(updates, match[1])) return line;
     const value = updates[match[1]];
     remaining.delete(match[1]);
-    return `${match[1]}=${JSON.stringify(value)}`;
+    return `${match[1]}=${quoteEnvValue(value)}`;
   });
 
   if (updated.length && updated.at(-1) !== '') updated.push('');
-  for (const [key, value] of remaining) updated.push(`${key}=${JSON.stringify(value)}`);
+  for (const [key, value] of remaining) updated.push(`${key}=${quoteEnvValue(value)}`);
   return `${updated.join('\n').replace(/\n+$/, '')}\n`;
 }
 

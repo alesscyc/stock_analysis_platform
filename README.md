@@ -40,7 +40,7 @@ Components live in `frontend/component/`, not `frontend/src/component/`.
 
 ## Development setup
 
-Prerequisites: Node.js 18+, npm, Python 3.9+, and optionally IB Gateway or TWS.
+Prerequisites: Node.js 22.12+, npm, Python 3.11+, and optionally IB Gateway or TWS.
 
 ```bash
 # Install dependencies
@@ -113,6 +113,12 @@ npm run build
 
 cd ../backend
 npm test
+
+cd ../analysis
+python -m unittest discover -p "test_*.py"
+
+cd ../electron
+npm test
 ```
 
 ## Windows desktop app (Electron)
@@ -156,7 +162,7 @@ Notes:
 - The API has no authentication and is intended for local development.
 - Orders reach the configured IB account. Use paper trading while testing.
 - Set `IB_CLIENT_ID=0` if the app must bind and display manually created TWS/IBKR open orders.
-- ML labels use a 22-trading-day forward return above 5%; trained models are cached per symbol for four hours under `analysis/model_cache/`.
+- ML labels use a 22-trading-day forward return above 5%. Bars without a known forward return are excluded from training, and a 22-bar gap separates training and evaluation data. Models are cached per symbol for four hours under `analysis/model_cache/`; cache writes are atomic and older cache formats are ignored.
 - AI chat uses only the chart payload already loaded in the UI (OHLCV, MAs, fundamentals, RF prediction). It does not fetch live news or place trades, and responses are informational only.
 - Python service output must remain valid JSON on stdout; write diagnostics to stderr.
 

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const dotenv = require('dotenv');
 const { saveSettings, updateEnvText, validateSettings } = require('../settingsEnv');
 
 describe('desktop settings env', () => {
@@ -23,6 +24,15 @@ describe('desktop settings env', () => {
     assert.throws(() => validateSettings({ UNKNOWN: 'value' }), /Unsupported setting/);
     assert.throws(() => validateSettings({ IB_PORT: '70000' }), /Invalid value/);
     assert.throws(() => validateSettings({ OPENAI_API_KEY: 'one\ntwo' }), /Invalid value/);
+    assert.throws(() => validateSettings({ constructor: 'value' }), /Unsupported setting/);
+  });
+
+  it('round-trips quotes and literal backslashes without changing secrets', () => {
+    for (const value of ['key"with"quotes', String.raw`key\new\route`, "key'with`quotes", ' key#=value ']) {
+      const result = updateEnvText('export OPENAI_API_KEY=old\n', { OPENAI_API_KEY: value });
+      assert.equal(dotenv.parse(result).OPENAI_API_KEY, value);
+      assert.equal(result.split('\n').filter(line => line.includes('OPENAI_API_KEY')).length, 1);
+    }
   });
 
   it('writes settings atomically and does not return secret values', t => {

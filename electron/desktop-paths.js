@@ -39,6 +39,7 @@ function buildBackendEnv(paths, baseEnv, userDataDir) {
     env.DESKTOP_MODE = '1';
     env.BIND_HOST = '127.0.0.1';
     env.PYTHON_SERVICE_EXE = paths.analysisServiceExe;
+    env.PYTHON_SERVICE_URL = `http://127.0.0.1:${PYTHON_PORT}`;
     env.ENV_FILE = path.join(userDataDir, '.env');
     env.MODEL_CACHE_DIR = path.join(userDataDir, 'model_cache');
   }

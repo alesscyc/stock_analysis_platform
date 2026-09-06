@@ -51,7 +51,7 @@ if (!app.requestSingleInstanceLock()) {
     if (!pid) return;
     if (process.platform === 'win32') {
       try {
-        execFileSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+        execFileSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
       } catch (_) {}
     } else {
       try { process.kill(pid, 'SIGTERM'); } catch (_) {}
@@ -106,8 +106,19 @@ if (!app.requestSingleInstanceLock()) {
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
+        sandbox: true,
       },
     });
+    mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    const frontendOrigin = new URL(paths.frontendUrl).origin;
+    const guardNavigation = (event, url) => {
+      try {
+        if (new URL(url).origin === frontendOrigin) return;
+      } catch (_) {}
+      event.preventDefault();
+    };
+    mainWindow.webContents.on('will-navigate', guardNavigation);
+    mainWindow.webContents.on('will-redirect', guardNavigation);
     mainWindow.loadURL(paths.frontendUrl);
     mainWindow.on('closed', () => {
       mainWindow = null;

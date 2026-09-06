@@ -15,7 +15,7 @@ const port = 3001;
 // Desktop mode (packaged Electron app): bind loopback only and skip the
 // permissive CORS used for the browser-based web workflow.
 const DESKTOP_MODE = process.env.DESKTOP_MODE === '1';
-const BIND_HOST = process.env.BIND_HOST;
+const BIND_HOST = DESKTOP_MODE ? '127.0.0.1' : process.env.BIND_HOST;
 const ENV_FILE = process.env.ENV_FILE;
 
 // Simple in-memory cache
@@ -782,6 +782,7 @@ app.get('/api/stock/:symbol', async (req, res) => {
     }
     
     const pyRes = await fetch(`${PYTHON_SERVICE_URL}/stock_history`, {
+      signal: AbortSignal.timeout(120000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -840,7 +841,7 @@ app.get('/api/symbols', async (req, res) => {
     }
 
     const url = `https://finnhub.io/api/v1/search?q=${encodeURIComponent(query)}&token=${FINNHUB_KEY}`;
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
 
     if (!response.ok) {
       console.error('Finnhub API error:', response.status, response.statusText);
@@ -888,6 +889,7 @@ app.get('/api/price/:symbol', async (req, res) => {
     }
 
     const pyRes = await fetch(`${PYTHON_SERVICE_URL}/current_price`, {
+      signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol }),
@@ -923,6 +925,7 @@ app.get('/api/fundamentals/:symbol', async (req, res) => {
     }
 
     const pyRes = await fetch(`${PYTHON_SERVICE_URL}/fundamentals`, {
+      signal: AbortSignal.timeout(30000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol }),
@@ -956,6 +959,7 @@ app.get('/api/prediction/:symbol', async (req, res) => {
     }
 
     const pyRes = await fetch(`${PYTHON_SERVICE_URL}/prediction`, {
+      signal: AbortSignal.timeout(120000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ symbol }),
@@ -1187,8 +1191,11 @@ app.get('/api/model/status/:symbol', async (req, res) => {
       return res.status(400).json({ error: 'Invalid symbol' });
     }
 
-    const pyRes = await fetch(`${PYTHON_SERVICE_URL}/model/status/${encodeURIComponent(symbol)}`);
+    const pyRes = await fetch(`${PYTHON_SERVICE_URL}/model/status/${encodeURIComponent(symbol)}`, {
+      signal: AbortSignal.timeout(10000),
+    });
     const result = await pyRes.json();
+    if (!pyRes.ok) return res.status(502).json({ error: result.detail || 'Python service error' });
     res.json(result);
   } catch (error) {
     console.error('[python-service] Model status failed:', error.message);
@@ -1203,17 +1210,16 @@ app.post('/api/model/retrain/:symbol', async (req, res) => {
       return res.status(400).json({ error: 'Invalid symbol' });
     }
 
-    // Also clear any cached stock data so next request retrains
-    for (const key of cache.keys()) {
-      if (key.startsWith(`${symbol}-`) && key.includes('-true')) {
-        cache.delete(key);
-      }
-    }
-
     const pyRes = await fetch(`${PYTHON_SERVICE_URL}/model/retrain/${encodeURIComponent(symbol)}`, {
+      signal: AbortSignal.timeout(10000),
       method: 'POST',
     });
     const result = await pyRes.json();
+    if (!pyRes.ok) return res.status(502).json({ error: result.detail || 'Python service error' });
+    cache.delete(`prediction-${symbol}`);
+    for (const key of cache.keys()) {
+      if (key.startsWith(`${symbol}-`) && key.includes('-true')) cache.delete(key);
+    }
     res.json(result);
   } catch (error) {
     console.error('[python-service] Model retrain failed:', error.message);
@@ -1242,7 +1248,7 @@ app.post('/api/orders', async (req, res) => {
       return res.status(400).json({ error: 'Action must be BUY or SELL' });
     }
 
-    if (!Number.isInteger(quantity) || quantity <= 0) {
+    if (!Number.isSafeInteger(quantity) || quantity <= 0) {
       return res.status(400).json({ error: 'Quantity must be a positive integer' });
     }
 
@@ -1640,6 +1646,7 @@ app.post('/api/backtest', async (req, res) => {
     }
 
     const pyRes = await fetch(`${PYTHON_SERVICE_URL}/backtest`, {
+      signal: AbortSignal.timeout(45000),
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

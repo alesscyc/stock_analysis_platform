@@ -24,7 +24,11 @@ function loadWatchlist() {
 }
 
 function saveWatchlist(list) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  } catch {
+    // Keep the watchlist usable when browser storage is unavailable.
+  }
 }
 
 function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
@@ -38,7 +42,6 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [pricesLoading, setPricesLoading] = useState(false);
   const pollIntervalRef = useRef(null);
-  const debounceTimer = useRef(null);
   const suggestionsRef = useRef(null);
   const inputRef = useRef(null);
   const { t } = useTranslation();
@@ -115,37 +118,40 @@ function WatchlistDialog({ isOpen, onClose, onStockSelect }) {
 
   // Debounced symbol search
   useEffect(() => {
-    if (debounceTimer.current) {
-      clearTimeout(debounceTimer.current);
-    }
+    const controller = new AbortController();
+    setSuggestions([]);
+    setHighlightedIndex(-1);
 
-    if (searchTerm.trim().length === 0) {
+    if (!isOpen || searchTerm.trim().length === 0) {
       setSuggestions([]);
       setShowSuggestions(false);
       setHighlightedIndex(-1);
       return;
     }
 
-    debounceTimer.current = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       try {
         const response = await fetch(
-          `/api/symbols?q=${encodeURIComponent(searchTerm)}`
+          `/api/symbols?q=${encodeURIComponent(searchTerm)}`,
+          { signal: controller.signal }
         );
+        if (!response.ok) throw new Error('Symbol search failed');
         const data = await response.json();
+        if (controller.signal.aborted) return;
         setSuggestions(Array.isArray(data) ? data : []);
         setShowSuggestions(true);
         setHighlightedIndex(-1);
       } catch {
+        if (controller.signal.aborted) return;
         setSuggestions([]);
       }
     }, 300);
 
     return () => {
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
+      clearTimeout(timer);
+      controller.abort();
     };
-  }, [searchTerm]);
+  }, [isOpen, searchTerm]);
 
   // Click outside to close suggestions
   useEffect(() => {
