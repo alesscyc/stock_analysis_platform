@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { memo, useState, useCallback, useRef } from 'react';
 import { useTranslation } from '../src/i18n/useTranslation';
 import PanelCloseButton from './PanelCloseButton';
 import './ScreenerDialog.css';
@@ -22,6 +22,47 @@ function clampNumber(value, min, max, fallback) {
   if (!Number.isFinite(num)) return fallback;
   return Math.min(max, Math.max(min, num));
 }
+
+const ResultChart = memo(function ResultChart({ data }) {
+  const { t } = useTranslation();
+  const points = data.slice(-126).map(row => ({
+    date: row.Date,
+    open: parseFloat(row.Open), high: parseFloat(row.High),
+    low: parseFloat(row.Low), close: parseFloat(row.Close),
+  })).filter(row => [row.open, row.high, row.low, row.close].every(Number.isFinite)
+    && row.high >= Math.max(row.open, row.close)
+    && row.low <= Math.min(row.open, row.close));
+  if (points.length < 2) return <span className="screener-chart-empty">{t('screenerChartUnavailable')}</span>;
+  const low = Math.min(...points.map(row => row.low));
+  const high = Math.max(...points.map(row => row.high));
+  const range = high - low || 1;
+  const y = price => 76 - (price - low) / range * 64;
+  const step = 300 / points.length;
+  const width = Math.min(8, step * 0.65);
+  const paths = { up: { wicks: '', bodies: '' }, down: { wicks: '', bodies: '' } };
+  points.forEach((row, index) => {
+    const x = (index + 0.5) * step;
+    const top = y(Math.max(row.open, row.close));
+    const height = Math.max(1, Math.abs(y(row.open) - y(row.close)));
+    const path = paths[row.close >= row.open ? 'up' : 'down'];
+    path.wicks += `M${x},${y(row.high)}V${y(row.low)}`;
+    path.bodies += `M${x - width / 2},${top}h${width}v${height}h${-width}Z`;
+  });
+  return (
+    <span className="screener-chart">
+      <svg viewBox="0 0 300 88" aria-hidden="true" focusable="false">
+        <path d="M0,12 H300 M0,44 H300 M0,76 H300" className="screener-chart-grid" />
+        {Object.entries(paths).map(([direction, path]) => (
+          <g key={direction} className={`screener-candle-${direction}`}>
+            <path d={path.wicks} fill="none" stroke="currentColor" vectorEffect="non-scaling-stroke" />
+            <path d={path.bodies} fill="currentColor" />
+          </g>
+        ))}
+      </svg>
+      <span className="screener-chart-dates"><span>{String(points[0].date).slice(0, 10)}</span><span>{String(points.at(-1).date).slice(0, 10)}</span></span>
+    </span>
+  );
+});
 
 function ScreenerDialog({ isOpen, onClose, onStockSelect, onStockDataScanned }) {
   const { t } = useTranslation();
@@ -173,19 +214,7 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect, onStockDataScanned }) 
           const latest = data[data.length - 1];
           const close = parseFloat(latest.Close);
 
-          // Compute 1-week and 1-month change for display
-          const weekAgo = data[Math.max(0, data.length - 6)];
-          const monthAgo = data[Math.max(0, data.length - 22)];
-          const weekChange = weekAgo ? ((close - parseFloat(weekAgo.Close)) / parseFloat(weekAgo.Close)) * 100 : null;
-          const monthChange = monthAgo ? ((close - parseFloat(monthAgo.Close)) / parseFloat(monthAgo.Close)) * 100 : null;
-
-          const match = {
-            symbol,
-            close,
-            weekChange,
-            monthChange,
-            chartData: data,
-          };
+          const match = { symbol, close, chartData: data };
 
           setResults(prev => [...prev, match]);
           setLatestMatchedSymbol(symbol);
@@ -304,7 +333,7 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect, onStockDataScanned }) 
         </div>
         <textarea
           id="screener-symbols"
-          rows={4}
+          rows={2}
           placeholder={t('symbolsPlaceholder')}
           value={symbolsText}
           onChange={(e) => setSymbolsText(e.target.value)}
@@ -314,11 +343,13 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect, onStockDataScanned }) 
       </div>
 
       {/* Conditions */}
-      <div id="screener-conditions">
-        <div id="screener-conditions-title">
-          {t('conditions')}
-          <span id="screener-conditions-active">{t('activeCount', { active: enabledConditions.length, total: conditions.length })}</span>
-        </div>
+      <details id="screener-conditions">
+        <summary id="screener-conditions-title">
+          <span className="screener-conditions-heading">
+            {t('conditions')}
+            <span id="screener-conditions-active">{t('activeCount', { active: enabledConditions.length, total: conditions.length })}</span>
+          </span>
+        </summary>
 
         <div id="screener-conditions-list">
           {conditions.map((cond) => (
@@ -384,7 +415,7 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect, onStockDataScanned }) 
             </div>
           ))}
         </div>
-      </div>
+      </details>
 
       {/* Actions */}
       <div id="screener-actions">
@@ -440,41 +471,23 @@ function ScreenerDialog({ isOpen, onClose, onStockSelect, onStockDataScanned }) 
             <span id="screener-results-count">{t('matchedCount', { count: results.length })}</span>
           </div>
 
-          <div id="screener-results-table-wrapper">
-            <table id="screener-results-table">
-              <thead>
-                <tr>
-                  <th>{t('symbol')}</th>
-                  <th className="align-right">{t('price')}</th>
-                  <th className="align-right">{t('oneWeek')}</th>
-                  <th className="align-right">{t('oneMonth')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((row, index) => (
-                  <tr
-                    key={row.symbol}
-                    className="screener-result-row"
-                    onClick={() => handleRowClick(row)}
-                    onKeyDown={(event) => handleResultRowKeyDown(event, row, index)}
-                    role="button"
-                    tabIndex={0}
-                    title={t('clickToViewChart', { symbol: row.symbol })}
-                  >
-                    <td className="screener-symbol-cell">{row.symbol}</td>
-                    <td className="align-right screener-num">
-                      ${row.close.toFixed(2)}
-                    </td>
-                    <td className={`align-right screener-num ${row.weekChange != null ? (row.weekChange >= 0 ? 'screener-up' : 'screener-down') : ''}`}>
-                      {row.weekChange != null ? `${row.weekChange >= 0 ? '+' : ''}${row.weekChange.toFixed(1)}%` : '–'}
-                    </td>
-                    <td className={`align-right screener-num ${row.monthChange != null ? (row.monthChange >= 0 ? 'screener-up' : 'screener-down') : ''}`}>
-                      {row.monthChange != null ? `${row.monthChange >= 0 ? '+' : ''}${row.monthChange.toFixed(1)}%` : '–'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div id="screener-results-list">
+            {results.map((row, index) => (
+              <button
+                key={`${row.symbol}-${index}`}
+                className="screener-result-row"
+                onClick={() => handleRowClick(row)}
+                onKeyDown={(event) => handleResultRowKeyDown(event, row, index)}
+                title={t('clickToViewChart', { symbol: row.symbol })}
+                aria-label={t('clickToViewChart', { symbol: row.symbol })}
+              >
+                <span className="screener-result-heading">
+                  <span className="screener-symbol-cell">{row.symbol}</span>
+                  <span className="screener-num">${row.close.toFixed(2)}</span>
+                </span>
+                <ResultChart data={row.chartData} />
+              </button>
+            ))}
           </div>
         </div>
       )}
