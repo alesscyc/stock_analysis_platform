@@ -1096,18 +1096,20 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
       containerEl.removeEventListener('contextmenu', handleContextMenu, true);
       window.removeEventListener('mouseup', handleMouseUp);
       ro.disconnect();
+      // Detaching markers requests a redraw; do it while the chart is alive.
+      backtestMarkersRef.current?.detach?.();
+      backtestMarkersRef.current = null;
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current  = null;
       volumeSeriesRef.current      = null;
       maSeriesRefs.current         = {};
       swingZonesPrimitiveRef.current = null;
+      pricePatternPrimitiveRef.current = null;
       drawingsPrimitiveRef.current = null;
       vol20maSeriesRef.current = null;
       ibLinesPrimitiveRef.current = null;
       ibPriceLinesRef.current = [];
-      backtestMarkersRef.current?.detach?.();
-      backtestMarkersRef.current = null;
     };
   }, []); // only on mount/unmount
 

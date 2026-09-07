@@ -150,10 +150,12 @@ def get_stock_price_history(
         # Dollar volume (Close * Volume)
         hist['Dollar_Volume'] = hist['Close'] * hist['Volume']
 
-        # ── ML feature computation (only when auto_predict is requested) ──
-        # The chart does NOT display these 16 features — they are only used for
-        # RandomForest training and prediction. Skipping them when auto_predict=false
-        # saves ~100 lines of rolling-window pandas operations per symbol load.
+        # Daily screener inputs are needed even when ML prediction is disabled.
+        if interval == '1d':
+            hist['52week_low'] = hist['Close'].rolling(window=252, min_periods=252).min()
+            hist['52week_high'] = hist['Close'].rolling(window=252, min_periods=252).max()
+
+        # ML-only features remain optional.
         if auto_predict and interval == '1d':
             
             # Technical indicator features (binary: 1 = True, 0 = False)
@@ -191,11 +193,9 @@ def get_stock_price_history(
             hist['MA200_uptrend_past_year'] = (hist['MA200_uptrend_count_1y'] >= 227).astype(int)  # 227/252 = ~90%
             
             # 52-week low feature: check if current price is at least 30% above 52-week low
-            hist['52week_low'] = hist['Close'].rolling(window=252, min_periods=252).min()
             hist['Price_above_52week_low_30pct'] = ((hist['Close'] - hist['52week_low']) / hist['52week_low'] >= 0.30).astype(int)
             
             # 52-week high feature: check if current price is within 25% of 52-week high
-            hist['52week_high'] = hist['Close'].rolling(window=252, min_periods=252).max()
             hist['Price_within_25pct_of_52week_high'] = ((hist['52week_high'] - hist['Close']) / hist['52week_high'] <= 0.25).astype(int)
             
             # Price range features: volatility indicators
@@ -278,6 +278,9 @@ def get_stock_price_history(
             }
             if include_market_cap:
                 data_point["MarketCap"] = market_cap
+            if interval == '1d':
+                data_point["52week_low"] = round(float(row['52week_low']), 2) if pd.notna(row['52week_low']) else None
+                data_point["52week_high"] = round(float(row['52week_high']), 2) if pd.notna(row['52week_high']) else None
             if auto_predict and interval == '1d':
                 data_point["MA50_above_MA150"] = int(row['MA50_above_MA150']) if pd.notna(row['MA50_above_MA150']) else None
                 data_point["MA150_above_MA200"] = int(row['MA150_above_MA200']) if pd.notna(row['MA150_above_MA200']) else None
@@ -287,8 +290,6 @@ def get_stock_price_history(
                 data_point["MA200_above_month_ago"] = int(row['MA200_above_month_ago']) if pd.notna(row['MA200_above_month_ago']) else None
                 data_point["MA200_uptrend_past_6months"] = int(row['MA200_uptrend_past_6months']) if pd.notna(row['MA200_uptrend_past_6months']) else None
                 data_point["MA200_uptrend_past_year"] = int(row['MA200_uptrend_past_year']) if pd.notna(row['MA200_uptrend_past_year']) else None
-                data_point["52week_low"] = round(float(row['52week_low']), 2) if pd.notna(row['52week_low']) else None
-                data_point["52week_high"] = round(float(row['52week_high']), 2) if pd.notna(row['52week_high']) else None
                 data_point["Price_above_52week_low_30pct"] = int(row['Price_above_52week_low_30pct']) if pd.notna(row['Price_above_52week_low_30pct']) else None
                 data_point["Price_within_25pct_of_52week_high"] = int(row['Price_within_25pct_of_52week_high']) if pd.notna(row['Price_within_25pct_of_52week_high']) else None
                 data_point["Week_Price_Range"] = round(float(row['Week_Price_Range']), 2) if pd.notna(row['Week_Price_Range']) else None
@@ -445,7 +446,8 @@ def get_fundamentals(symbol):
         def fmt_pct(value):
             if value is None or not isinstance(value, (int, float)):
                 return None
-            return f"{value * 100:.2f}%"
+            # Yahoo's dividendYield is already expressed in percentage points.
+            return f"{value:.2f}%"
 
         def fmt_vol(value):
             if value is None or not isinstance(value, (int, float)):

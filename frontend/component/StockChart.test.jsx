@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../src/i18n/I18nContext.jsx'
 import StockChart from './StockChart'
+import { createSeriesMarkers } from 'lightweight-charts'
 
 const chartMock = vi.hoisted(() => {
   let chart
@@ -109,6 +110,18 @@ describe('StockChart drawings', () => {
     localStorage.clear()
     chartMock.reset()
     globalThis.ResizeObserver = ResizeObserverStub
+  })
+
+  it('detaches markers before destroying their chart on unmount', () => {
+    const { unmount } = renderChart()
+    const chart = chartMock.createChart.mock.results.at(-1).value
+    const markers = createSeriesMarkers.mock.results.at(-1).value
+    markers.detach.mockImplementation(() => {
+      expect(chart.remove).not.toHaveBeenCalled()
+    })
+    unmount()
+    expect(markers.detach).toHaveBeenCalledOnce()
+    expect(chart.remove).toHaveBeenCalledOnce()
   })
 
   it('draws by drag, selects, and deletes a persisted trend line', () => {

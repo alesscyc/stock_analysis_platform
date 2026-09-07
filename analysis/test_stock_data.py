@@ -40,6 +40,18 @@ class FakeTicker:
 
 class StockHistoryWindowTest(unittest.TestCase):
     @patch.object(stock_data.yf, 'Ticker', return_value=FakeTicker())
+    def test_daily_screener_fields_do_not_require_prediction(self, _ticker):
+        with patch.object(stock_data, 'train_random_forest_model') as train:
+            rows = stock_data.get_stock_price_history('TEST', include_market_cap=False)
+        train.assert_not_called()
+        self.assertIsNone(rows[250]['52week_low'])
+        self.assertEqual(rows[251]['52week_low'], 101)
+        self.assertEqual(rows[-1]['52week_low'], 649)
+        self.assertEqual(rows[-1]['52week_high'], 900)
+        self.assertNotIn('Label', rows[-1])
+        json.dumps(rows, allow_nan=False)
+
+    @patch.object(stock_data.yf, 'Ticker', return_value=FakeTicker())
     def test_window_is_trimmed_after_indicator_warmup(self, _ticker):
         rows = stock_data.get_stock_price_history(
             'TEST',
@@ -63,6 +75,15 @@ class StockHistoryWindowTest(unittest.TestCase):
             end_date='1991-01-01',
             include_market_cap=False,
         ), [])
+
+
+class FundamentalsTest(unittest.TestCase):
+    @patch.object(stock_data.yf, 'Ticker')
+    def test_dividend_yield_is_already_percentage_points(self, ticker):
+        for value, expected in ((0.34, '0.34%'), (0, '0.00%'), (None, None)):
+            with self.subTest(value=value):
+                ticker.return_value.info = {'dividendYield': value}
+                self.assertEqual(stock_data.get_fundamentals('TEST')['dividendYield'], expected)
 
 
 class IncompleteBarTicker(FakeTicker):
