@@ -38,7 +38,7 @@ npm --prefix frontend run dev      # UI:  http://localhost:5173
 
 The frontend calls relative `/api/...` URLs; Vite proxies them to port 3001. Do not start the Python service separately unless debugging it directly.
 
-The backend launches the service with the bare `python` command; it must resolve to Python 3.
+The backend launches the service with the repo `.venv` Python when that virtualenv exists, otherwise with the bare `python` command; either must resolve to Python 3 with `analysis/requirements.txt` installed.
 
 Core charting and analysis work without `backend/.env`. Copy `backend/.env.example` when using IB, Finnhub autocomplete, or AI chat. Yahoo Finance access requires network egress.
 

@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 const { buildChatIbContext, parseChatResponse } = require('./chatSafety');
 const { readSettings, saveSettings } = require('./settingsEnv');
 
@@ -1675,6 +1676,12 @@ app.post('/api/backtest', async (req, res) => {
 // ── Python FastAPI service manager ───────────────────────────────────────────
 const PYTHON_SCRIPT = path.join(__dirname, '../analysis/stock_data.py');
 const PYTHON_SERVICE_EXE = process.env.PYTHON_SERVICE_EXE;
+// Dev mode: prefer the repo virtualenv, which is where the analysis requirements
+// are usually installed, over whatever `python` resolves to on PATH.
+const DEV_PYTHON = [
+  path.join(__dirname, '../.venv/Scripts/python.exe'),
+  path.join(__dirname, '../.venv/bin/python'),
+].find((candidate) => fs.existsSync(candidate));
 let pythonProcess = null;
 let pythonExiting = false;
 
@@ -1683,10 +1690,10 @@ function startPythonService() {
 
   console.log('[python-service] Starting FastAPI service...');
   // Packaged desktop apps ship a PyInstaller bundle via PYTHON_SERVICE_EXE;
-  // otherwise fall back to the system Python interpreter (dev mode).
+  // otherwise fall back to the virtualenv, or the system Python (dev mode).
   pythonProcess = PYTHON_SERVICE_EXE
     ? spawn(PYTHON_SERVICE_EXE, ['serve'], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
-    : spawn('python', [PYTHON_SCRIPT, 'serve'], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    : spawn(DEV_PYTHON || 'python', [PYTHON_SCRIPT, 'serve'], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
 
   pythonProcess.stdout.on('data', (data) => {
     process.stdout.write(`[python-service] ${data}`);
