@@ -1,4 +1,4 @@
-/* ── Sidebar panel ─────────────────────────────────────── */
+/* ── Account overview panel ────────────────────────────── */
 #portfolio-dialog-sidebar {
   width: 100%;
   background: var(--bg-surface);
@@ -6,10 +6,339 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
   padding: var(--space-5);
   overflow-y: auto;
   flex-shrink: 0;
+}
+
+#account-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+.account-overview-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.account-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ── Header: account selector, status, freshness ────────── */
+.account-overview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.account-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.account-selector-masked {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.4px;
+}
+
+.account-selector-select {
+  padding: 3px var(--space-2);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.account-selector-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.account-type {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+}
+
+.account-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.account-status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(239, 83, 80, 0.4);
+  background: var(--red-dim);
+  color: var(--red-bright);
+}
+
+.account-status-badge.is-connected {
+  border-color: rgba(38, 166, 154, 0.35);
+  background: var(--green-dim);
+  color: var(--green-bright);
+}
+
+.account-freshness {
+  white-space: nowrap;
+}
+
+/* ── KPI strip ─────────────────────────────────────────── */
+.account-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.account-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.account-kpi-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.account-kpi-value {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.account-kpi-value.is-negative,
+#portfolio-table td.is-negative {
+  color: var(--red-bright);
+}
+
+.account-kpi-sub {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.account-kpi-note {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.account-kpi-time {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.account-overview-note {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Alerts ────────────────────────────────────────────── */
+.account-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.account-alerts-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.account-alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.account-alert {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-normal);
+  background: var(--bg-elevated);
+  font-size: 12px;
+}
+
+.account-alert-warning {
+  border-color: rgba(240, 180, 41, 0.4);
+  background: var(--warning-dim);
+}
+
+.account-alert-critical {
+  border-color: rgba(239, 83, 80, 0.4);
+  background: var(--red-dim);
+}
+
+.account-alert-label {
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.account-alert-detail {
+  color: var(--text-secondary);
+}
+
+/* ── Allocation ────────────────────────────────────────── */
+.account-allocation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.account-allocation-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.account-allocation-bar {
+  display: grid;
+  grid-template-columns: minmax(90px, 130px) 1fr minmax(120px, 180px);
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: left;
+}
+
+.account-allocation-bar:hover {
+  background: var(--bg-hover);
+}
+
+.account-allocation-bar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.account-allocation-symbol {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.account-allocation-track {
+  display: block;
+  position: relative;
+  height: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.account-allocation-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.account-allocation-bar.is-short .account-allocation-fill {
+  background: var(--red);
+}
+
+.account-allocation-value {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.account-allocation-weight {
+  color: var(--text-muted);
+}
+
+.account-short-tag {
+  margin-left: var(--space-1);
+  padding: 0 4px;
+  border: 1px solid rgba(239, 83, 80, 0.4);
+  border-radius: var(--radius-sm);
+  background: var(--red-dim);
+  color: var(--red-bright);
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 /* ── Loading state ─────────────────────────────────────── */
@@ -88,47 +417,15 @@
   max-width: 240px;
 }
 
-/* ── Summary strip ─────────────────────────────────────── */
-#portfolio-summary {
-  display: flex;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  flex-shrink: 0;
-}
-
-.portfolio-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.portfolio-stat-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.portfolio-stat-value {
-  font-size: 16px;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  color: var(--text-primary);
-}
-
-/* ── Table wrapper ─────────────────────────────────────── */
+/* ── Holdings table ────────────────────────────────────── */
 #portfolio-table-wrapper {
   overflow-x: auto;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   flex: 1;
+  min-height: 0;
 }
 
-/* ── Holdings table ────────────────────────────────────── */
 #portfolio-table {
   width: 100%;
   border-collapse: collapse;
@@ -157,7 +454,6 @@
 
 #portfolio-table tbody tr {
   border-bottom: 1px solid var(--border-subtle);
-  transition: background 0.1s ease;
 }
 
 #portfolio-table tbody tr:last-child {
@@ -196,31 +492,29 @@
   font-size: 14px;
 }
 
+.portfolio-symbol-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+.portfolio-symbol-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .portfolio-num {
   font-family: var(--font-mono);
   font-size: 13px;
 }
 
-/* ── Type badge ────────────────────────────────────────── */
-.portfolio-type-badge {
-  display: inline-block;
-  padding: 2px 7px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.portfolio-type-badge.type-buy {
-  background: var(--green-dim);
-  color: var(--green-bright);
-  border: 1px solid rgba(38,166,154,0.3);
-}
-
-.portfolio-type-badge.type-sell {
-  background: var(--red-dim);
-  color: var(--red-bright);
-  border: 1px solid rgba(239,83,80,0.3);
+/* Compact panel: keep the KPI strip, alerts, and the core holding columns. */
+#portfolio-dialog-sidebar:not(.account-overview-maximized) .col-extra {
+  display: none;
 }
 
 /* ── Responsive ────────────────────────────────────────── */
@@ -228,5 +522,9 @@
   #portfolio-dialog-sidebar {
     width: 100%;
     border-left: none;
+  }
+
+  .account-allocation-bar {
+    grid-template-columns: minmax(70px, 100px) 1fr minmax(90px, 120px);
   }
 }

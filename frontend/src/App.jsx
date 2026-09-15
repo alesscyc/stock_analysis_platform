@@ -76,6 +76,8 @@ function App() {
   const [isSidebarResizing, setIsSidebarResizing] = useState(false);
   const [accountPanelHeight, setAccountPanelHeight] = useState(ACCOUNT_PANEL_DEFAULT_HEIGHT);
   const [isAccountPanelResizing, setIsAccountPanelResizing] = useState(false);
+  const [isAccountPanelMaximized, setIsAccountPanelMaximized] = useState(false);
+  const accountPanelMaximizeRef = useRef(null);
   const stockDataCacheRef = useRef(new Map());
   const loadAbortRef = useRef(null);
   const orderModificationCommittedRef = useRef(false);
@@ -226,7 +228,9 @@ function App() {
   }, [applyAccountPanelHeight]);
 
   const toggleAccountPanel = () => {
-    if (!isAccountPanelOpen) {
+    if (isAccountPanelOpen) {
+      setIsAccountPanelMaximized(false);
+    } else {
       setAccountPanelHeight((height) => applyAccountPanelHeight(height));
     }
     setIsAccountPanelOpen((open) => !open);
@@ -234,7 +238,13 @@ function App() {
 
   const closeAccountPanel = () => {
     setIsAccountPanelOpen(false);
+    setIsAccountPanelMaximized(false);
     requestAnimationFrame(() => accountPanelToggleRef.current?.focus());
+  };
+
+  const toggleAccountPanelMaximized = () => {
+    setIsAccountPanelMaximized((maximized) => !maximized);
+    requestAnimationFrame(() => accountPanelMaximizeRef.current?.focus());
   };
 
   const handleAccountTabKeyDown = (event) => {
@@ -678,7 +688,7 @@ function App() {
             ref={accountPanelToggleRef}
             className={`btn-portfolio${isAccountPanelOpen ? ' is-active' : ''}`}
             onClick={toggleAccountPanel}
-            aria-label={`${t('portfolio')} / ${t('orders')}`}
+            aria-label={`${t('accountOverview')} / ${t('orders')}`}
             aria-expanded={isAccountPanelOpen}
             aria-controls="account-panel"
           >
@@ -686,7 +696,7 @@ function App() {
               <rect x="2" y="7" width="20" height="14" rx="2"/>
               <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
             </svg>
-            {t('portfolio')}
+            {t('accountOverview')}
           </button>
 
           <div className="topbar-divider" />
@@ -782,7 +792,11 @@ function App() {
           )}
 
           {/* ── Main workspace ── */}
-          <main className="app-workspace">
+          <main
+            className={`app-workspace${isAccountPanelMaximized ? ' app-workspace-hidden' : ''}`}
+            aria-hidden={isAccountPanelMaximized || undefined}
+            inert={isAccountPanelMaximized}
+          >
             {stockData.length === 0 && !loading && !error && !selectedStock && (
               <div className="app-empty-state research-start">
                 <div className="research-mark" aria-hidden="true">
@@ -878,8 +892,8 @@ function App() {
           <section
             ref={accountPanelRef}
             id="account-panel"
-            className={`account-panel${isAccountPanelOpen ? '' : ' account-panel-hidden'}${isAccountPanelResizing ? ' account-panel-resizing' : ''}`}
-            aria-label={`${t('portfolio')} / ${t('orders')}`}
+            className={`account-panel${isAccountPanelOpen ? '' : ' account-panel-hidden'}${isAccountPanelResizing ? ' account-panel-resizing' : ''}${isAccountPanelMaximized ? ' account-panel-maximized' : ''}`}
+            aria-label={`${t('accountOverview')} / ${t('orders')}`}
             aria-hidden={!isAccountPanelOpen}
             inert={!isAccountPanelOpen}
           >
@@ -888,18 +902,19 @@ function App() {
               role="separator"
               aria-orientation="horizontal"
               aria-label={t('resizeAccountPanel')}
+              aria-hidden={isAccountPanelMaximized || undefined}
               aria-valuemin={ACCOUNT_PANEL_MIN_HEIGHT}
               aria-valuemax={Math.min(
                 ACCOUNT_PANEL_MAX_HEIGHT,
                 Math.max(ACCOUNT_PANEL_MIN_HEIGHT, window.innerHeight - getTopbarHeight() - ACCOUNT_PANEL_MIN_MAIN_HEIGHT),
               )}
               aria-valuenow={accountPanelHeight}
-              tabIndex={isAccountPanelOpen ? 0 : -1}
+              tabIndex={isAccountPanelOpen && !isAccountPanelMaximized ? 0 : -1}
               onPointerDown={handleAccountPanelResizePointerDown}
               onKeyDown={handleAccountPanelResizeKeyDown}
             />
             <div className="account-panel-bar">
-              <div className="account-panel-tabs" role="tablist" aria-label={`${t('portfolio')} / ${t('orders')}`}>
+              <div className="account-panel-tabs" role="tablist" aria-label={`${t('accountOverview')} / ${t('orders')}`}>
                 <button
                   id="portfolio-tab"
                   className="account-panel-tab"
@@ -910,7 +925,7 @@ function App() {
                   onClick={() => setAccountPanelTab('portfolio')}
                   onKeyDown={handleAccountTabKeyDown}
                 >
-                  {t('portfolio')}
+                  {t('accountOverview')}
                 </button>
                 <button
                   id="orders-tab"
@@ -925,14 +940,43 @@ function App() {
                   {t('orders')}
                 </button>
               </div>
-              <PanelCloseButton
-                onClick={closeAccountPanel}
-                label={accountPanelTab === 'portfolio' ? t('closePortfolio') : t('closeOrders')}
-              />
+              <div className="account-panel-actions">
+                <button
+                  ref={accountPanelMaximizeRef}
+                  type="button"
+                  className="account-panel-icon-button"
+                  onClick={toggleAccountPanelMaximized}
+                  aria-label={isAccountPanelMaximized ? t('restoreAccountPanel') : t('maximizeAccountPanel')}
+                  tabIndex={isAccountPanelOpen ? 0 : -1}
+                >
+                  <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    {isAccountPanelMaximized ? (
+                      <>
+                        <polyline points="4 14 10 14 10 20" />
+                        <polyline points="20 10 14 10 14 4" />
+                        <line x1="14" y1="10" x2="21" y2="3" />
+                        <line x1="3" y1="21" x2="10" y2="14" />
+                      </>
+                    ) : (
+                      <>
+                        <polyline points="15 3 21 3 21 9" />
+                        <polyline points="9 21 3 21 3 15" />
+                        <line x1="21" y1="3" x2="14" y2="10" />
+                        <line x1="3" y1="21" x2="10" y2="14" />
+                      </>
+                    )}
+                  </svg>
+                </button>
+                <PanelCloseButton
+                  onClick={closeAccountPanel}
+                  label={accountPanelTab === 'portfolio' ? t('closeAccountOverview') : t('closeOrders')}
+                />
+              </div>
             </div>
             <div className="account-panel-content">
               <PortfolioDialog
                 isOpen={isAccountPanelOpen && accountPanelTab === 'portfolio'}
+                isMaximized={isAccountPanelMaximized}
                 onStockSelect={handleStockSelect}
               />
               <OrdersDialog
@@ -999,7 +1043,7 @@ function App() {
 
       {!isMock && (
         <AIChat
-          accountPanelOpen={isAccountPanelOpen}
+          accountPanelOpen={isAccountPanelOpen && !isAccountPanelMaximized}
           stockSymbol={selectedStock?.symbol}
           stockData={stockData}
           currentInterval={currentInterval}

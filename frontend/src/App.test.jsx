@@ -72,6 +72,29 @@ describe('App', () => {
     expect(screen.getByText('AAPL', { selector: '.instrument-symbol' })).toBeInTheDocument()
   })
 
+  it('hides the chart workspace while the account panel is maximized', async () => {
+    vi.stubGlobal('fetch', vi.fn(url => {
+      if (url === '/api/ib/status') return Promise.resolve(ok({ connected: false }))
+      if (url.startsWith('/api/stock/')) return Promise.resolve(ok([
+        { Date: '1900-01-01', Open: 10, High: 12, Low: 9, Close: 11, Volume: 100 },
+      ]))
+      if (url.startsWith('/api/account/overview')) {
+        return Promise.resolve(ok({ connected: false, managedAccounts: [], holdings: [], metrics: {} }))
+      }
+      return Promise.resolve(ok({}))
+    }))
+
+    const { container } = render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'AAPL' }))
+    await screen.findByTestId('stock-chart')
+    fireEvent.click(screen.getByRole('button', { name: 'Account Overview / Orders' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Maximize account panel' }))
+
+    expect(container.querySelector('.app-workspace')).toHaveClass('app-workspace-hidden')
+    fireEvent.click(screen.getByRole('button', { name: 'Restore account panel' }))
+    expect(container.querySelector('.app-workspace')).not.toHaveClass('app-workspace-hidden')
+  })
+
   it('starts research tools from the welcome workspace and toggles them closed', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(ok({ connected: false }))))
     render(<App />)

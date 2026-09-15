@@ -454,6 +454,24 @@
   transition: none;
 }
 
+.account-panel.account-panel-maximized {
+  height: 100%;
+  max-height: 100%;
+  transition: none;
+}
+
+.app-workspace.app-workspace-hidden {
+  display: none;
+}
+
+.account-panel.account-panel-maximized.account-panel-hidden {
+  height: 0;
+}
+
+.account-panel-maximized > .account-panel-resizer {
+  display: none;
+}
+
 .account-panel-resizer {
   position: absolute;
   top: 0;
@@ -511,6 +529,34 @@
   gap: var(--space-1);
 }
 
+.account-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.account-panel-icon-button {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.account-panel-icon-button:hover {
+  color: var(--text-primary);
+}
+
+.account-panel-icon-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .account-panel-tab {
   position: relative;
   min-width: 108px;
@@ -555,6 +601,11 @@
   min-height: 0;
   flex: 1;
   overflow: hidden;
+}
+
+#portfolio-dialog-sidebar[hidden],
+#orders-dialog-sidebar[hidden] {
+  display: none;
 }
 
 .account-panel-content > #portfolio-dialog-sidebar,

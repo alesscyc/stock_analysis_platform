@@ -167,6 +167,228 @@ function serializePortfolioRow(row) {
   };
 }
 
+// ── IB account overview (account summary + selected-account holdings) ────────
+// One long-lived account-summary subscription keeps KPI metrics for every
+// managed account; a single reqAccountUpdates subscription enriches holdings
+// for the account the user is looking at. Nothing here routes or places orders.
+const IB_ACCOUNT_SUMMARY_REQ_ID = 9001;
+const IB_ACCOUNT_SUMMARY_TAGS = [
+  'AccountType',
+  'NetLiquidation',
+  'TotalCashValue',
+  'BuyingPower',
+  'ExcessLiquidity',
+  'InitMarginReq',
+  'MaintMarginReq',
+  'GrossPositionValue',
+];
+
+let managedAccounts = [];
+let managedAccountsCurrent = false;
+let selectedAccount = null;
+let accountOverviewActive = false;
+let accountSummarySubscribed = false;
+let accountSummaryReady = false;
+let lastAccountSummaryError = null;
+const accountSummaryUpdatedAtByAccount = new Map();
+// account -> currency -> tag -> finite number or null (never merged across
+// accounts or currencies).
+let accountSummaryByAccount = new Map();
+const accountTypeByAccount = new Map();
+
+let accountUpdatesAccount = null;
+let holdingsAccount = null;
+let holdingsByKey = new Map();
+let pendingHoldingsByKey = new Map();
+let holdingsReady = false;
+let holdingsDownloadStarted = false;
+let lastHoldingsError = null;
+let lastHoldingsUpdatedAt = null;
+const baseCurrencyByAccount = new Map();
+const exchangeRatesByAccount = new Map();
+
+function toIsoTimestamp(timestamp) {
+  return timestamp ? new Date(timestamp).toISOString() : null;
+}
+
+function parseAccountSummaryValue(value) {
+  const numeric = Number(value);
+  return value == null || value === '' || !Number.isFinite(numeric) ? null : numeric;
+}
+
+function applyAccountSummaryValue(account, tag, value, currency) {
+  const accountKey = account || 'UNKNOWN';
+
+  if (tag === 'AccountType') {
+    accountTypeByAccount.set(accountKey, String(value ?? ''));
+  }
+
+  const currencyKey = String(currency ?? '').trim();
+  let byCurrency = accountSummaryByAccount.get(accountKey);
+  if (!byCurrency) {
+    byCurrency = new Map();
+    accountSummaryByAccount.set(accountKey, byCurrency);
+  }
+
+  let byTag = byCurrency.get(currencyKey);
+  if (!byTag) {
+    byTag = new Map();
+    byCurrency.set(currencyKey, byTag);
+  }
+
+  byTag.set(tag, parseAccountSummaryValue(value));
+  lastAccountSummaryError = null;
+  accountSummaryUpdatedAtByAccount.set(accountKey, Date.now());
+}
+
+function serializeAccountMetrics(account) {
+  const byCurrency = account ? accountSummaryByAccount.get(account) : null;
+  if (!byCurrency) return {};
+
+  const result = {};
+  for (const [currency, byTag] of byCurrency) {
+    const outputCurrency = currency === 'BASE'
+      ? baseCurrencyByAccount.get(account) ?? currency
+      : currency;
+    result[outputCurrency] = { ...result[outputCurrency], ...Object.fromEntries(byTag) };
+  }
+  return result;
+}
+
+function getBaseCurrency(account) {
+  const configured = baseCurrencyByAccount.get(account);
+  if (/^[A-Z]{3}$/.test(configured ?? '')) return configured;
+
+  const byCurrency = accountSummaryByAccount.get(account);
+  return Array.from(byCurrency?.keys() ?? []).find(
+    (currency) => /^[A-Z]{3}$/.test(currency) && Number.isFinite(byCurrency.get(currency)?.get('NetLiquidation')),
+  ) ?? null;
+}
+
+function startAccountSummarySubscription() {
+  if (!ibConnected || accountSummarySubscribed) return;
+
+  accountSummarySubscribed = true;
+  accountSummaryReady = false;
+
+  try {
+    ib.reqAccountSummary(IB_ACCOUNT_SUMMARY_REQ_ID, 'All', IB_ACCOUNT_SUMMARY_TAGS.join(','));
+  } catch (error) {
+    accountSummarySubscribed = false;
+    lastAccountSummaryError = error.message || 'Failed to subscribe to IB account summary';
+    console.error('[ib] Account summary subscribe failed:', lastAccountSummaryError);
+  }
+}
+
+function stopAccountSummarySubscription() {
+  if (!accountSummarySubscribed) return;
+  accountSummarySubscribed = false;
+
+  try {
+    ib.cancelAccountSummary(IB_ACCOUNT_SUMMARY_REQ_ID);
+  } catch (error) {
+    console.warn('[ib] Account summary cancel failed:', error.message);
+  }
+}
+
+function normalizeHolding(contract, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL) {
+  const quantity = Number(position) || 0;
+  const symbol = contract?.symbol || contract?.localSymbol || 'UNKNOWN';
+
+  return {
+    id: buildPortfolioKey(accountUpdatesAccount, contract),
+    symbol,
+    localSymbol: contract?.localSymbol || symbol,
+    secType: contract?.secType || '',
+    currency: contract?.currency || 'USD',
+    exchange: contract?.exchange || '',
+    quantity,
+    averageCost: Number(averageCost) || 0,
+    marketPrice: Number(marketPrice) || 0,
+    marketValue: Number(marketValue) || 0,
+    unrealizedPnl: Number(unrealizedPNL) || 0,
+    realizedPnl: Number(realizedPNL) || 0,
+  };
+}
+
+function startAccountUpdatesSubscription(account) {
+  if (!ibConnected || !managedAccountsCurrent || !accountOverviewActive
+    || !managedAccounts.includes(account) || accountUpdatesAccount === account) return;
+
+  const previous = accountUpdatesAccount;
+  accountUpdatesAccount = account;
+  if (holdingsAccount !== account) {
+    holdingsAccount = account;
+    holdingsByKey = new Map();
+    holdingsReady = false;
+    lastHoldingsUpdatedAt = null;
+  }
+  pendingHoldingsByKey = new Map();
+  holdingsReady = false;
+  holdingsDownloadStarted = false;
+  lastHoldingsError = null;
+
+  try {
+    if (previous) ib.reqAccountUpdates(false, previous);
+    ib.reqAccountUpdates(true, account);
+  } catch (error) {
+    accountUpdatesAccount = null;
+    lastHoldingsError = error.message || 'Failed to subscribe to IB account updates';
+    console.error('[ib] Account updates subscribe failed:', lastHoldingsError);
+  }
+}
+
+function stopAccountUpdatesSubscription() {
+  if (!accountUpdatesAccount) return;
+
+  const account = accountUpdatesAccount;
+  accountUpdatesAccount = null;
+
+  try {
+    ib.reqAccountUpdates(false, account);
+  } catch (error) {
+    console.warn('[ib] Account updates cancel failed:', error.message);
+  }
+}
+
+function buildOverviewHoldings(account) {
+  const baseCurrency = getBaseCurrency(account);
+  const exchangeRates = exchangeRatesByAccount.get(account);
+  const rows = (holdingsAccount === account ? Array.from(holdingsByKey.values()) : []).map((row) => {
+    const rate = row.currency === baseCurrency ? 1 : exchangeRates?.get(row.currency);
+    return { ...row, baseMarketValue: Number.isFinite(rate) ? row.marketValue * rate : null, rate };
+  }).sort((a, b) => {
+    const byValue = Math.abs(b.baseMarketValue ?? 0) - Math.abs(a.baseMarketValue ?? 0);
+    return byValue !== 0 ? byValue : a.symbol.localeCompare(b.symbol);
+  });
+
+  const canConvertAll = rows.every((row) => Number.isFinite(row.baseMarketValue));
+  const summedGross = canConvertAll
+    ? rows.reduce((sum, row) => sum + Math.abs(row.baseMarketValue), 0)
+    : null;
+  const summaryByCurrency = accountSummaryByAccount.get(account);
+  const summaryGross = (summaryByCurrency?.get(baseCurrency) ?? summaryByCurrency?.get('BASE'))
+    ?.get('GrossPositionValue');
+  const grossMarketValue = Number.isFinite(summaryGross) && summaryGross > 0
+    ? summaryGross
+    : summedGross;
+  const unrealizedPnl = canConvertAll
+    ? rows.reduce((sum, row) => sum + (Number.isFinite(row.unrealizedPnl) ? row.unrealizedPnl * row.rate : 0), 0)
+    : null;
+
+  return {
+    baseCurrency,
+    grossMarketValue,
+    unrealizedPnl,
+    holdings: rows.map(({ baseMarketValue, rate: _rate, ...row }) => ({
+      ...row,
+      weight: grossMarketValue > 0 && Number.isFinite(baseMarketValue)
+        ? (Math.abs(baseMarketValue) / grossMarketValue) * 100
+        : null,
+    })),
+  };
+}
+
 function getOpenOrders() {
   return Array.from(openOrdersById.values()).sort((a, b) => a.orderId - b.orderId);
 }
@@ -548,6 +770,10 @@ ib.on('connected', () => {
   console.log(`[ib] Connected to IB Gateway at ${IB_HOST}:${IB_PORT}`);
   resetPortfolioSnapshot();
   resetOpenOrders();
+  accountSummarySubscribed = false;
+  accountSummaryReady = false;
+  accountUpdatesAccount = null;
+  managedAccountsCurrent = false;
 
   setImmediate(() => {
     try {
@@ -563,6 +789,10 @@ ib.on('connected', () => {
       scheduleReconnect();
     }
   });
+
+  setImmediate(() => {
+    startAccountSummarySubscription();
+  });
 });
 
 ib.on('managedAccounts', (accountsList) => {
@@ -574,6 +804,17 @@ ib.on('managedAccounts', (accountsList) => {
     } else if (accounts.length === 1) {
       ibAccount = accounts[0];
       console.log(`[ib] Account resolved: ${ibAccount}`);
+    }
+
+    if (accounts.length > 0) {
+      managedAccounts = accounts;
+      managedAccountsCurrent = true;
+      // Selection only decides what the overview shows; order routing keeps
+      // using ibAccount below.
+      if (!selectedAccount || !accounts.includes(selectedAccount)) {
+        selectedAccount = accounts.includes(ibAccount) ? ibAccount : accounts[0];
+      }
+      if (accountOverviewActive) startAccountUpdatesSubscription(selectedAccount);
     }
   }
 });
@@ -604,11 +845,16 @@ ib.on('disconnected', () => {
     console.warn('[ib] Disconnected from IB Gateway');
     failPortfolioSnapshot('IB Gateway disconnected');
     failOpenOrdersSnapshot('IB Gateway disconnected');
+    // Keep the last account snapshot visible; only its freshness changes.
+    accountSummarySubscribed = false;
+    accountSummaryReady = false;
+    accountUpdatesAccount = null;
+    managedAccountsCurrent = false;
     scheduleReconnect();
   }
 });
 
-ib.on('error', (error) => {
+ib.on('error', (error, request) => {
   const message = error?.message || 'Unknown IB Gateway error';
   console.error('[ib] Error:', message);
   lastPortfolioError = message;
@@ -621,10 +867,26 @@ ib.on('error', (error) => {
     failOpenOrdersSnapshot(message);
   }
 
+  if (Number(request?.id ?? request) === IB_ACCOUNT_SUMMARY_REQ_ID) {
+    try {
+      ib.cancelAccountSummary(IB_ACCOUNT_SUMMARY_REQ_ID);
+    } catch (cancelError) {
+      console.warn('[ib] Account summary recovery cancel failed:', cancelError.message);
+    }
+    accountSummarySubscribed = false;
+    accountSummaryReady = false;
+    lastAccountSummaryError = message;
+  }
+
   if (!ibConnected) {
     ibConnecting = false;
     nextOrderId = null;
     requestingNextOrderId = false;
+    accountSummarySubscribed = false;
+    accountSummaryReady = false;
+    accountUpdatesAccount = null;
+    lastAccountSummaryError = message;
+    if (!holdingsReady) lastHoldingsError = message;
     rejectOrderIdWaiters(message);
     scheduleReconnect();
   }
@@ -670,6 +932,73 @@ ib.on('positionEnd', () => {
     ? new Date(lastPortfolioUpdatedAt).toISOString()
     : 'unknown';
   console.log(`[ib] Portfolio snapshot updated with ${getPortfolioRows().length} position(s) at ${updatedAt}`);
+});
+
+ib.on('accountSummary', (reqId, account, tag, value, currency) => {
+  if (Number(reqId) !== IB_ACCOUNT_SUMMARY_REQ_ID) return;
+  applyAccountSummaryValue(account, tag, value, currency);
+});
+
+ib.on('accountSummaryEnd', (reqId) => {
+  if (Number(reqId) !== IB_ACCOUNT_SUMMARY_REQ_ID) return;
+  accountSummaryReady = true;
+  lastAccountSummaryError = null;
+  console.log(`[ib] Account summary complete for ${accountSummaryByAccount.size} account(s)`);
+});
+
+ib.on('updateAccountValue', (key, value, currency, accountName) => {
+  if (!accountUpdatesAccount || accountName !== accountUpdatesAccount) return;
+
+  if (!holdingsReady) holdingsDownloadStarted = true;
+  lastHoldingsUpdatedAt = Date.now();
+
+  if (key === 'Currency' && /^[A-Z]{3}$/.test(String(value ?? ''))) {
+    baseCurrencyByAccount.set(accountName, String(value));
+  }
+
+  if (key === 'ExchangeRate') {
+    const rate = Number(value);
+    if (!Number.isFinite(rate) || !currency) return;
+    let rates = exchangeRatesByAccount.get(accountName);
+    if (!rates) {
+      rates = new Map();
+      exchangeRatesByAccount.set(accountName, rates);
+    }
+    rates.set(currency, rate);
+  }
+});
+
+ib.on('updateAccountTime', () => {
+  if (accountUpdatesAccount) lastHoldingsUpdatedAt = Date.now();
+});
+
+ib.on('updatePortfolio', (contract, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL, accountName) => {
+  if (!ibConnected) return;
+
+  const account = accountName || accountUpdatesAccount;
+  if (!accountUpdatesAccount || account !== accountUpdatesAccount) return;
+
+  const row = normalizeHolding(contract, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL);
+  if (!holdingsReady) holdingsDownloadStarted = true;
+  const target = holdingsReady ? holdingsByKey : pendingHoldingsByKey;
+  if (row.quantity === 0) target.delete(row.id);
+  else target.set(row.id, row);
+  lastHoldingsError = null;
+  if (holdingsReady) lastHoldingsUpdatedAt = Date.now();
+});
+
+ib.on('accountDownloadEnd', (accountName) => {
+  if (!ibConnected) return;
+  if (!accountUpdatesAccount || accountName !== accountUpdatesAccount) return;
+  if (!holdingsDownloadStarted) return;
+
+  holdingsByKey = pendingHoldingsByKey;
+  pendingHoldingsByKey = new Map();
+  holdingsReady = true;
+  holdingsDownloadStarted = false;
+  lastHoldingsError = null;
+  lastHoldingsUpdatedAt = Date.now();
+  console.log(`[ib] Account updates complete for ${accountName} with ${holdingsByKey.size} holding(s)`);
 });
 
 ib.on('openOrder', (orderId, contract, order, orderState) => {
@@ -1446,6 +1775,60 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
+app.get('/api/account/overview', (req, res) => {
+  try {
+    const requestedAccount = String(req.query?.account ?? '').trim();
+
+    if (requestedAccount && !managedAccounts.includes(requestedAccount)) {
+      return res.status(400).json({ error: 'Unknown IB account' });
+    }
+
+    if (requestedAccount) {
+      selectedAccount = requestedAccount;
+    } else if (!selectedAccount || !managedAccounts.includes(selectedAccount)) {
+      selectedAccount = managedAccounts.includes(ibAccount) ? ibAccount : managedAccounts[0] ?? null;
+    }
+
+    accountOverviewActive = true;
+
+    if (ibConnected) {
+      startAccountSummarySubscription();
+      if (selectedAccount) startAccountUpdatesSubscription(selectedAccount);
+    }
+
+    const { holdings, grossMarketValue, unrealizedPnl, baseCurrency } = buildOverviewHoldings(selectedAccount);
+
+    res.json({
+      connected: ibConnected,
+      managedAccounts: managedAccounts.slice(),
+      selectedAccount,
+      accountType: accountTypeByAccount.get(selectedAccount) ?? null,
+      metrics: serializeAccountMetrics(selectedAccount),
+      summaryReady: accountSummaryReady,
+      summaryError: lastAccountSummaryError,
+      summaryUpdatedAt: toIsoTimestamp(accountSummaryUpdatedAtByAccount.get(selectedAccount)),
+      holdingsReady,
+      holdingsError: lastHoldingsError,
+      holdingsUpdatedAt: toIsoTimestamp(lastHoldingsUpdatedAt),
+      grossMarketValue,
+      unrealizedPnl,
+      baseCurrency,
+      holdings,
+    });
+  } catch (error) {
+    console.error('Error building IB account overview:', error);
+    res.status(500).json({ error: error.message || 'Failed to build account overview' });
+  }
+});
+
+// Explicit cleanup so the holdings subscription is not left running after the
+// overview panel is closed. Read-only: it never touches orders.
+app.post('/api/account/release', (_req, res) => {
+  accountOverviewActive = false;
+  stopAccountUpdatesSubscription();
+  res.json({ ok: true, selectedAccount });
+});
+
 app.get('/api/portfolio', async (req, res) => {
   try {
     const rows = await waitForPortfolioSnapshot();
@@ -1728,6 +2111,8 @@ function stopPythonService() {
 function shutdown(signal) {
   console.log(`\n[server] Received ${signal}, shutting down...`);
   stopPythonService();
+  stopAccountSummarySubscription();
+  stopAccountUpdatesSubscription();
   try { ib.disconnect(); } catch (_) {}
   process.exit(0);
 }
