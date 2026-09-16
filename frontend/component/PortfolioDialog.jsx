@@ -9,7 +9,139 @@ const STALE_AFTER_MS = STALE_AFTER_MINUTES * 60 * 1000;
 const CONCENTRATION_LIMIT_PCT = 25;
 const EXCESS_LIQUIDITY_MIN_PCT = 20;
 const MAINT_MARGIN_MAX_PCT = 50;
+const OTHER_THRESHOLD_PCT = 2;
 const NO_HOLDINGS = [];
+const LONG_SLICE_COLORS = ['var(--accent)', 'var(--green)', 'var(--warning)', 'var(--accent-hover)', 'var(--green-bright)'];
+
+function deriveAllocation(holdings, cashValue, grossMarketValue, currency, baseCurrency, holdingsReady) {
+  if (
+    (holdingsReady === false && holdings.length === 0)
+    || holdings.some((row) => !Number.isFinite(row.weight))
+    || (holdings.length > 0 && !Number.isFinite(grossMarketValue))
+    || !Number.isFinite(cashValue)
+    || !baseCurrency
+    || currency !== baseCurrency
+  ) {
+    return { status: 'unavailable', slices: [], byId: new Map(), representedTotal: 0 };
+  }
+
+  const cash = cashValue > 0 ? cashValue : 0;
+  const positions = holdings.map((row) => ({
+    id: row.id ?? row.symbol,
+    symbol: row.symbol,
+    isShort: Number(row.quantity) < 0,
+    value: Math.abs((row.weight / 100) * (grossMarketValue || 0)),
+  }));
+  const representedTotal = cash + positions.reduce((sum, row) => sum + row.value, 0);
+  if (!(representedTotal > 0)) {
+    return { status: 'empty', slices: [], byId: new Map(), representedTotal: 0 };
+  }
+
+  const byId = new Map(positions.map((row) => [row.id, (row.value / representedTotal) * 100]));
+  const slices = [];
+  let otherValue = 0;
+  for (const row of positions) {
+    const percent = byId.get(row.id);
+    if (percent + 1e-9 < OTHER_THRESHOLD_PCT) {
+      otherValue += row.value;
+      continue;
+    }
+    slices.push({
+      id: row.id,
+      label: row.symbol,
+      value: row.value,
+      percent,
+      isShort: row.isShort,
+    });
+  }
+  if (cash > 0) {
+    slices.push({ id: 'cash', kind: 'cash', value: cash, percent: (cash / representedTotal) * 100 });
+  }
+  if (otherValue > 0) {
+    slices.push({ id: 'other', kind: 'other', value: otherValue, percent: (otherValue / representedTotal) * 100 });
+  }
+  slices.sort((a, b) => b.percent - a.percent);
+
+  for (const slice of slices) {
+    if (slice.kind === 'cash') slice.color = 'var(--text-muted)';
+    else if (slice.kind === 'other') slice.color = 'var(--border-strong)';
+    else if (slice.isShort) slice.color = 'var(--red)';
+    else {
+      const key = String(slice.id ?? slice.label ?? '');
+      let hash = 0;
+      for (let i = 0; i < key.length; i += 1) hash += key.charCodeAt(i);
+      slice.color = LONG_SLICE_COLORS[hash % LONG_SLICE_COLORS.length];
+    }
+  }
+
+  return { status: 'ok', slices, byId, representedTotal };
+}
+
+function allocationSliceLabel(slice, t) {
+  if (slice.kind === 'cash') return t('cashBalance');
+  if (slice.kind === 'other') return t('allocationOther');
+  return slice.label;
+}
+
+function donutGradient(slices) {
+  let acc = 0;
+  return slices.map((slice, index) => {
+    const start = acc;
+    acc += slice.percent;
+    const end = index === slices.length - 1 ? 100 : acc;
+    return `${slice.color} ${start}% ${end}%`;
+  }).join(', ');
+}
+
+// Donut geometry, shared by the connectors and the absolutely positioned callouts (see the CSS).
+const DONUT_RADIUS = 74;
+const CONNECTOR_ELBOW = 88;
+const CALLOUT_ANCHOR = 104;
+const CALLOUT_ROW = 26;
+
+function layoutAllocationCallouts(slices) {
+  let start = 0;
+  const items = slices.map((slice) => {
+    const angle = (-90 + (start + slice.percent / 2) * 3.6) * (Math.PI / 180);
+    start += slice.percent;
+    return { ...slice, angle, side: Math.cos(angle) < 0 ? 'left' : 'right' };
+  });
+  const perSide = Math.max(
+    items.filter((item) => item.side === 'left').length,
+    items.filter((item) => item.side === 'right').length,
+  );
+  const height = Math.max(CONNECTOR_ELBOW * 2, perSide * CALLOUT_ROW);
+  const centerY = height / 2;
+
+  for (const side of ['left', 'right']) {
+    const column = items
+      .filter((item) => item.side === side)
+      .sort((a, b) => Math.sin(a.angle) - Math.sin(b.angle));
+
+    // Anchor each label at its slice's mid-angle, then spread overlaps apart without leaving the box.
+    column.forEach((item) => {
+      item.targetY = centerY + Math.sin(item.angle) * CONNECTOR_ELBOW;
+    });
+    column.forEach((item, index) => {
+      const floor = index === 0 ? CALLOUT_ROW / 2 : column[index - 1].targetY + CALLOUT_ROW;
+      item.targetY = Math.max(item.targetY, floor);
+    });
+    for (let index = column.length - 1; index >= 0; index -= 1) {
+      const ceiling = index === column.length - 1
+        ? height - CALLOUT_ROW / 2
+        : column[index + 1].targetY - CALLOUT_ROW;
+      column[index].targetY = Math.min(column[index].targetY, ceiling);
+    }
+  }
+
+  // Leader lines only stay untangled while labels sit near their own slice; past ~35px of
+  // displacement the diagonals start crossing neighbours, so crowded donuts drop to a stacked list.
+  const leadered = items.every(
+    (item) => Math.abs(item.targetY - (centerY + Math.sin(item.angle) * CONNECTOR_ELBOW)) <= CALLOUT_ROW,
+  );
+
+  return { height, items, leadered };
+}
 
 function maskAccountId(account) {
   const value = String(account ?? '').trim();
@@ -61,6 +193,87 @@ function formatQuantity(value) {
 function formatPercent(value) {
   if (!Number.isFinite(value)) return '—';
   return `${value.toFixed(1)}%`;
+}
+
+function AllocationCallout({ slice, t, currency }) {
+  return (
+    <div className="account-allocation-callout" style={{ top: slice.targetY }}>
+      <span className="account-allocation-legend-label">
+        {allocationSliceLabel(slice, t)}
+        {slice.isShort && <span className="account-short-tag">{t('short')}</span>}
+      </span>
+      <span className="account-allocation-legend-pct">{formatPercent(slice.percent)}</span>
+      <span className="account-allocation-legend-value">{formatCurrency(slice.value, currency)}</span>
+    </div>
+  );
+}
+
+function AllocationChart({ allocation, t, currency }) {
+  const { height, items, leadered } = layoutAllocationCallouts(allocation.slices);
+  const bySide = (side) => items.filter((item) => item.side === side);
+
+  return (
+    <div
+      className={`account-allocation-body${leadered ? ' account-allocation-body--leadered' : ''}`}
+      style={{ '--allocation-height': `${height}px` }}
+    >
+      {['left', 'right'].map((side) => (
+        <div key={side} className={`account-allocation-callouts account-allocation-callouts--${side}`}>
+          {bySide(side).map((slice) => (
+            <AllocationCallout key={slice.id} slice={slice} t={t} currency={currency} />
+          ))}
+        </div>
+      ))}
+      <div className="account-allocation-chart">
+        {leadered && (
+        <svg
+          className="account-allocation-connectors"
+          viewBox={`0 0 ${DONUT_RADIUS * 2} ${height}`}
+          aria-hidden="true"
+        >
+          {items.map((slice) => {
+            const direction = slice.side === 'left' ? -1 : 1;
+            const centerY = height / 2;
+            const point = (radius) => [
+              DONUT_RADIUS + Math.cos(slice.angle) * radius,
+              centerY + Math.sin(slice.angle) * radius,
+            ].join(',');
+            return (
+              <polyline
+                key={slice.id}
+                data-slice={slice.id}
+                points={`${point(DONUT_RADIUS)} ${point(CONNECTOR_ELBOW)} ${DONUT_RADIUS + direction * CALLOUT_ANCHOR},${slice.targetY}`}
+                stroke={slice.color}
+              />
+            );
+          })}
+        </svg>
+        )}
+        <div
+          className="account-allocation-donut"
+          role="img"
+          aria-label={[
+            formatCurrency(allocation.representedTotal, currency),
+            ...allocation.slices.map((slice) => `${allocationSliceLabel(slice, t)} ${formatPercent(slice.percent)}`),
+          ].join(', ')}
+          style={{ background: `conic-gradient(${donutGradient(allocation.slices)})` }}
+        >
+          <span className="account-allocation-donut-center">
+            {formatCurrency(allocation.representedTotal, currency)}
+          </span>
+        </div>
+      </div>
+      <ul className="account-overview-sr">
+        {allocation.slices.map((slice) => (
+          <li key={slice.id}>
+            <span style={{ background: slice.color }} aria-hidden="true" />
+            {allocationSliceLabel(slice, t)} {slice.isShort ? t('short') : ''} {formatPercent(slice.percent)}{' '}
+            {formatCurrency(slice.value, currency)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function formatClockTime(value, language) {
@@ -173,7 +386,12 @@ function AccountOverview({ isOpen, isMaximized, onStockSelect }) {
   }, [metrics, currency]);
 
   const nav = metric('NetLiquidation');
+  const cashValue = metric('TotalCashValue');
   const unrealizedPnl = Number.isFinite(data?.unrealizedPnl) ? data.unrealizedPnl : null;
+  const allocation = useMemo(
+    () => deriveAllocation(holdings, cashValue, data?.grossMarketValue, currency, data?.baseCurrency, data?.holdingsReady),
+    [cashValue, currency, data?.baseCurrency, data?.grossMarketValue, data?.holdingsReady, holdings],
+  );
 
   const lastUpdated = latestTimestamp([data?.summaryUpdatedAt, data?.holdingsUpdatedAt]);
   const syncError = error || data?.summaryError || data?.holdingsError;
@@ -246,29 +464,26 @@ function AccountOverview({ isOpen, isMaximized, onStockSelect }) {
       });
     }
 
-    for (const holding of holdings) {
-      if (!Number.isFinite(holding.weight) || holding.weight <= CONCENTRATION_LIMIT_PCT) continue;
+    if (allocation.status === 'ok') {
+      for (const holding of holdings) {
+        const percent = allocation.byId.get(holding.id ?? holding.symbol);
+        if (!Number.isFinite(percent) || percent <= CONCENTRATION_LIMIT_PCT + 1e-9) continue;
 
-      list.push({
-        id: `concentration-${holding.id ?? holding.symbol}`,
-        tone: 'warning',
-        label: t('alertConcentration', { symbol: holding.symbol }),
-        detail: t('alertConcentrationDetail', {
-          symbol: holding.symbol,
-          percent: holding.weight.toFixed(1),
-          limit: CONCENTRATION_LIMIT_PCT,
-        }),
-      });
+        list.push({
+          id: `concentration-${holding.id ?? holding.symbol}`,
+          tone: 'warning',
+          label: t('alertConcentration', { symbol: holding.symbol }),
+          detail: t('alertConcentrationDetail', {
+            symbol: holding.symbol,
+            percent: percent.toFixed(1),
+            limit: CONCENTRATION_LIMIT_PCT,
+          }),
+        });
+      }
     }
 
     return list;
-  }, [data, holdings, metric, nav, stale, syncError, t]);
-
-  const maxWeight = holdings.reduce(
-    (max, row) => (Number.isFinite(row.weight) ? Math.max(max, Math.abs(row.weight)) : max),
-    0,
-  );
-  const weightedHoldings = holdings.filter((row) => Number.isFinite(row.weight));
+  }, [allocation, data, holdings, metric, nav, stale, syncError, t]);
 
   const hasSnapshot = Boolean(
     data && (
@@ -439,42 +654,19 @@ function AccountOverview({ isOpen, isMaximized, onStockSelect }) {
             </>
           )}
 
-          {isMaximized && weightedHoldings.length > 0 && (
-            <section className="account-allocation" aria-label={t('allocation')}>
-              <span className="account-section-title">{t('allocation')}</span>
-              <ul className="account-allocation-list">
-                {weightedHoldings.map((row) => {
-                  const weight = row.weight;
-                  const width = maxWeight > 0 ? (Math.abs(weight) / maxWeight) * 100 : 0;
-                  const isShort = Number(row.quantity) < 0;
-                  return (
-                    <li key={`bar-${row.id ?? row.symbol}`}>
-                      <button
-                        type="button"
-                        className={`account-allocation-bar${isShort ? ' is-short' : ''}`}
-                        onClick={() => handleSelectSymbol(row)}
-                        aria-label={t('allocationBarLabel', {
-                          symbol: row.symbol,
-                          percent: weight.toFixed(1),
-                          value: formatCurrency(row.marketValue, row.currency),
-                        })}
-                      >
-                        <span className="account-allocation-symbol">
-                          {row.symbol}
-                          {isShort && <span className="account-short-tag">{t('short')}</span>}
-                        </span>
-                        <span className="account-allocation-track">
-                          <span className="account-allocation-fill" style={{ width: `${width}%` }} />
-                        </span>
-                        <span className="account-allocation-value">
-                          {formatCurrency(row.marketValue, row.currency)}
-                          <span className="account-allocation-weight">{formatPercent(weight)}</span>
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+          {isMaximized && (
+            <section className="account-allocation" aria-label={t('portfolioAllocation')}>
+              <span className="account-section-title">{t('portfolioAllocation')}</span>
+              <span className="account-allocation-subtitle">{t('allocationSubtitle')}</span>
+              {allocation.status === 'unavailable' && (
+                <p className="account-overview-note">{t('allocationUnavailable')}</p>
+              )}
+              {allocation.status === 'empty' && (
+                <p className="account-overview-note">{t('noAllocationData')}</p>
+              )}
+              {allocation.status === 'ok' && (
+                <AllocationChart allocation={allocation} t={t} currency={currency} />
+              )}
             </section>
           )}
 
@@ -490,7 +682,7 @@ function AccountOverview({ isOpen, isMaximized, onStockSelect }) {
                     <th scope="col" className="align-right col-extra">{t('marketPrice')}</th>
                     <th scope="col" className="align-right">{t('marketValue')}</th>
                     <th scope="col" className="align-right">{t('unrealizedPnl')}</th>
-                    <th scope="col" className="align-right">{t('weight')}</th>
+                    <th scope="col" className="align-right">{t('allocation')}</th>
                     <th scope="col" className="col-extra">{t('currency')}</th>
                   </tr>
                 </thead>
@@ -527,7 +719,7 @@ function AccountOverview({ isOpen, isMaximized, onStockSelect }) {
                         <td className={`align-right portfolio-num${row.unrealizedPnl < 0 ? ' is-negative' : ''}`}>
                           {formatCurrency(row.unrealizedPnl, row.currency)}
                         </td>
-                        <td className="align-right portfolio-num">{formatPercent(row.weight)}</td>
+                        <td className="align-right portfolio-num">{formatPercent(allocation.byId.get(row.id ?? row.symbol))}</td>
                         <td className="col-extra">{row.currency}</td>
                       </tr>
                     );
