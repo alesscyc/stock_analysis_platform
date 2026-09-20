@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS = {
   OPENAI_MODEL: '',
 };
 
-function SettingsDialog({ isOpen, onClose }) {
+function SettingsDialog({ isOpen, onClose, onResetPaper = () => {}, paperError, paperReadOnly = false, showConnectionSettings = true }) {
   const { t } = useTranslation();
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [configuredSecrets, setConfiguredSecrets] = useState({});
@@ -24,9 +24,11 @@ function SettingsDialog({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [paperBalance, setPaperBalance] = useState('100000');
+  const desktop = showConnectionSettings;
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !desktop) return;
     const controller = new AbortController();
     setLoading(true);
     setMessage(null);
@@ -44,7 +46,7 @@ function SettingsDialog({ isOpen, onClose }) {
       .finally(() => setLoading(false));
 
     return () => controller.abort();
-  }, [isOpen, t]);
+  }, [desktop, isOpen, t]);
 
   if (!isOpen) return null;
 
@@ -92,6 +94,21 @@ function SettingsDialog({ isOpen, onClose }) {
     </div>
   );
 
+  const resetPaper = async () => {
+    const balance = Number(paperBalance);
+    if (!Number.isFinite(balance) || balance <= 0) {
+      setMessage({ type: 'error', text: t('paperBalanceInvalid') });
+      return;
+    }
+    if (!window.confirm(t('confirmPaperReset'))) return;
+    try {
+      await onResetPaper(balance);
+      setMessage({ type: 'success', text: t('paperResetDone') });
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message });
+    }
+  };
+
   const submit = async event => {
     event.preventDefault();
     setSaving(true);
@@ -131,6 +148,18 @@ function SettingsDialog({ isOpen, onClose }) {
           {message && <div className={`settings-message ${message.type}`} role={message.type === 'error' ? 'alert' : 'status'}>{message.text}</div>}
 
           <fieldset>
+            <legend>{t('paperAccount')}</legend>
+            <div className="settings-field">
+              <label htmlFor="paper-starting-balance">{t('paperStartingBalance')}</label>
+              <input id="paper-starting-balance" type="number" min="0.01" step="0.01" value={paperBalance} onChange={(event) => setPaperBalance(event.target.value)} />
+              <small>{t('paperResetWarning')}</small>
+            </div>
+            {paperError && <div className="settings-message error" role="alert">{paperError}</div>}
+            <button type="button" className="settings-save" onClick={resetPaper} disabled={paperReadOnly}>{t('resetPaperAccount')}</button>
+          </fieldset>
+
+          {desktop && <>
+          <fieldset>
             <legend>{t('ibConnection')}</legend>
             {field('IB_HOST', t('ibHost'), { required: true })}
             {field('IB_PORT', t('ibPort'), { required: true, type: 'number', min: 1, max: 65535, hint: t('ibPortHint') })}
@@ -156,6 +185,7 @@ function SettingsDialog({ isOpen, onClose }) {
           <button className="settings-save" type="submit" disabled={saving}>
             {saving ? t('savingSettings') : t('saveSettings')}
           </button>
+          </>}
         </form>
       )}
     </section>

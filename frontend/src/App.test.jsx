@@ -410,3 +410,68 @@ describe('sidebar resize', () => {
     expect(visibleSeparator).not.toHaveAttribute('aria-hidden')
   })
 })
+
+describe('trading mode selection', () => {
+  const MODE_KEY = 'stockai-trading-mode'
+  let stored
+
+  const readStorage = () => {
+    const entries = []
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index)
+      entries.push([key, localStorage.getItem(key)])
+    }
+    return entries
+  }
+
+  const renderWithIbStatus = connected => {
+    vi.stubGlobal('fetch', vi.fn(url => {
+      if (url === '/api/ib/status') return Promise.resolve(ok({ connected }))
+      return Promise.resolve(ok({}))
+    }))
+    return render(<App />)
+  }
+
+  const liveButton = () => screen.getByRole('button', { name: 'LIVE' })
+  const paperButton = () => screen.getByRole('button', { name: 'PAPER' })
+
+  beforeEach(() => {
+    stored = readStorage()
+    localStorage.clear()
+  })
+
+  afterEach(() => {
+    localStorage.clear()
+    for (const [key, value] of stored) localStorage.setItem(key, value)
+  })
+
+  it('forces PAPER mode and disables LIVE while IB is disconnected', async () => {
+    localStorage.setItem(MODE_KEY, JSON.stringify('live'))
+    renderWithIbStatus(false)
+
+    await waitFor(() => expect(paperButton()).toHaveAttribute('aria-pressed', 'true'))
+    expect(liveButton()).toBeDisabled()
+    expect(liveButton()).toHaveAttribute('aria-pressed', 'false')
+    // The explicit preference survives the forced fallback.
+    expect(JSON.parse(localStorage.getItem(MODE_KEY))).toBe('live')
+  })
+
+  it('starts in LIVE mode when IB is connected', async () => {
+    renderWithIbStatus(true)
+
+    await waitFor(() => expect(liveButton()).toHaveAttribute('aria-pressed', 'true'))
+    expect(liveButton()).toBeEnabled()
+    expect(paperButton()).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('persists an explicit PAPER selection to storage', async () => {
+    renderWithIbStatus(true)
+    await waitFor(() => expect(liveButton()).toHaveAttribute('aria-pressed', 'true'))
+
+    fireEvent.click(paperButton())
+
+    await waitFor(() => expect(paperButton()).toHaveAttribute('aria-pressed', 'true'))
+    expect(liveButton()).toBeEnabled()
+    expect(JSON.parse(localStorage.getItem(MODE_KEY))).toBe('paper')
+  })
+})

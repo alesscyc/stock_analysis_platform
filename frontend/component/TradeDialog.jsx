@@ -18,7 +18,7 @@ function rememberSubmittedOrderPrice(orderId, orderPrice) {
   }
 }
 
-function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, draft, onModificationPriceChange, onModified, onPreviewChange, previewPriceChange, currentPrice }) {
+function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, accountMode = 'live', canTrade = ibConnected, onPaperSubmit, onPaperModify, modification, draft, onModificationPriceChange, onModified, onPreviewChange, previewPriceChange, currentPrice }) {
   const { t } = useTranslation();
   const currentPriceRef = useRef(currentPrice);
   useEffect(() => {
@@ -39,6 +39,10 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const isModifyMode = Boolean(modification?.order);
+
+  useEffect(() => {
+    if (accountMode === 'paper' && (action === 'SELL' || ['IOC', 'FOK'].includes(tif))) setIsBracketOrder(false);
+  }, [accountMode, action, tif]);
 
   const handlePriceChange = (nextPrice) => {
     setPrice(nextPrice);
@@ -175,15 +179,17 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
     try {
       if (isModifyMode) {
         const orderRef = modification.order.id ?? modification.order.permId ?? modification.order.orderId;
-        const response = await fetch(`/api/orders/${encodeURIComponent(orderRef)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ price: Number(price) }),
-        });
-
-        const data = await response.json();
-        if (!response.ok || !data.success) {
-          throw new Error(data.error || t('unknownError'));
+        let data;
+        if (accountMode === 'paper') {
+          data = await onPaperModify(orderRef, Number(price));
+        } else {
+          const response = await fetch(`/api/orders/${encodeURIComponent(orderRef)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ price: Number(price) }),
+          });
+          data = await response.json();
+          if (!response.ok || !data.success) throw new Error(data.error || t('unknownError'));
         }
 
         setSuccessMsg(t('orderModified', {
@@ -211,14 +217,20 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
         };
       }
 
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderPayload),
-      });
-
-      const data = await response.json();
-      if (response.ok && data.success) {
+      let data;
+      let ok = true;
+      if (accountMode === 'paper') {
+        data = await onPaperSubmit(orderPayload);
+      } else {
+        const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderPayload),
+        });
+        data = await response.json();
+        ok = response.ok;
+      }
+      if (ok && data.success) {
         rememberSubmittedOrderPrice(data.orderId, data.price ?? price);
         setSuccessMsg(t('orderSubmitted', {
           type: data.orderType === 'BRACKET' ? t('bracketOrder') : t('order'),
@@ -239,6 +251,8 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
     } catch (error) {
       if (isModifyMode && error.message) {
         setErrorMsg(t('failedModifyOrder', { error: error.message }));
+      } else if (accountMode === 'paper' && error.message) {
+        setErrorMsg(t('failedSubmitOrder', { error: error.message }));
       } else {
         setErrorMsg(t('networkError'));
       }
@@ -275,7 +289,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
         {/* Header */}
         <div id="trade-dialog-header">
           <div id="trade-dialog-header-left">
-            <div id="trade-dialog-type-badge">{isModifyMode ? t('modifyOrder') : t('orderTicket')}</div>
+            <div id="trade-dialog-type-badge">{isModifyMode ? t('modifyOrder') : t('orderTicket')} · {accountMode === 'paper' ? t('paperMode') : t('liveMode')}</div>
             <h2 id="trade-dialog-title">
               <span id="trade-dialog-symbol">{stockSymbol}</span>
             </h2>
@@ -381,6 +395,7 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
                   setTakeProfitError('');
                   setStopLossError('');
                 }}
+                disabled={accountMode === 'paper' && (action === 'SELL' || ['IOC', 'FOK'].includes(tif))}
               />
               <span className="trade-switch-slider" />
             </label>
@@ -440,15 +455,17 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
         {/* Inline feedback */}
         {successMsg && <div className="trade-feedback trade-feedback-success">{successMsg}</div>}
         {errorMsg && <div className="trade-feedback trade-feedback-error">{errorMsg}</div>}
-        {!ibConnected && (
-          <div className="trade-feedback trade-feedback-error">{t('ibNotConnected')}</div>
+        {!canTrade && (
+          <div className="trade-feedback trade-feedback-error">
+            {accountMode === 'paper' ? t('paperTradingUnavailable') : t('ibNotConnected')}
+          </div>
         )}
 
         {/* Submit order CTA */}
         <button
           id="trade-buy-btn"
           onClick={handleSubmitOrder}
-          disabled={loading || !ibConnected}
+          disabled={loading || !canTrade}
         >
           {loading ? (
             <span className="btn-spinner" />
@@ -464,7 +481,9 @@ function TradeDialog({ isOpen, onClose, stockSymbol, ibConnected, modification, 
         </button>
 
         <p id="trade-disclaimer">
-          {isModifyMode ? t('modifyOrderDisclaimer') : t('orderDisclaimer', { bracket: isBracketOrder ? t('withBracket') : '' })}
+          {accountMode === 'paper'
+            ? t('paperOrderDisclaimer')
+            : isModifyMode ? t('modifyOrderDisclaimer') : t('orderDisclaimer', { bracket: isBracketOrder ? t('withBracket') : '' })}
         </p>
       </div>
   );

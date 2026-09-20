@@ -347,7 +347,9 @@ function saveWatchlist(list) {
   localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(list));
 }
 
-function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick, onOrderPriceDrag, orderModification, orderPreview, onPreviewPriceDrag, ibConnected, ordersRefreshToken, backtestTrades }) {
+const NO_PAPER_ORDERS = [];
+
+function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange, aiPrediction, onTradeClick, onOrderPriceDrag, orderModification, orderPreview, onPreviewPriceDrag, ibConnected, tradingEnabled = ibConnected, accountMode = 'live', paperPosition = null, paperOrders = NO_PAPER_ORDERS, ordersRefreshToken, backtestTrades }) {
   const containerRef = useRef(null);
   const chartRef     = useRef(null);
   const dataContextRef = useRef(null);
@@ -509,8 +511,15 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     { value: '1mo', label: t('monthly') },
   ];
 
+  useEffect(() => {
+    if (accountMode !== 'paper') return;
+    setIbPosition(paperPosition);
+    setSymbolOrders(paperOrders);
+  }, [accountMode, paperOrders, paperPosition]);
+
   // ── Fetch IB portfolio position and orders for current symbol ──
   useEffect(() => {
+    if (accountMode !== 'live') return;
     if (!ibConnected || !stockSymbol) {
       setIbPosition(null);
       setSymbolOrders([]);
@@ -557,7 +566,7 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
     return () => {
       cancelled = true;
     };
-  }, [ibConnected, stockSymbol, ordersRefreshToken]);
+  }, [accountMode, ibConnected, stockSymbol, ordersRefreshToken]);
 
   // ── Transform raw API data into series arrays ────────────
   const { candleData, volumeData, maData, vol20maData } = useMemo(() => {
@@ -1401,8 +1410,8 @@ function StockChart({ stockData, stockSymbol, currentInterval, onIntervalChange,
           <button
             id="trade-btn"
             onClick={onTradeClick}
-            disabled={!ibConnected}
-            title={ibConnected ? t('trade') : t('ibNotConnected')}
+            disabled={!tradingEnabled}
+            title={tradingEnabled ? t('trade') : accountMode === 'paper' ? t('paperTradingUnavailable') : t('ibNotConnected')}
           >
             {t('trade')}
           </button>

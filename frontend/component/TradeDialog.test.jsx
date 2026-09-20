@@ -54,3 +54,16 @@ it('allows price-only changes to orders with fractional remaining shares', async
   expect(fetchMock.mock.calls[0][1].method).toBe('PATCH');
   expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ price: 101 });
 });
+
+// Regression guard for the Paper Account work: submitting while IB is disconnected
+// must never reach the live order endpoint.
+it('never posts an order to the API while IB is disconnected', async () => {
+  const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+    ok: true, json: async () => ({ success: true, orderId: 123 }),
+  });
+  render(<TradeDialog isOpen stockSymbol="TEST" onClose={() => {}} />);
+  fireEvent.change(screen.getByLabelText('Price (USD)'), { target: { value: '100' } });
+  fireEvent.change(screen.getByLabelText('Shares'), { target: { value: '1' } });
+  fireEvent.click(screen.getByRole('button', { name: /Place.*Order/i }));
+  expect(fetchMock).not.toHaveBeenCalled();
+});

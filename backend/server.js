@@ -1414,8 +1414,26 @@ app.post('/api/chat', async (req, res) => {
     let pendingOrders = [];
     let positionsAvailable = false;
     let pendingOrdersAvailable = false;
+    let accountMode = 'live';
+    let paperSummary = null;
 
-    if (ibConnected) {
+    if (body.accountContext?.mode === 'paper') {
+      if (!Array.isArray(body.accountContext.portfolio)
+        || !Array.isArray(body.accountContext.pendingOrders)
+        || body.accountContext.portfolio.length > 500
+        || body.accountContext.pendingOrders.length > 500) {
+        return res.status(400).json({ error: 'Invalid paper account context' });
+      }
+      accountMode = 'paper';
+      portfolioRows = body.accountContext.portfolio;
+      pendingOrders = body.accountContext.pendingOrders;
+      positionsAvailable = true;
+      pendingOrdersAvailable = true;
+      paperSummary = Object.fromEntries(['cash', 'realizedPnl', 'netLiquidation'].flatMap((field) => {
+        const value = Number(body.accountContext.summary?.[field]);
+        return Number.isFinite(value) ? [[field, value]] : [];
+      }));
+    } else if (ibConnected) {
       const [portfolioResult, ordersResult] = await Promise.allSettled([
         waitForPortfolioSnapshot(),
         waitForOpenOrdersSnapshot(IB_OPEN_ORDERS_SYNC_TIMEOUT_MS, true),
@@ -1430,16 +1448,18 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    const ibContext = {
+    const accountContext = {
+      mode: accountMode,
       positionsAvailable,
       pendingOrdersAvailable,
+      ...(paperSummary && { summary: paperSummary }),
       ...buildChatIbContext(portfolioRows, pendingOrders),
     };
     const context = [
       'You answer questions about the currently displayed stock using only the supplied data.',
       'Do not claim access to live prices, news, or outside information. If the data cannot answer a question, say so.',
       'Explain uncertainty and do not provide personalized financial advice.',
-      'You may analyze the supplied read-only IB portfolio and pending orders and draft one limit order for review.',
+      'You may analyze the supplied read-only active account portfolio and pending orders and draft one limit order for review.',
       'You cannot submit, modify, or cancel any order. Never claim that an order was placed, changed, cancelled, or executed.',
       'A draft has no IB side effect and the user must review it and manually submit it in the existing order ticket.',
       'Use concise plain text with short paragraphs or simple bullets.',
@@ -1447,7 +1467,7 @@ app.post('/api/chat', async (req, res) => {
       `Interval: ${interval}`,
       `Fundamentals: ${JSON.stringify(body.fundamentals ?? null)}`,
       `Existing AI prediction: ${JSON.stringify(body.aiPrediction ?? null)}`,
-      `Read-only IB context: ${JSON.stringify(ibContext)}`,
+      `Read-only active account context: ${JSON.stringify(accountContext)}`,
       `Historical market data CSV (${marketRows.length} rows, oldest to newest):`,
       `Date,${CHAT_MARKET_FIELDS.join(',')}`,
       ...marketRows,

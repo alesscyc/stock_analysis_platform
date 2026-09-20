@@ -297,9 +297,9 @@ function latestTimestamp(timestamps) {
   return values.length ? Math.max(...values) : null;
 }
 
-function AccountOverview({ isOpen, isMaximized, onStockSelect }) {
+function AccountOverview({ isOpen, isMaximized, onStockSelect, paperMode = false, snapshot = null, storageError = null }) {
   const { t, language } = useTranslation();
-  const [data, setData] = useState(null);
+  const [data, setData] = useState(snapshot);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -307,6 +307,12 @@ function AccountOverview({ isOpen, isMaximized, onStockSelect }) {
   const releaseTimerRef = useRef(null);
 
   useEffect(() => {
+    if (paperMode) {
+      setData(snapshot);
+      setError(storageError);
+      setLoading(false);
+      return undefined;
+    }
     if (!isOpen) return undefined;
 
     const controller = new AbortController();
@@ -355,10 +361,17 @@ function AccountOverview({ isOpen, isMaximized, onStockSelect }) {
       clearInterval(timer);
       controller.abort();
     };
-  }, [isOpen, selectedAccount, t]);
+  }, [isOpen, paperMode, selectedAccount, snapshot, storageError, t]);
 
   useEffect(() => {
-    if (!isOpen) return undefined;
+    if (!isOpen || !snapshot) return undefined;
+    setCheckedAt(Date.now());
+    const timer = setInterval(() => setCheckedAt(Date.now()), OVERVIEW_POLL_MS);
+    return () => clearInterval(timer);
+  }, [isOpen, snapshot]);
+
+  useEffect(() => {
+    if (!isOpen || paperMode) return undefined;
 
     // Explicit cleanup: stop the selected-account holdings subscription. The
     // release is deferred so a StrictMode remount (immediate re-registration)
@@ -372,7 +385,7 @@ function AccountOverview({ isOpen, isMaximized, onStockSelect }) {
         fetch('/api/account/release', { method: 'POST' }).catch(() => {});
       }, 0);
     };
-  }, [isOpen]);
+  }, [isOpen, paperMode]);
 
   const metrics = data?.metrics;
   const currency = useMemo(() => pickMetricCurrency(metrics, data?.baseCurrency), [data?.baseCurrency, metrics]);
@@ -502,6 +515,7 @@ function AccountOverview({ isOpen, isMaximized, onStockSelect }) {
 
   const kpi = [
     { id: 'net-liquidation', tag: 'NetLiquidation', label: t('netLiquidation'), timestamp: data?.summaryUpdatedAt },
+    ...(data?.paper ? [{ id: 'realized-pnl', value: data.realizedPnl, label: t('realizedPnl'), timestamp: data?.summaryUpdatedAt }] : []),
     {
       id: 'unrealized-pnl',
       label: t('unrealizedPnl'),
@@ -585,7 +599,7 @@ function AccountOverview({ isOpen, isMaximized, onStockSelect }) {
                   className="account-selector-masked"
                   aria-label={`${t('selectAccount')}: ${maskAccountId(data.selectedAccount)}`}
                 >
-                  {maskAccountId(data.selectedAccount)}
+                  {data.paper ? t('paperAccount') : maskAccountId(data.selectedAccount)}
                 </span>
               )}
               {accountType && <span className="account-type">{accountType}</span>}
@@ -593,13 +607,13 @@ function AccountOverview({ isOpen, isMaximized, onStockSelect }) {
 
             <div className="account-status">
               <span className={`account-status-badge${data.connected && !stale && !syncError ? ' is-connected' : ''}`}>
-                {data.connected ? t('ibConnected') : t('ibDisconnected')}
+                {data.paper ? t('paperMode') : data.connected ? t('ibConnected') : t('ibDisconnected')}
               </span>
               {freshnessLabel && <span className="account-freshness">{freshnessLabel}</span>}
               {data.connected && data.summaryReady === false && (
                 <span className="account-freshness">{t('summaryRefreshing')}</span>
               )}
-              <span className="account-freshness">{t('notLiveNote')}</span>
+              <span className="account-freshness">{data.paper ? t('paperPriceLimitations') : t('notLiveNote')}</span>
             </div>
               </div>
 
@@ -729,8 +743,8 @@ function AccountOverview({ isOpen, isMaximized, onStockSelect }) {
             </div>
           ) : (
             <div id="portfolio-empty-state">
-              <span className="portfolio-empty-title">{t('noIBPositions')}</span>
-              <span className="portfolio-empty-sub">{t('makeSureIB')}</span>
+              <span className="portfolio-empty-title">{data?.paper ? t('noPaperPositions') : t('noIBPositions')}</span>
+              <span className="portfolio-empty-sub">{data?.paper ? t('paperEmptyHint') : t('makeSureIB')}</span>
             </div>
           )}
         </div>

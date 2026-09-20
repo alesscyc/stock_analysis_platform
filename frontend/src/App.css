@@ -105,6 +105,30 @@
   flex-shrink: 0;
 }
 
+.trading-mode-switch {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+}
+
+.trading-mode-switch button {
+  padding: 4px 7px;
+  border: 0;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.trading-mode-switch button:disabled { cursor: not-allowed; opacity: .45; }
+.live-disconnect-warning { max-width: 110px; color: var(--warning); font-size: 10px; line-height: 1.15; }
+.trading-mode-switch.is-live button.is-active { background: var(--green); color: var(--bg-primary); }
+.trading-mode-switch.is-paper button.is-active { background: var(--warning); color: var(--bg-primary); }
+
 /* Watchlist button */
 .btn-watchlist {
   display: flex;

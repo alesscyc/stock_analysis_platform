@@ -17,7 +17,7 @@ async function readApiJson(response, fallbackMessage) {
   }
 }
 
-function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPrediction, onReviewDraft, accountPanelOpen = false }) {
+function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPrediction, accountContext, onReviewDraft, accountPanelOpen = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -120,6 +120,7 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
           stockData: compactStockData,
           fundamentals,
           aiPrediction,
+          accountContext,
         }),
       });
       const data = await readApiJson(response, t('chatFailed'));

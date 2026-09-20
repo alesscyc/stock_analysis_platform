@@ -15,6 +15,9 @@ import { isDesktopApp, isGitHubPages } from './environment';
 import { generateNvdaMockData } from './mockData';
 import { useTranslation } from './i18n/useTranslation';
 import { mergeStockData, olderDailyWindow, recentDailyWindow } from './chartLoading';
+import usePersistedState from './hooks/usePersistedState';
+import usePaperAccount from './usePaperAccount';
+import { PAPER_MODE_KEY } from './paperAccount';
 
 const RECENT_CACHE_TTL = 5 * 60 * 1000;
 const HISTORY_FLOOR_DATE = '1900-01-01';
@@ -64,6 +67,11 @@ function App() {
   const [recentLoadState, setRecentLoadState] = useState('idle');
   const [isMock, setIsMock] = useState(false);
   const [ibConnected, setIbConnected] = useState(false);
+  const [modePreference, setModePreference] = usePersistedState(PAPER_MODE_KEY, 'live');
+  const paper = usePaperAccount();
+  const requestedMode = modePreference === 'paper' ? 'paper' : 'live';
+  const activeMode = ibConnected && requestedMode === 'live' ? 'live' : 'paper';
+  const tradingEnabled = activeMode === 'live' ? ibConnected : paper.canTrade;
   const [fundamentals, setFundamentals] = useState(null);
   const [showFundamentals, setShowFundamentals] = useState(false);
   const [orderModification, setOrderModification] = useState(null);
@@ -84,6 +92,18 @@ function App() {
   const sidebarRef = useRef(null);
   const accountPanelRef = useRef(null);
   const accountPanelToggleRef = useRef(null);
+  const activeModeRef = useRef(activeMode);
+
+  useEffect(() => {
+    if (activeModeRef.current === activeMode) return;
+    activeModeRef.current = activeMode;
+    setActiveSidebar((current) => current === 'trade' ? null : current);
+    setOrderDraft(null);
+    setOrderPreview(null);
+    setPreviewPriceChange(null);
+    setOrderModification(null);
+    orderModificationCommittedRef.current = false;
+  }, [activeMode]);
 
   const clampSidebarWidth = useCallback((width) => (
     Math.min(
@@ -520,6 +540,17 @@ function App() {
     });
   }, []);
 
+  const selectTradingMode = useCallback((mode) => {
+    if (mode === 'live' && !ibConnected) return;
+    setModePreference(mode);
+    setActiveSidebar((current) => current === 'trade' ? null : current);
+    setOrderDraft(null);
+    setOrderPreview(null);
+    setPreviewPriceChange(null);
+    setOrderModification(null);
+    orderModificationCommittedRef.current = false;
+  }, [ibConnected, setModePreference]);
+
   const handleTradeButtonClick = useCallback(() => {
     if (orderModification && !orderModificationCommittedRef.current) {
       setOrdersRefreshToken(token => token + 1);
@@ -651,6 +682,25 @@ function App() {
         {selectedStock && <div className="topbar-divider" />}
 
         <div className="topbar-actions">
+          <div className={`trading-mode-switch is-${activeMode}`} role="group" aria-label={t('tradingMode')}>
+            <button
+              type="button"
+              className={activeMode === 'live' ? 'is-active' : ''}
+              onClick={() => selectTradingMode('live')}
+              disabled={!ibConnected}
+              aria-pressed={activeMode === 'live'}
+              title={!ibConnected ? t('liveUnavailable') : t('liveMode')}
+            >{t('liveMode')}</button>
+            <button
+              type="button"
+              className={activeMode === 'paper' ? 'is-active' : ''}
+              onClick={() => selectTradingMode('paper')}
+              aria-pressed={activeMode === 'paper'}
+            >{t('paperMode')}</button>
+          </div>
+          {!ibConnected && requestedMode === 'live' && (
+            <span className="live-disconnect-warning" role="status">{t('liveOrdersMayRemainActive')}</span>
+          )}
           <button
             className={`btn-screener${activeSidebar === 'screener' ? ' is-active' : ''}`}
             onClick={() => setActiveSidebar(prev => prev === 'screener' ? null : 'screener')}
@@ -701,8 +751,7 @@ function App() {
 
           <div className="topbar-divider" />
 
-          {isDesktopApp() && (
-            <button
+          <button
               className={`btn-orders${activeSidebar === 'settings' ? ' is-active' : ''}`}
               onClick={() => setActiveSidebar(prev => prev === 'settings' ? null : 'settings')}
               aria-label={t('settings')}
@@ -714,7 +763,6 @@ function App() {
               </svg>
               {t('settings')}
             </button>
-          )}
 
           <button
             className="btn-language"
@@ -882,6 +930,14 @@ function App() {
                   orderPreview={activeSidebar === 'trade' ? orderPreview : null}
                   onPreviewPriceDrag={setPreviewPriceChange}
                   ibConnected={ibConnected}
+                  tradingEnabled={tradingEnabled}
+                  accountMode={activeMode}
+                  paperPosition={activeMode === 'paper'
+                    ? paper.overview?.holdings?.find((row) => row.symbol === selectedStock?.symbol) || null
+                    : null}
+                  paperOrders={activeMode === 'paper'
+                    ? paper.openOrders.filter((row) => row.symbol === selectedStock?.symbol)
+                    : []}
                   ordersRefreshToken={ordersRefreshToken}
                   backtestTrades={backtestTrades}
                 />
@@ -978,10 +1034,17 @@ function App() {
                 isOpen={isAccountPanelOpen && accountPanelTab === 'portfolio'}
                 isMaximized={isAccountPanelMaximized}
                 onStockSelect={handleStockSelect}
+                paperMode={activeMode === 'paper'}
+                snapshot={activeMode === 'paper' ? paper.overview : null}
+                storageError={activeMode === 'paper' ? paper.error : null}
               />
               <OrdersDialog
                 isOpen={isAccountPanelOpen && accountPanelTab === 'orders'}
                 onStockSelect={handleStockSelect}
+                mode={activeMode}
+                paperOrders={paper.openOrders}
+                paperHistory={paper.history}
+                onPaperCancel={paper.cancel}
               />
             </div>
           </section>
@@ -1010,6 +1073,10 @@ function App() {
             onClose={handleTradeClose}
             stockSymbol={selectedStock?.symbol}
             ibConnected={ibConnected}
+            accountMode={activeMode}
+            canTrade={tradingEnabled}
+            onPaperSubmit={paper.submit}
+            onPaperModify={paper.modify}
             modification={orderModification}
             draft={orderDraft}
             onModificationPriceChange={handleOrderModificationPriceChange}
@@ -1037,7 +1104,14 @@ function App() {
             currentInterval={currentInterval}
             onTradesUpdate={setBacktestTrades}
           />
-          <SettingsDialog isOpen={activeSidebar === 'settings'} onClose={() => setActiveSidebar(null)} />
+          <SettingsDialog
+            isOpen={activeSidebar === 'settings'}
+            onClose={() => setActiveSidebar(null)}
+            onResetPaper={paper.reset}
+            paperError={paper.error}
+            paperReadOnly={!paper.isPrimary}
+            showConnectionSettings={isDesktopApp()}
+          />
         </aside>
       </div>
 
@@ -1050,6 +1124,16 @@ function App() {
           fundamentals={fundamentals}
           aiPrediction={aiPrediction}
           onReviewDraft={handleReviewDraft}
+          accountContext={activeMode === 'paper' ? {
+            mode: 'paper',
+            portfolio: paper.overview?.holdings || [],
+            pendingOrders: paper.openOrders,
+            summary: {
+              cash: paper.overview?.cash,
+              realizedPnl: paper.overview?.realizedPnl,
+              netLiquidation: paper.overview?.metrics?.USD?.NetLiquidation,
+            },
+          } : undefined}
         />
       )}
     </div>

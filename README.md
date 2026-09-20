@@ -13,6 +13,7 @@ A local full-stack stock research and trading workspace with interactive charts,
 - Random Forest trade signals with per-symbol model caching
 - AI chat over the currently loaded chart data (OpenAI-compatible providers)
 - IB portfolio, limit/bracket order placement, modification, and cancellation
+- Browser-local Paper Account fallback when IB Gateway/TWS is disconnected
 - English and Traditional Chinese interface
 
 ## Stack
@@ -160,7 +161,7 @@ Notes:
 ## Important notes
 
 - The API has no authentication and is intended for local development.
-- Orders reach the configured IB account. Use paper trading while testing.
+- Live Mode orders reach the configured IB account. When IB Gateway/TWS is disconnected, the app forces Paper Mode and keeps its simulated cash account in browser `localStorage`; paper orders are never synchronized to IB.
 - Set `IB_CLIENT_ID=0` if the app must bind and display manually created TWS/IBKR open orders.
 - ML labels use a 22-trading-day forward return above 5%. Bars without a known forward return are excluded from training, and a 22-bar gap separates training and evaluation data. Models are cached per symbol for four hours under `analysis/model_cache/`; cache writes are atomic and older cache formats are ignored.
 - AI chat uses only the chart payload already loaded in the UI (OHLCV, MAs, fundamentals, RF prediction). It does not fetch live news or place trades, and responses are informational only.

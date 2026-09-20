@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { useTranslation } from '../src/i18n/useTranslation';
 import './OrdersDialog.css';
 
@@ -14,8 +14,10 @@ function loadSubmittedOrderPrices() {
   }
 }
 
-function OrdersDialog({ isOpen, onStockSelect }) {
+function OrdersDialog({ isOpen, onStockSelect, mode = 'live', paperOrders = [], paperHistory = [], onPaperCancel }) {
   const [orders, setOrders] = useState([]);
+  const [paperView, setPaperView] = useState('open');
+  const [expandedBracket, setExpandedBracket] = useState(null);
   const [submittedPrices, setSubmittedPrices] = useState(loadSubmittedOrderPrices);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -23,7 +25,11 @@ function OrdersDialog({ isOpen, onStockSelect }) {
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (mode === 'paper') setError(null);
+  }, [mode]);
+
+  useEffect(() => {
+    if (!isOpen || mode === 'paper') return;
 
     const controller = new AbortController();
     let active = true;
@@ -59,7 +65,25 @@ function OrdersDialog({ isOpen, onStockSelect }) {
       active = false;
       controller.abort();
     };
-  }, [isOpen, t]);
+  }, [isOpen, mode, t]);
+
+  const paperRows = (() => {
+    const all = [...new Map([...paperOrders, ...paperHistory].map((order) => [order.id, order])).values()];
+    return all.filter((order) => !order.parentId).flatMap((order) => {
+      const children = all.filter((child) => child.parentId === order.id);
+      if (!children.length) {
+        const belongs = paperView === 'open' ? paperOrders.some((row) => row.id === order.id) : paperHistory.some((row) => row.id === order.id);
+        return belongs ? [order] : [];
+      }
+      const group = [order, ...children];
+      const open = group.filter((row) => ['Submitted', 'Inactive'].includes(row.status));
+      if ((paperView === 'open') !== (open.length > 0)) return [];
+      return [{ ...order, status: open.length ? 'Submitted' : order.status, _children: children, _cancelRef: open[0]?.id }];
+    });
+  })();
+  const displayedOrders = mode === 'paper' ? paperRows : orders;
+  const displayLoading = mode === 'live' && loading;
+  const displayError = error;
 
   const getStatusBadgeClass = (status) => {
     const statusMap = {
@@ -91,6 +115,7 @@ function OrdersDialog({ isOpen, onStockSelect }) {
   };
 
   const handleRowKeyDown = (event, row, index) => {
+    if (event.target.closest('button')) return;
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       handleRowClick(row);
@@ -101,26 +126,29 @@ function OrdersDialog({ isOpen, onStockSelect }) {
 
     event.preventDefault();
     const direction = event.key === 'ArrowDown' ? 1 : -1;
-    const nextIndex = Math.min(orders.length - 1, Math.max(0, index + direction));
+    const nextIndex = Math.min(displayedOrders.length - 1, Math.max(0, index + direction));
     event.currentTarget.parentElement?.children[nextIndex]?.focus();
-    handleRowClick(orders[nextIndex]);
+    handleRowClick(displayedOrders[nextIndex]);
   };
 
-  const getOrderRef = (row) => row.id ?? row.permId ?? row.orderId;
+  const getOrderRef = (row) => row._cancelRef ?? row.id ?? row.permId ?? row.orderId;
 
   const handleCancelOrder = async (row) => {
     const orderRef = getOrderRef(row);
     setCancellingId(orderRef);
+    setError(null);
     try {
-      const response = await fetch(`/api/orders/${encodeURIComponent(orderRef)}/cancel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || t('failedCancelOrder'));
+      if (mode === 'paper') {
+        await onPaperCancel(orderRef);
+      } else {
+        const response = await fetch(`/api/orders/${encodeURIComponent(orderRef)}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || t('failedCancelOrder'));
+        setOrders((prev) => prev.filter((o) => getOrderRef(o) !== orderRef));
       }
-      setOrders((prev) => prev.filter((o) => getOrderRef(o) !== orderRef));
     } catch (err) {
       setError(err.message || t('failedCancelOrder'));
     } finally {
@@ -139,8 +167,15 @@ function OrdersDialog({ isOpen, onStockSelect }) {
       aria-labelledby="orders-tab"
       hidden={!isOpen}
     >
+        {mode === 'paper' && (
+          <div className="orders-history-tabs" role="tablist" aria-label={t('paperOrders')}>
+            <button type="button" role="tab" aria-selected={paperView === 'open'} onClick={() => setPaperView('open')}>{t('openOrders')}</button>
+            <button type="button" role="tab" aria-selected={paperView === 'history'} onClick={() => setPaperView('history')}>{t('orderHistory')}</button>
+          </div>
+        )}
+
         {/* Loading state */}
-        {loading && (
+        {displayLoading && (
           <div id="orders-loading-state">
             <span className="orders-spinner" />
             <span>{t('loadingPendingOrders')}</span>
@@ -148,19 +183,19 @@ function OrdersDialog({ isOpen, onStockSelect }) {
         )}
 
         {/* Error state */}
-        {error && (
+        {displayError && (
           <div id="orders-error-state">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <circle cx="12" cy="12" r="10"/>
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
-            {error}
+            {displayError}
           </div>
         )}
 
         {/* Empty state */}
-        {!loading && !error && orders.length === 0 && (
+        {!displayLoading && !displayError && displayedOrders.length === 0 && (
           <div id="orders-empty-state">
             <div className="orders-empty-icon">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -174,13 +209,13 @@ function OrdersDialog({ isOpen, onStockSelect }) {
         )}
 
         {/* Orders table */}
-        {!loading && !error && orders.length > 0 && (
+        {!displayLoading && !displayError && displayedOrders.length > 0 && (
           <>
             {/* Summary row */}
             <div id="orders-summary">
               <div className="orders-stat">
                 <span className="orders-stat-label">{t('totalOrders')}</span>
-                <span className="orders-stat-value">{orders.length}</span>
+                <span className="orders-stat-value">{displayedOrders.length}</span>
               </div>
             </div>
 
@@ -197,56 +232,66 @@ function OrdersDialog({ isOpen, onStockSelect }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((row, index) => (
-                    <tr
-                      key={row.id ?? row.permId ?? `${row.orderId}-${index}`}
-                      className="orders-clickable-row"
-                      onClick={() => handleRowClick(row)}
-                      onKeyDown={(event) => handleRowKeyDown(event, row, index)}
-                      role="button"
-                      tabIndex={0}
-                      title={t('loadChart', { symbol: row.symbol })}
-                    >
-                      <td className="align-center orders-symbol-cell">{row.symbol}</td>
-                      <td className="align-center orders-action-cell">
-                        <span className={`orders-action-badge ${row.action.toLowerCase()}`}>
-                          {row.action}
-                        </span>
-                      </td>
-                      <td className="align-center orders-num">{Number(row.quantity).toLocaleString()}</td>
-                      <td className="align-center orders-num">
-                        {row.orderType || '—'} / {formatLimitPrice(getOrderPrice(row))}
-                      </td>
-                      <td className="align-center">
-                        <span className={`orders-status-badge ${getStatusBadgeClass(row.status)}`}>
-                          {row.status}
-                        </span>
-                      </td>
-                      <td className="align-center">
-                        {canCancel(row.status) && (
-                          <button
-                            className="orders-cancel-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCancelOrder(row);
+                  {displayedOrders.map((row, index) => {
+                    const key = row.id ?? row.permId ?? `${row.orderId}-${index}`;
+                    const expanded = expandedBracket === key;
+                    return <Fragment key={key}>
+                      <tr
+                        className="orders-clickable-row"
+                        onClick={() => handleRowClick(row)}
+                        onKeyDown={(event) => handleRowKeyDown(event, row, index)}
+                        role="button"
+                        tabIndex={0}
+                        title={t('loadChart', { symbol: row.symbol })}
+                      >
+                        <td className="align-center orders-symbol-cell">
+                          {row.symbol}
+                          {row._children && <button
+                            type="button"
+                            className="orders-expand-btn"
+                            aria-expanded={expanded}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setExpandedBracket(expanded ? null : key);
                             }}
-                            disabled={cancellingId === getOrderRef(row)}
-                            aria-label={t('cancelOrder')}
-                            title={t('cancelOrder')}
-                          >
-                            {cancellingId === getOrderRef(row) ? (
-                              <span className="orders-cancel-spinner" />
-                            ) : (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                                <line x1="18" y1="6" x2="6" y2="18"/>
-                                <line x1="6" y1="6" x2="18" y2="18"/>
-                              </svg>
-                            )}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          >{expanded ? '−' : '+'}</button>}
+                        </td>
+                        <td className="align-center orders-action-cell">
+                          <span className={`orders-action-badge ${row.action.toLowerCase()}`}>{row.action}</span>
+                        </td>
+                        <td className="align-center orders-num">{Number(row.quantity).toLocaleString()}</td>
+                        <td className="align-center orders-num">{row.orderType || '—'} / {formatLimitPrice(getOrderPrice(row))}</td>
+                        <td className="align-center">
+                          <span className={`orders-status-badge ${getStatusBadgeClass(row.status)}`}>{row.status}</span>
+                        </td>
+                        <td className="align-center">
+                          {canCancel(row.status) && (
+                            <button
+                              className="orders-cancel-btn"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleCancelOrder(row);
+                              }}
+                              disabled={cancellingId === getOrderRef(row)}
+                              aria-label={t('cancelOrder')}
+                              title={t('cancelOrder')}
+                            >
+                              {cancellingId === getOrderRef(row) ? <span className="orders-cancel-spinner" /> : '×'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {expanded && row._children && (
+                        <tr className="orders-bracket-details">
+                          <td colSpan="6">
+                            {[row, ...row._children].map((leg) => (
+                              <span key={leg.id}>{leg.bracketRole || 'parent'}: {leg.orderType} {formatLimitPrice(getOrderPrice(leg))} · {leg.status}</span>
+                            ))}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>;
+                  })}
                 </tbody>
               </table>
             </div>
