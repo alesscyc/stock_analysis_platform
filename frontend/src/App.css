@@ -852,3 +852,18 @@
 .app-workspace:has(.research-start) { overflow-y: auto; }
 .research-start { flex-shrink: 0; overflow: visible; }
 .research-mark { flex-shrink: 0; }
+
+.quick-search-dialog {
+  width: min(560px, calc(100% - 32px));
+  margin: min(18vh, 140px) auto 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  box-shadow: var(--shadow-lg);
+}
+
+.quick-search-dialog::backdrop {
+  background: rgba(5, 8, 14, 0.72);
+}

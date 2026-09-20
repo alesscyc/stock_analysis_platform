@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import App from './App'
 
 vi.mock('../component/StockChart', () => ({
@@ -473,5 +473,128 @@ describe('trading mode selection', () => {
     await waitFor(() => expect(paperButton()).toHaveAttribute('aria-pressed', 'true'))
     expect(liveButton()).toBeEnabled()
     expect(JSON.parse(localStorage.getItem(MODE_KEY))).toBe('paper')
+  })
+})
+
+// Type-anywhere Quick Search. The popup reuses SearchBar, so the assertions only
+// rely on observable state: a visible text field carrying the seeded query.
+describe('quick search', () => {
+  const stubFetch = (overrides = {}) => {
+    const mock = vi.fn(url => {
+      if (url === '/api/ib/status') return Promise.resolve(ok({ connected: false }))
+      for (const [prefix, respond] of Object.entries(overrides)) {
+        if (url.startsWith(prefix)) return respond(url)
+      }
+      return Promise.resolve(ok({}))
+    })
+    vi.stubGlobal('fetch', mock)
+    return mock
+  }
+
+  const fields = () => screen.getAllByRole('textbox')
+  const hasOpenPopup = () => fields().some(field => field.value !== '')
+  const seededField = () => {
+    const field = fields().find(element => element.value !== '')
+    if (!field) throw new Error('Quick Search is not open')
+    return field
+  }
+
+  it('opens on a valid symbol-start character and seeds it', () => {
+    for (const key of ['a', '7', '.', '-', '^']) {
+      cleanup()
+      stubFetch()
+      render(<App />)
+      fireEvent.keyDown(document.body, { key })
+      expect(seededField().value.toUpperCase()).toBe(key.toUpperCase())
+      expect(seededField()).toHaveFocus()
+    }
+  })
+
+  it('ignores modifier shortcuts, IME composition, and other keys', () => {
+    stubFetch()
+    render(<App />)
+    const ignored = [
+      { key: 'a', ctrlKey: true },
+      { key: 'a', metaKey: true },
+      { key: 'a', altKey: true },
+      { key: 'a', isComposing: true },
+      { key: ' ' },
+      { key: '!' },
+      { key: 'Enter' },
+    ]
+    for (const event of ignored) fireEvent.keyDown(document.body, event)
+    expect(hasOpenPopup()).toBe(false)
+  })
+
+  it('does not activate while a text field has focus', () => {
+    stubFetch()
+    render(<App />)
+    const field = fields()[0]
+    field.focus()
+    fireEvent.keyDown(field, { key: 'a' })
+    expect(hasOpenPopup()).toBe(false)
+  })
+
+  it('closes on Escape, discards the query, and restores focus', () => {
+    stubFetch()
+    render(<App />)
+    const shortcut = screen.getByRole('button', { name: 'AAPL' })
+    shortcut.focus()
+    fireEvent.keyDown(shortcut, { key: 'a' })
+    const popup = seededField()
+    expect(popup).toHaveFocus()
+
+    fireEvent.change(popup, { target: { value: 'AAP' } })
+    const go = screen.getByRole('button', { name: 'Search' })
+    go.focus()
+    fireEvent.keyDown(go, { key: 'b' })
+    expect(popup).toHaveValue('AAP')
+    fireEvent.keyDown(go, { key: 'Escape' })
+    expect(hasOpenPopup()).toBe(false)
+    expect(shortcut).toHaveFocus()
+
+    fireEvent.keyDown(shortcut, { key: 'b' })
+    expect(seededField().value.toUpperCase()).toBe('B')
+  })
+
+  it('closes on an outside click and discards the query', () => {
+    stubFetch()
+    render(<App />)
+    fireEvent.keyDown(document.body, { key: 'a' })
+    fireEvent.change(seededField(), { target: { value: 'MSFT' } })
+
+    fireEvent.mouseDown(screen.getByRole('dialog', { name: 'Search' }))
+    expect(hasOpenPopup()).toBe(false)
+  })
+
+  it('stays closed while a stock is loading', async () => {
+    stubFetch({ '/api/stock/': () => new Promise(() => {}) })
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'AAPL' }))
+    await waitFor(() => expect(fields().some(field => field.disabled)).toBe(true))
+
+    fireEvent.keyDown(document.body, { key: 'a' })
+    expect(hasOpenPopup()).toBe(false)
+  })
+
+  it('reuses the shared symbol search and Enter selection', async () => {
+    const fetchMock = stubFetch({
+      '/api/symbols': () => Promise.resolve(ok([{ symbol: 'AAPL', description: 'Apple Inc.' }])),
+      '/api/stock/': () => Promise.resolve(ok([
+        { Date: '2026-08-11', Open: 10, High: 12, Low: 9, Close: 11, Volume: 100 },
+      ])),
+    })
+    render(<App />)
+    fireEvent.keyDown(document.body, { key: 'a' })
+    fireEvent.change(seededField(), { target: { value: 'AAP' } })
+
+    await waitFor(() => expect(
+      fetchMock.mock.calls.some(([url]) => String(url).includes('/api/symbols?q=AAP')),
+    ).toBe(true))
+    await screen.findByText('Apple Inc.')
+
+    fireEvent.keyDown(seededField(), { key: 'ArrowDown' })
+    fireEvent.keyDown(seededField(), { key: 'Enter' })
+    expect(await screen.findByTestId('stock-chart')).toHaveTextContent('AAPL:1')
   })
 })

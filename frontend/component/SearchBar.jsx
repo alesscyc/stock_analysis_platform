@@ -3,9 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import './searchBar.css';
 import { useTranslation } from '../src/i18n/useTranslation';
 
-function SearchBar({ onStockSelect, loading }) {
+function SearchBar({ onStockSelect, loading, initialValue = '', autoFocus = false }) {
     const { t } = useTranslation();
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(initialValue.toUpperCase());
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -146,6 +146,7 @@ function SearchBar({ onStockSelect, loading }) {
                     spellCheck={false}
                     aria-label={t('search')}
                     disabled={loading}
+                    autoFocus={autoFocus}
                 />
 
                 {loading ? (

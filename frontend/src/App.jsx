@@ -32,6 +32,7 @@ const ACCOUNT_PANEL_MAX_HEIGHT = 520;
 const ACCOUNT_PANEL_MIN_MAIN_HEIGHT = 240;
 const ACCOUNT_PANEL_KEYBOARD_STEP = 10;
 const APP_TOPBAR_HEIGHT = 56;
+const QUICK_SEARCH_KEY = /^[A-Z0-9.^-]$/i;
 // The topbar grows taller once its contents wrap, so measure the live element
 // instead of trusting the base constant when clamping panel sizes.
 const getTopbarHeight = () => {
@@ -85,6 +86,7 @@ function App() {
   const [accountPanelHeight, setAccountPanelHeight] = useState(ACCOUNT_PANEL_DEFAULT_HEIGHT);
   const [isAccountPanelResizing, setIsAccountPanelResizing] = useState(false);
   const [isAccountPanelMaximized, setIsAccountPanelMaximized] = useState(false);
+  const [quickSearchTerm, setQuickSearchTerm] = useState(null);
   const accountPanelMaximizeRef = useRef(null);
   const stockDataCacheRef = useRef(new Map());
   const loadAbortRef = useRef(null);
@@ -93,6 +95,48 @@ function App() {
   const accountPanelRef = useRef(null);
   const accountPanelToggleRef = useRef(null);
   const activeModeRef = useRef(activeMode);
+  const quickSearchDialogRef = useRef(null);
+  const quickSearchReturnFocusRef = useRef(null);
+
+  const closeQuickSearch = () => {
+    const dialog = quickSearchDialogRef.current;
+    if (dialog?.open && typeof dialog.close === 'function') dialog.close();
+    else setQuickSearchTerm(null);
+  };
+
+  useEffect(() => {
+    const handleTypeAnywhere = (event) => {
+      const tagName = event.target?.tagName?.toLowerCase();
+      if (
+        loading || quickSearchTerm !== null || event.defaultPrevented || event.isComposing ||
+        event.ctrlKey || event.altKey || event.metaKey ||
+        !QUICK_SEARCH_KEY.test(event.key) ||
+        ['input', 'textarea', 'select'].includes(tagName) || event.target?.isContentEditable
+      ) return;
+
+      event.preventDefault();
+      quickSearchReturnFocusRef.current = document.activeElement;
+      setQuickSearchTerm(event.key.toUpperCase());
+    };
+
+    window.addEventListener('keydown', handleTypeAnywhere);
+    return () => window.removeEventListener('keydown', handleTypeAnywhere);
+  }, [loading, quickSearchTerm]);
+
+  useEffect(() => {
+    if (quickSearchTerm === null) {
+      const returnFocus = quickSearchReturnFocusRef.current;
+      quickSearchReturnFocusRef.current = null;
+      if (returnFocus?.isConnected) returnFocus.focus();
+      return;
+    }
+
+    const dialog = quickSearchDialogRef.current;
+    if (!dialog?.open) {
+      if (typeof dialog?.showModal === 'function') dialog.showModal();
+      else dialog?.setAttribute('open', '');
+    }
+  }, [quickSearchTerm]);
 
   useEffect(() => {
     if (activeModeRef.current === activeMode) return;
@@ -603,6 +647,32 @@ function App() {
 
   return (
     <div id="root">
+      {quickSearchTerm !== null && (
+        <dialog
+          ref={quickSearchDialogRef}
+          className="quick-search-dialog"
+          aria-label={t('search')}
+          onClose={() => setQuickSearchTerm(null)}
+          onMouseDown={(event) => event.target === event.currentTarget && closeQuickSearch()}
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') return;
+            event.preventDefault();
+            event.stopPropagation();
+            closeQuickSearch();
+          }}
+        >
+          <SearchBar
+            initialValue={quickSearchTerm}
+            autoFocus
+            loading={loading}
+            onStockSelect={(stock) => {
+              closeQuickSearch();
+              handleStockSelect(stock);
+            }}
+          />
+        </dialog>
+      )}
+
       {/* ── Top nav bar ── */}
       <header className="app-topbar">
         <div className="app-brand">
