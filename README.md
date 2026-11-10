@@ -70,7 +70,16 @@ OPENAI_MODEL=your-model-id
 
 AI chat needs `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `OPENAI_MODEL`. Point `OPENAI_BASE_URL` at any OpenAI-compatible provider that exposes `/models` and `/chat/completions` (OpenAI, OpenCode Zen, local gateways, etc.). Without these vars, chat returns `503`.
 
-Run the frontend and backend in separate terminals:
+On Windows, start both services in one terminal from the repository root:
+
+```powershell
+.\run-project.bat
+```
+
+Both services share the terminal output. Press `Ctrl+C` to stop both.
+If either service exits, the launcher stops the other service too.
+
+Alternatively, run the frontend and backend in separate terminals:
 
 ```bash
 cd frontend
