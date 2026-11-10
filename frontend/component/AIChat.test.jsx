@@ -230,4 +230,28 @@ describe('AIChat', () => {
     await screen.findByText('AI response failed (HTTP 404)');
     expect(screen.queryByText(/Unexpected token/)).not.toBeInTheDocument();
   });
+
+  it('refreshes models after the AI chat connection changes and ignores stale results', async () => {
+    const responses = [];
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url, options) => new Promise((resolve, reject) => {
+      expect(url).toBe('/api/chat/models');
+      options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+      responses.push(resolve);
+    }));
+    const props = { stockSymbol: 'AAPL', stockData: [{ Date: '2026-01-02', Close: 101 }], currentInterval: '1d' };
+    const { rerender } = render(<I18nProvider><AIChat {...props} aiConnectionVersion={0} /></I18nProvider>);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open AI chat' }));
+    await waitFor(() => expect(responses).toHaveLength(1));
+    const firstSignal = fetchMock.mock.calls[0][1].signal;
+
+    rerender(<I18nProvider><AIChat {...props} aiConnectionVersion={1} /></I18nProvider>);
+    await waitFor(() => expect(responses).toHaveLength(2));
+    expect(firstSignal.aborted).toBe(true);
+
+    responses[0]({ ok: true, json: async () => ({ models: ['old-model'], defaultModel: 'old-model' }) });
+    responses[1]({ ok: true, json: async () => ({ models: ['new-model'], defaultModel: 'new-model' }) });
+    await waitFor(() => expect(screen.getByLabelText('Model')).toHaveValue('new-model'));
+    expect(screen.queryByRole('option', { name: 'old-model' })).not.toBeInTheDocument();
+  });
 });

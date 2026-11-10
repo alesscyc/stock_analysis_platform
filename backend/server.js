@@ -1,12 +1,14 @@
 // server.js
-require('dotenv').config(process.env.ENV_FILE ? { path: process.env.ENV_FILE } : undefined);
+const path = require('path');
+// Web mode reads and saves backend/.env; desktop mode passes its own ENV_FILE.
+const AI_ENV_FILE = process.env.ENV_FILE || path.join(__dirname, '.env');
+require('dotenv').config({ path: AI_ENV_FILE });
 const express = require('express');
 const cors = require('cors');
 const { spawn } = require('child_process');
-const path = require('path');
 const fs = require('fs');
 const { buildChatIbContext, parseChatResponse } = require('./chatSafety');
-const { readSettings, saveSettings } = require('./settingsEnv');
+const { readSettings, saveSettings, validateSettings } = require('./settingsEnv');
 
 const IB = require('ib');
 
@@ -41,9 +43,14 @@ const FINNHUB_KEY = process.env.FINNHUB_KEY;
 // Python FastAPI microservice URL
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://127.0.0.1:8000';
 
-// OpenAI-compatible chat API
-const OPENAI_BASE_URL = String(process.env.OPENAI_BASE_URL || '').replace(/\/+$/, '');
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+// OpenAI-compatible chat API. The connection (URL and key) can be replaced at
+// runtime; each request snapshots it so a save never mixes old and new values.
+const AI_CONNECTION_KEYS = ['OPENAI_BASE_URL', 'OPENAI_API_KEY'];
+const normalizeAiBaseUrl = (value) => String(value || '').replace(/\/+$/, '');
+let aiConnection = {
+  baseUrl: normalizeAiBaseUrl(process.env.OPENAI_BASE_URL),
+  apiKey: process.env.OPENAI_API_KEY || '',
+};
 const OPENAI_MODEL = process.env.OPENAI_MODEL;
 const CHAT_MARKET_FIELDS = ['Open', 'High', 'Low', 'Close', 'Volume', '10MA', '20MA', '50MA', '150MA', '200MA'];
 
@@ -1045,6 +1052,61 @@ app.put('/api/settings', (req, res) => {
   }
 });
 
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
+const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+// The AI chat connection decides where the saved API key is sent, so only the
+// local app may read or change it: a loopback client (the desktop app or the
+// Vite dev proxy), a loopback Host (blocks DNS rebinding), and, when the
+// browser sends one, a loopback Origin (blocks other websites despite CORS).
+function isLocalAppRequest(req) {
+  const isLoopbackUrl = (value) => {
+    try {
+      return LOOPBACK_HOSTNAMES.has(new URL(value).hostname);
+    } catch {
+      return false;
+    }
+  };
+  const { host, origin } = req.headers;
+  return LOOPBACK_ADDRESSES.has(req.socket?.remoteAddress)
+    && typeof host === 'string' && isLoopbackUrl(`http://${host}`)
+    && (origin === undefined || isLoopbackUrl(origin));
+}
+
+function aiConnectionResponse() {
+  return {
+    settings: { OPENAI_BASE_URL: aiConnection.baseUrl },
+    configuredSecrets: { OPENAI_API_KEY: aiConnection.apiKey.length > 0 },
+  };
+}
+
+app.get('/api/settings/ai-connection', (req, res) => {
+  if (!isLocalAppRequest(req)) {
+    return res.status(403).json({ error: 'AI chat connection settings are only available to the local app' });
+  }
+  res.json(aiConnectionResponse());
+});
+
+app.put('/api/settings/ai-connection', (req, res) => {
+  if (!isLocalAppRequest(req)) {
+    return res.status(403).json({ error: 'AI chat connection settings are only available to the local app' });
+  }
+  let updates;
+  try {
+    updates = validateSettings(req.body, AI_CONNECTION_KEYS);
+    saveSettings(AI_ENV_FILE, updates, AI_CONNECTION_KEYS);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  // Apply only after the env file was written, so a failed save keeps the
+  // running connection unchanged.
+  aiConnection = {
+    baseUrl: Object.hasOwn(updates, 'OPENAI_BASE_URL') ? normalizeAiBaseUrl(updates.OPENAI_BASE_URL) : aiConnection.baseUrl,
+    apiKey: updates.OPENAI_API_KEY ?? aiConnection.apiKey,
+  };
+  res.json(aiConnectionResponse());
+});
+
 app.get('/api/stock/:symbol', async (req, res) => {
 
   try {
@@ -1311,13 +1373,15 @@ app.get('/api/prediction/:symbol', async (req, res) => {
 });
 
 app.get('/api/chat/models', async (_req, res) => {
+  // Snapshot the connection so a concurrent save cannot affect this request.
+  const { baseUrl, apiKey } = aiConnection;
   try {
-    if (!OPENAI_BASE_URL || !OPENAI_API_KEY || !OPENAI_MODEL) {
+    if (!baseUrl || !apiKey || !OPENAI_MODEL) {
       return res.status(503).json({ error: 'AI chat is not configured' });
     }
 
-    const providerResponse = await fetch(`${OPENAI_BASE_URL}/models`, {
-      headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+    const providerResponse = await fetch(`${baseUrl}/models`, {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(30000),
     });
     const providerBody = await providerResponse.json().catch(() => ({}));
@@ -1333,7 +1397,7 @@ app.get('/api/chat/models', async (_req, res) => {
         .map((item) => item?.id)
         .filter((id) => typeof id === 'string' && id.trim())
         // Zen's list also includes Responses, Anthropic, and Gemini transports.
-        .filter((id) => !OPENAI_BASE_URL.startsWith('https://opencode.ai/zen/v1')
+        .filter((id) => !baseUrl.startsWith('https://opencode.ai/zen/v1')
           || !/^(gpt-|claude-|gemini-|qwen)/.test(id))
     )].sort();
 
@@ -1349,8 +1413,10 @@ app.get('/api/chat/models', async (_req, res) => {
 });
 
 app.post('/api/chat', async (req, res) => {
+  // Snapshot the connection so a concurrent save cannot affect this request.
+  const { baseUrl, apiKey } = aiConnection;
   try {
-    if (!OPENAI_BASE_URL || !OPENAI_API_KEY || !OPENAI_MODEL) {
+    if (!baseUrl || !apiKey || !OPENAI_MODEL) {
       return res.status(503).json({ error: 'AI chat is not configured' });
     }
 
@@ -1481,10 +1547,10 @@ app.post('/api/chat', async (req, res) => {
           'Only draft BUY or SELL whole-share LMT orders with a positive limitPrice and null stopPrice. Otherwise use null.',
         ]
         : ['Return plain text only. Do not return an order draft because structured output is unavailable for this model.'];
-      const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+      const response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

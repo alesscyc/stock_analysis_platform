@@ -16,7 +16,7 @@ const IB_METHODS = [
 
 // Run the actual route handlers with broker/process startup replaced, so no
 // test can contact a broker, launch Python, or submit a real order.
-function loadRoutes(fetch) {
+function loadRoutes(fetch, env = {}) {
   const routes = new Map();
   const timers = new Set();
   const app = { use() {}, listen(_port, host) { assert.equal(host, '127.0.0.1'); } };
@@ -51,7 +51,7 @@ function loadRoutes(fetch) {
       }) };
       return localRequire(name);
     },
-    process: { env: { DESKTOP_MODE: '1', BIND_HOST: '0.0.0.0' }, on() {} },
+    process: { env: { DESKTOP_MODE: '1', BIND_HOST: '0.0.0.0', ...env }, on() {} },
     console: { log() {}, warn() {}, error() {} },
     fetch, AbortSignal, URL, setImmediate, clearImmediate,
     setTimeout(fn, ms, ...args) {
@@ -71,7 +71,13 @@ function loadRoutes(fetch) {
     const handler = routes.get(route);
     assert.ok(handler, `missing route ${route}`);
     const response = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(data) { this.body = data; } };
-    await handler({ params: extras.params ?? { symbol: 'AAPL' }, query: extras.query ?? {}, body }, response);
+    await handler({
+      params: extras.params ?? { symbol: 'AAPL' },
+      query: extras.query ?? {},
+      headers: extras.headers ?? {},
+      socket: { remoteAddress: extras.remoteAddress ?? '127.0.0.1' },
+      body,
+    }, response);
     return response;
   };
   request.ib = ibInstance;
@@ -350,5 +356,147 @@ describe('IB account overview', () => {
     } finally {
       request.close();
     }
+  });
+});
+
+describe('AI chat connection settings', () => {
+  const os = require('node:os');
+  const local = { headers: { host: 'localhost:3001', origin: 'http://localhost:5173' } };
+  const desktop = { headers: { host: '127.0.0.1:3001', origin: 'http://127.0.0.1:3001' } };
+
+  function setup(t, fetch = () => { throw new Error('Unexpected upstream request'); }) {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-connection-'));
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+    const envFile = path.join(directory, '.env');
+    fs.writeFileSync(envFile, 'IB_PORT=4002\nOPENAI_BASE_URL=http://old.test/v1\nOPENAI_API_KEY=old-key\n');
+    const request = loadRoutes(fetch, {
+      DESKTOP_MODE: '',
+      BIND_HOST: '127.0.0.1',
+      ENV_FILE: envFile,
+      OPENAI_BASE_URL: 'http://old.test/v1',
+      OPENAI_API_KEY: 'old-key',
+      OPENAI_MODEL: 'deepseek-test',
+    });
+    t.after(() => request.close());
+    return { request, envFile };
+  }
+
+  it('reads the connection in browser and desktop clients without returning the key', async (t) => {
+    const { request } = setup(t);
+    for (const extras of [local, desktop, { headers: { host: 'localhost:3001' } }]) {
+      const result = await request('get /api/settings/ai-connection', {}, extras);
+      assert.equal(result.statusCode, 200);
+      assert.deepEqual(JSON.parse(JSON.stringify(result.body)), {
+        settings: { OPENAI_BASE_URL: 'http://old.test/v1' },
+        configuredSecrets: { OPENAI_API_KEY: true },
+      });
+    }
+  });
+
+  it('rejects untrusted origins, rebinding hosts, and non-local clients', async (t) => {
+    const { request, envFile } = setup(t);
+    const before = fs.readFileSync(envFile, 'utf8');
+    const attempts = [
+      { headers: { host: 'localhost:3001', origin: 'https://evil.example' } },
+      { headers: { host: 'localhost:3001', origin: 'null' } },
+      { headers: { host: 'evil.example:3001' } },
+      { headers: { host: 'localhost:3001', origin: 'http://localhost:5173' }, remoteAddress: '192.168.1.5' },
+    ];
+    for (const extras of attempts) {
+      for (const route of ['get /api/settings/ai-connection', 'put /api/settings/ai-connection']) {
+        const result = await request(route, { OPENAI_BASE_URL: 'https://evil.example/v1' }, extras);
+        assert.equal(result.statusCode, 403, `${route} ${JSON.stringify(extras)}`);
+        assert.doesNotMatch(JSON.stringify(result.body), /old-key/);
+      }
+    }
+    assert.equal(fs.readFileSync(envFile, 'utf8'), before);
+  });
+
+  it('rejects unrelated or invalid settings without changing the running connection', async (t) => {
+    const urls = [];
+    const { request, envFile } = setup(t, async (url) => {
+      urls.push(url);
+      return { ok: true, status: 200, json: async () => ({ data: [{ id: 'deepseek-test' }] }) };
+    });
+    const before = fs.readFileSync(envFile, 'utf8');
+    for (const body of [
+      { IB_PORT: '7497' },
+      { OPENAI_MODEL: 'other' },
+      { OPENAI_BASE_URL: 'ftp://new.test' },
+      { OPENAI_BASE_URL: 42 },
+      ['OPENAI_BASE_URL'],
+    ]) {
+      const result = await request('put /api/settings/ai-connection', body, local);
+      assert.equal(result.statusCode, 400, JSON.stringify(body));
+      assert.ok(result.body.error);
+    }
+    assert.equal(fs.readFileSync(envFile, 'utf8'), before);
+    await request('get /api/chat/models');
+    assert.deepEqual(urls, ['http://old.test/v1/models']);
+  });
+
+  it('persists and applies saves immediately while in-flight chat keeps its connection', async (t) => {
+    const calls = [];
+    let releaseFirst;
+    const { request, envFile } = setup(t, async (url, options) => {
+      calls.push({ url, auth: options.headers.Authorization });
+      if (calls.length === 1) {
+        await new Promise((resolve) => { releaseFirst = resolve; });
+        return { ok: false, status: 400, json: async () => ({ error: { message: 'no json mode' } }) };
+      }
+      return url.endsWith('/models')
+        ? { ok: true, status: 200, json: async () => ({ data: [{ id: 'new-model' }] }) }
+        : { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'hello' } }] }) };
+    });
+
+    const chat = request('post /api/chat', {
+      symbol: 'AAPL',
+      interval: '1d',
+      messages: [{ role: 'user', content: 'Hi' }],
+      stockData: [{ Date: '2024-01-02', Close: 100 }],
+      accountContext: { mode: 'paper', portfolio: [], pendingOrders: [] },
+    });
+    await flush();
+    assert.equal(calls.length, 1);
+
+    const saved = await request('put /api/settings/ai-connection', {
+      OPENAI_BASE_URL: ' http://new.test/v1/ ',
+      OPENAI_API_KEY: 'new-key',
+    }, desktop);
+    assert.equal(saved.statusCode, 200);
+    assert.deepEqual(JSON.parse(JSON.stringify(saved.body)), {
+      settings: { OPENAI_BASE_URL: 'http://new.test/v1' },
+      configuredSecrets: { OPENAI_API_KEY: true },
+    });
+    const text = fs.readFileSync(envFile, 'utf8');
+    assert.match(text, /IB_PORT=4002/);
+    assert.match(text, /OPENAI_BASE_URL="http:\/\/new\.test\/v1\/?"/);
+    assert.match(text, /OPENAI_API_KEY="new-key"/);
+
+    releaseFirst();
+    assert.equal((await chat).body.answer, 'hello');
+    assert.deepEqual(calls.slice(0, 2), [
+      { url: 'http://old.test/v1/chat/completions', auth: 'Bearer old-key' },
+      { url: 'http://old.test/v1/chat/completions', auth: 'Bearer old-key' },
+    ]);
+
+    const models = await request('get /api/chat/models');
+    assert.deepEqual(JSON.parse(JSON.stringify(models.body)), { models: ['new-model'], defaultModel: 'deepseek-test' });
+    assert.deepEqual(calls.at(-1), { url: 'http://new.test/v1/models', auth: 'Bearer new-key' });
+
+    const blankKey = await request('put /api/settings/ai-connection', {
+      OPENAI_BASE_URL: 'http://newer.test/v1',
+      OPENAI_API_KEY: '',
+    }, local);
+    assert.equal(blankKey.statusCode, 200);
+    assert.match(fs.readFileSync(envFile, 'utf8'), /OPENAI_API_KEY="new-key"/);
+    await request('get /api/chat/models');
+    assert.deepEqual(calls.at(-1), { url: 'http://newer.test/v1/models', auth: 'Bearer new-key' });
+  });
+
+  it('keeps the general settings API desktop-only', async (t) => {
+    const { request } = setup(t);
+    assert.equal((await request('get /api/settings', {}, local)).statusCode, 404);
+    assert.equal((await request('put /api/settings', { IB_PORT: '1' }, local)).statusCode, 404);
   });
 });

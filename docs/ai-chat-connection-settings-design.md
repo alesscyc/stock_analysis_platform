@@ -1,6 +1,6 @@
 # AI chat connection settings
 
-Status: Scope agreed; awaiting final shared-understanding confirmation before implementation.
+Status: Implemented and verified. Standards review passed in round 2; spec review passed in round 1.
 
 ## Agreed behavior
 

@@ -24,7 +24,7 @@ See the root README.md for the public API and .env.example for supported configu
 - Validate and normalize all request data before sending it to Python, IB, the filesystem, or an external API.
 - Keep IB order placement serialized. Preserve stable order references and parent/child bracket relationships when modifying or cancelling orders.
 - AI output may produce a validated draft for user review; it must never place an order directly. Keep account context restricted by chatSafety.js.
-- Desktop settings routes must remain unavailable outside desktop mode. Never return stored secret values.
+- The general desktop settings routes (`/api/settings`) must remain unavailable outside desktop mode. The only exception is `/api/settings/ai-connection`, which browser clients may use but which must stay restricted to local-app requests (loopback client, loopback `Host`, loopback or absent `Origin`) and limited to the AI chat URL and key. Never return stored secret values.
 - Keep settings writes allowlisted, validated, atomic, and private.
 - Preserve graceful shutdown of the Python child and IB connection.
 - Return useful JSON errors without leaking credentials or upstream response bodies.

@@ -68,7 +68,7 @@ OPENAI_MODEL=your-model-id
 
 `FINNHUB_KEY` is optional; symbol search returns no results without it. `PYTHON_SERVICE_URL` defaults to the value shown above.
 
-AI chat needs `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `OPENAI_MODEL`. Point `OPENAI_BASE_URL` at any OpenAI-compatible provider that exposes `/models` and `/chat/completions` (OpenAI, OpenCode Zen, local gateways, etc.). Without these vars, chat returns `503`.
+AI chat needs `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `OPENAI_MODEL`. Point `OPENAI_BASE_URL` at any OpenAI-compatible provider that exposes `/models` and `/chat/completions` (OpenAI, OpenCode Zen, local gateways, etc.). Without these vars, chat returns `503`. The base URL and API key (the AI chat connection) can also be changed from **Settings** in the browser or desktop app; saving writes them to the backend's `.env` and new chat requests use them immediately. Only the local app may read or change them: requests must come from a loopback client with a loopback `Host` and, if present, a loopback `Origin`.
 
 On Windows, start both services in one terminal from the repository root:
 
@@ -101,6 +101,8 @@ The backend starts the FastAPI analysis service on port 8000 when needed.
 | `GET` | `/api/fundamentals/:symbol` | Fetch company fundamentals |
 | `GET` | `/api/chat/models` | List available chat models from the configured provider |
 | `POST` | `/api/chat` | Ask about the loaded symbol using supplied OHLCV/MA context |
+| `GET` | `/api/settings/ai-connection` | Read the AI chat base URL and whether an API key is configured (local app only) |
+| `PUT` | `/api/settings/ai-connection` | Save `OPENAI_BASE_URL` / `OPENAI_API_KEY` and apply them without restarting (local app only; blank key keeps the saved key) |
 | `GET` | `/api/model/status/:symbol` | Inspect the cached model status |
 | `POST` | `/api/model/retrain/:symbol` | Retrain a symbol model |
 | `POST` | `/api/backtest` | Run a strategy backtest |
@@ -160,9 +162,9 @@ npm start                   # loads the built frontend (run `npm run build` in f
 
 Notes:
 
-- Open **Settings** in the desktop top bar to configure IB Gateway/TWS, Finnhub, and the OpenAI-compatible provider. Values are saved to `%APPDATA%\Stock Analysis Platform\.env` and take effect after restarting the app.
+- Open **Settings** in the desktop top bar to configure IB Gateway/TWS, Finnhub, and the OpenAI-compatible provider. Values are saved to `%APPDATA%\Stock Analysis Platform\.env`. The AI chat connection applies immediately; other settings take effect after restarting the app.
 - API keys are write-only in the Settings panel: saved values are never returned to the renderer. Leaving a key blank preserves it. The installer never bundles local secrets or model artifacts.
-- Settings in development continue to come from `backend/.env`; the settings API is disabled outside the loopback-only desktop mode.
+- Settings in development continue to come from `backend/.env`; the general settings API is disabled outside the loopback-only desktop mode, while the AI chat connection is editable from Settings in the browser too.
 - Model cache and backtests work the same in the packaged app: models are stored under `<userData>\model_cache`.
 - In desktop mode the backend binds `127.0.0.1` and disables permissive CORS; the browser-based web workflow keeps its original `0.0.0.0`/CORS behavior.
 - `npm run dist` installs PyInstaller and `electron/` dependencies automatically on first run.

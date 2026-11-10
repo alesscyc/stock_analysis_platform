@@ -67,6 +67,7 @@ function App() {
   const [historyLoadState, setHistoryLoadState] = useState('idle');
   const [recentLoadState, setRecentLoadState] = useState('idle');
   const [isMock, setIsMock] = useState(false);
+  const [aiConnectionVersion, setAiConnectionVersion] = useState(0);
   const [ibConnected, setIbConnected] = useState(false);
   const [modePreference, setModePreference] = usePersistedState(PAPER_MODE_KEY, 'live');
   const paper = usePaperAccount();
@@ -1162,6 +1163,8 @@ function App() {
             paperError={paper.error}
             paperReadOnly={!paper.isPrimary}
             showConnectionSettings={isDesktopApp()}
+            showAiConnection={!isGitHubPages()}
+            onAiConnectionSaved={() => setAiConnectionVersion(version => version + 1)}
           />
         </aside>
       </div>
@@ -1175,6 +1178,7 @@ function App() {
           fundamentals={fundamentals}
           aiPrediction={aiPrediction}
           onReviewDraft={handleReviewDraft}
+          aiConnectionVersion={aiConnectionVersion}
           accountContext={activeMode === 'paper' ? {
             mode: 'paper',
             portfolio: paper.overview?.holdings || [],

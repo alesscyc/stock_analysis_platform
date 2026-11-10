@@ -17,7 +17,7 @@ async function readApiJson(response, fallbackMessage) {
   }
 }
 
-function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPrediction, accountContext, onReviewDraft, accountPanelOpen = false }) {
+function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPrediction, accountContext, onReviewDraft, accountPanelOpen = false, aiConnectionVersion = 0 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -43,6 +43,21 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
     modelsRequestRef.current?.abort();
   }, []);
 
+  // A saved AI chat connection may point at another provider: drop the old
+  // list, cancel any pending lookup, and reload now if the chat is open.
+  useEffect(() => {
+    if (!aiConnectionVersion) return;
+    modelsRequestRef.current?.abort();
+    modelsRequestRef.current = null;
+    modelsLoadedRef.current = false;
+    setModels([]);
+    setSelectedModel('');
+    setModelsError(null);
+    setModelsLoading(false);
+    if (isOpen) loadModels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiConnectionVersion]);
+
   const loadModels = async () => {
     if (modelsLoadedRef.current) return;
     modelsLoadedRef.current = true;
@@ -57,6 +72,7 @@ function AIChat({ stockSymbol, stockData, currentInterval, fundamentals, aiPredi
       const data = await readApiJson(response, t('modelsFailed'));
       if (!response.ok) throw new Error(data.error || t('modelsFailed'));
 
+      if (controller.signal.aborted) return;
       const availableModels = Array.isArray(data.models) ? data.models : [];
       if (data.defaultModel && !availableModels.includes(data.defaultModel)) {
         availableModels.unshift(data.defaultModel);

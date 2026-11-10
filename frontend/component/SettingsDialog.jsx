@@ -15,8 +15,26 @@ const DEFAULT_SETTINGS = {
   OPENAI_API_KEY: '',
   OPENAI_MODEL: '',
 };
+// The AI chat connection has its own backend route: it applies immediately and
+// is available to browser clients, unlike the desktop-only general settings.
+const AI_CONNECTION_KEYS = ['OPENAI_BASE_URL', 'OPENAI_API_KEY'];
+const withoutAiConnection = values => Object.fromEntries(
+  Object.entries(values || {}).filter(([key]) => !AI_CONNECTION_KEYS.includes(key)),
+);
 
-function SettingsDialog({ isOpen, onClose, activeMode = 'paper', ibConnected = false, onSelectTradingMode, onResetPaper = () => {}, paperError, paperReadOnly = false, showConnectionSettings = true }) {
+async function readSettingsResponse(response, fallbackMessage) {
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(fallbackMessage);
+  }
+  if (!data || typeof data !== 'object') throw new Error(fallbackMessage);
+  if (!response.ok) throw new Error(data.error || fallbackMessage);
+  return data;
+}
+
+function SettingsDialog({ isOpen, onClose, activeMode = 'paper', ibConnected = false, onSelectTradingMode, onResetPaper = () => {}, paperError, paperReadOnly = false, showConnectionSettings = true, showAiConnection = true, onAiConnectionSaved = () => {} }) {
   const { t, language, setLanguage } = useTranslation();
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [configuredSecrets, setConfiguredSecrets] = useState({});
@@ -27,26 +45,36 @@ function SettingsDialog({ isOpen, onClose, activeMode = 'paper', ibConnected = f
   const [paperBalance, setPaperBalance] = useState('100000');
   const desktop = showConnectionSettings;
 
+  const applyAiConnection = data => {
+    setSettings(current => ({ ...current, OPENAI_BASE_URL: data.settings?.OPENAI_BASE_URL ?? '', OPENAI_API_KEY: '' }));
+    setConfiguredSecrets(current => ({ ...current, OPENAI_API_KEY: Boolean(data.configuredSecrets?.OPENAI_API_KEY) }));
+  };
+  const applyDesktopSettings = data => {
+    setSettings(current => ({ ...current, ...withoutAiConnection(data.settings) }));
+    setConfiguredSecrets(current => ({ ...current, ...withoutAiConnection(data.configuredSecrets) }));
+  };
+
   useEffect(() => {
-    if (!isOpen || !desktop) return;
+    if (!isOpen || (!desktop && !showAiConnection)) return;
     const controller = new AbortController();
+    const load = url => fetch(url, { signal: controller.signal })
+      .then(response => readSettingsResponse(response, t('settingsLoadFailed')));
     setLoading(true);
     setMessage(null);
 
-    fetch('/api/settings', { signal: controller.signal })
-      .then(async response => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || t('settingsLoadFailed'));
-        setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
-        setConfiguredSecrets(data.configuredSecrets || {});
-      })
+    Promise.all([
+      showAiConnection && load('/api/settings/ai-connection').then(applyAiConnection),
+      desktop && load('/api/settings').then(applyDesktopSettings),
+    ])
       .catch(error => {
         if (error.name !== 'AbortError') setMessage({ type: 'error', text: error.message });
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
 
     return () => controller.abort();
-  }, [desktop, isOpen, t]);
+  }, [desktop, isOpen, showAiConnection, t]);
 
   if (!isOpen) return null;
 
@@ -109,26 +137,35 @@ function SettingsDialog({ isOpen, onClose, activeMode = 'paper', ibConnected = f
     }
   };
 
-  const submit = async event => {
-    event.preventDefault();
+  const save = async (url, values, apply, successText) => {
     setSaving(true);
     setMessage(null);
     try {
-      const response = await fetch('/api/settings', {
+      const response = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(values),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || t('settingsSaveFailed'));
-      setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
-      setConfiguredSecrets(data.configuredSecrets || {});
-      setMessage({ type: 'success', text: t('settingsSavedRestart') });
+      apply(await readSettingsResponse(response, t('settingsSaveFailed')));
+      setMessage({ type: 'success', text: successText });
+      return true;
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
+      return false;
     } finally {
       setSaving(false);
     }
+  };
+
+  const submit = event => {
+    event.preventDefault();
+    save('/api/settings', withoutAiConnection(settings), applyDesktopSettings, t('settingsSavedRestart'));
+  };
+
+  const submitAiConnection = async event => {
+    event.preventDefault();
+    const values = Object.fromEntries(AI_CONNECTION_KEYS.map(key => [key, settings[key]]));
+    if (await save('/api/settings/ai-connection', values, applyAiConnection, t('aiConnectionSaved'))) onAiConnectionSaved();
   };
 
   return (
@@ -179,7 +216,7 @@ function SettingsDialog({ isOpen, onClose, activeMode = 'paper', ibConnected = f
       {loading ? (
         <div className="settings-loading" role="status"><span className="settings-spinner" />{t('loadingSettings')}</div>
       ) : (
-        <form className="settings-form" onSubmit={submit}>
+        <div className="settings-form">
           {message && <div className={`settings-message ${message.type}`} role={message.type === 'error' ? 'alert' : 'status'}>{message.text}</div>}
 
           <fieldset>
@@ -193,7 +230,20 @@ function SettingsDialog({ isOpen, onClose, activeMode = 'paper', ibConnected = f
             <button type="button" className="settings-save" onClick={resetPaper} disabled={paperReadOnly}>{t('resetPaperAccount')}</button>
           </fieldset>
 
-          {desktop && <>
+          {showAiConnection && (
+            <form className="settings-form" onSubmit={submitAiConnection}>
+              <fieldset>
+                <legend>{t('aiChatConnection')}</legend>
+                {field('OPENAI_BASE_URL', t('openAiBaseUrl'), { type: 'url' })}
+                {secretField('OPENAI_API_KEY', t('openAiApiKey'))}
+                <button className="settings-save" type="submit" disabled={saving}>
+                  {saving ? t('savingSettings') : t('saveAiConnection')}
+                </button>
+              </fieldset>
+            </form>
+          )}
+
+          {desktop && <form className="settings-form" onSubmit={submit}>
           <fieldset>
             <legend>{t('ibConnection')}</legend>
             {field('IB_HOST', t('ibHost'), { required: true })}
@@ -204,8 +254,6 @@ function SettingsDialog({ isOpen, onClose, activeMode = 'paper', ibConnected = f
           <fieldset>
             <legend>{t('marketAndAi')}</legend>
             {secretField('FINNHUB_KEY', t('finnhubApiKey'))}
-            {field('OPENAI_BASE_URL', t('openAiBaseUrl'), { type: 'url' })}
-            {secretField('OPENAI_API_KEY', t('openAiApiKey'))}
             {field('OPENAI_MODEL', t('openAiModel'))}
           </fieldset>
 
@@ -220,8 +268,8 @@ function SettingsDialog({ isOpen, onClose, activeMode = 'paper', ibConnected = f
           <button className="settings-save" type="submit" disabled={saving}>
             {saving ? t('savingSettings') : t('saveSettings')}
           </button>
-          </>}
-        </form>
+          </form>}
+        </div>
       )}
     </section>
   );

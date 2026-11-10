@@ -52,7 +52,7 @@ function readSettings(envFile, fallbackEnv = {}) {
   return { settings, configuredSecrets };
 }
 
-function validateSettings(input) {
+function validateSettings(input, allowedKeys = Object.keys(SETTINGS_FIELDS)) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error('Settings must be an object');
   }
@@ -60,7 +60,7 @@ function validateSettings(input) {
   const normalized = {};
   for (const [key, value] of Object.entries(input)) {
     const field = SETTINGS_FIELDS[key];
-    if (!Object.hasOwn(SETTINGS_FIELDS, key)) throw new Error(`Unsupported setting: ${key}`);
+    if (!Object.hasOwn(SETTINGS_FIELDS, key) || !allowedKeys.includes(key)) throw new Error(`Unsupported setting: ${key}`);
     if (typeof value !== 'string') throw new Error(`${key} must be text`);
     const trimmed = field.secret ? value : value.trim();
     if (field.secret && trimmed === '') continue;
@@ -95,8 +95,8 @@ function updateEnvText(existingText, updates) {
   return `${updated.join('\n').replace(/\n+$/, '')}\n`;
 }
 
-function saveSettings(envFile, input) {
-  const updates = validateSettings(input);
+function saveSettings(envFile, input, allowedKeys) {
+  const updates = validateSettings(input, allowedKeys);
   const existing = fs.existsSync(envFile) ? fs.readFileSync(envFile, 'utf8') : '';
   const next = updateEnvText(existing, updates);
   fs.mkdirSync(path.dirname(envFile), { recursive: true });
