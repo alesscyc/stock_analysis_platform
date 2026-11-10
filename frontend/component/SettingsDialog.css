@@ -189,3 +189,57 @@
 @media (prefers-reduced-motion: reduce) {
   .settings-spinner { animation: none; }
 }
+
+/* General rows: label left, segmented control right */
+.settings-general {
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-row + .settings-row { border-top: 1px solid var(--border-subtle); }
+
+.trading-mode-switch,
+.btn-language {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.btn-language { cursor: pointer; }
+.btn-language:hover { border-color: var(--border-strong); }
+
+.trading-mode-switch button,
+.btn-language span {
+  min-width: 52px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.trading-mode-switch button { cursor: pointer; }
+.trading-mode-switch button:disabled { cursor: not-allowed; opacity: .45; }
+.trading-mode-switch.is-live button.is-active { background: var(--green); color: var(--bg-primary); }
+.trading-mode-switch.is-paper button.is-active { background: var(--warning); color: var(--bg-primary); }
+.btn-language span.is-active { background: var(--accent); color: var(--bg-base); }

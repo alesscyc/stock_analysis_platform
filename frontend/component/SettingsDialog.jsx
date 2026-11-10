@@ -16,8 +16,8 @@ const DEFAULT_SETTINGS = {
   OPENAI_MODEL: '',
 };
 
-function SettingsDialog({ isOpen, onClose, onResetPaper = () => {}, paperError, paperReadOnly = false, showConnectionSettings = true }) {
-  const { t } = useTranslation();
+function SettingsDialog({ isOpen, onClose, activeMode = 'paper', ibConnected = false, onSelectTradingMode, onResetPaper = () => {}, paperError, paperReadOnly = false, showConnectionSettings = true }) {
+  const { t, language, setLanguage } = useTranslation();
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [configuredSecrets, setConfiguredSecrets] = useState({});
   const [visibleSecrets, setVisibleSecrets] = useState({});
@@ -140,6 +140,41 @@ function SettingsDialog({ isOpen, onClose, onResetPaper = () => {}, paperError, 
         </div>
         <PanelCloseButton onClick={onClose} label={t('closeSettings')} />
       </header>
+
+      <div className="settings-general">
+        <div className="settings-row">
+          <span>{t('language')}</span>
+          <button
+            type="button"
+            className="btn-language"
+            onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
+            aria-label={t('language')}
+            title={language === 'en' ? t('traditionalChinese') : t('english')}
+          >
+            <span className={language === 'en' ? 'is-active' : ''}>EN</span>
+            <span className={language === 'en' ? '' : 'is-active'}>繁</span>
+          </button>
+        </div>
+        <div className="settings-row">
+          <span>{t('tradingMode')}</span>
+          <div className={`trading-mode-switch is-${activeMode}`} role="group" aria-label={t('tradingMode')}>
+            <button
+              type="button"
+              className={activeMode === 'live' ? 'is-active' : ''}
+              onClick={() => onSelectTradingMode('live')}
+              disabled={!ibConnected}
+              aria-pressed={activeMode === 'live'}
+              title={!ibConnected ? t('liveUnavailable') : t('liveMode')}
+            >{t('liveMode')}</button>
+            <button
+              type="button"
+              className={activeMode === 'paper' ? 'is-active' : ''}
+              onClick={() => onSelectTradingMode('paper')}
+              aria-pressed={activeMode === 'paper'}
+            >{t('paperMode')}</button>
+          </div>
+        </div>
+      </div>
 
       {loading ? (
         <div className="settings-loading" role="status"><span className="settings-spinner" />{t('loadingSettings')}</div>

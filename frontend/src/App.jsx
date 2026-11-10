@@ -52,7 +52,7 @@ async function fetchJson(url, signal) {
 }
 
 function App() {
-  const { t, language, setLanguage } = useTranslation();
+  const { t } = useTranslation();
 
   const [selectedStock, setSelectedStock] = useState(null);
   const [stockData, setStockData] = useState([]);
@@ -752,22 +752,9 @@ function App() {
         {selectedStock && <div className="topbar-divider" />}
 
         <div className="topbar-actions">
-          <div className={`trading-mode-switch is-${activeMode}`} role="group" aria-label={t('tradingMode')}>
-            <button
-              type="button"
-              className={activeMode === 'live' ? 'is-active' : ''}
-              onClick={() => selectTradingMode('live')}
-              disabled={!ibConnected}
-              aria-pressed={activeMode === 'live'}
-              title={!ibConnected ? t('liveUnavailable') : t('liveMode')}
-            >{t('liveMode')}</button>
-            <button
-              type="button"
-              className={activeMode === 'paper' ? 'is-active' : ''}
-              onClick={() => selectTradingMode('paper')}
-              aria-pressed={activeMode === 'paper'}
-            >{t('paperMode')}</button>
-          </div>
+          <span className={`trading-mode-badge is-${activeMode}`} role="status" aria-label={t('tradingMode')}>
+            {t(activeMode === 'live' ? 'liveMode' : 'paperMode')}
+          </span>
           {!ibConnected && requestedMode === 'live' && (
             <span className="live-disconnect-warning" role="status">{t('liveOrdersMayRemainActive')}</span>
           )}
@@ -833,15 +820,6 @@ function App() {
               </svg>
               {t('settings')}
             </button>
-
-          <button
-            className="btn-language"
-            onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
-            aria-label={t('language')}
-            title={language === 'en' ? t('traditionalChinese') : t('english')}
-          >
-            {language === 'en' ? 'EN' : '繁'}
-          </button>
         </div>
       </header>
 
@@ -1177,6 +1155,9 @@ function App() {
           <SettingsDialog
             isOpen={activeSidebar === 'settings'}
             onClose={() => setActiveSidebar(null)}
+            activeMode={activeMode}
+            ibConnected={ibConnected}
+            onSelectTradingMode={selectTradingMode}
             onResetPaper={paper.reset}
             paperError={paper.error}
             paperReadOnly={!paper.isPrimary}

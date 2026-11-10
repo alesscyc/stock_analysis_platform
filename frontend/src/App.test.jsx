@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
+import { I18nProvider } from './i18n/I18nContext.jsx'
 
 vi.mock('../component/StockChart', () => ({
   default: ({ stockData, stockSymbol }) => (
@@ -429,7 +430,9 @@ describe('trading mode selection', () => {
       if (url === '/api/ib/status') return Promise.resolve(ok({ connected }))
       return Promise.resolve(ok({}))
     }))
-    return render(<App />)
+    const view = render(<I18nProvider><App /></I18nProvider>)
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    return view
   }
 
   const liveButton = () => screen.getByRole('button', { name: 'LIVE' })
@@ -452,6 +455,7 @@ describe('trading mode selection', () => {
     await waitFor(() => expect(paperButton()).toHaveAttribute('aria-pressed', 'true'))
     expect(liveButton()).toBeDisabled()
     expect(liveButton()).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByText('Live IB orders may remain active')).toBeInTheDocument()
     // The explicit preference survives the forced fallback.
     expect(JSON.parse(localStorage.getItem(MODE_KEY))).toBe('live')
   })
@@ -473,6 +477,32 @@ describe('trading mode selection', () => {
     await waitFor(() => expect(paperButton()).toHaveAttribute('aria-pressed', 'true'))
     expect(liveButton()).toBeEnabled()
     expect(JSON.parse(localStorage.getItem(MODE_KEY))).toBe('paper')
+  })
+
+  it('keeps controls in Settings and active mode visible after closing it', async () => {
+    const { container } = renderWithIbStatus(true)
+    await waitFor(() => expect(liveButton()).toHaveAttribute('aria-pressed', 'true'))
+    const sidebar = screen.getByRole('dialog', { name: 'Settings' })
+    expect(within(sidebar).getByRole('button', { name: 'Language' })).toBeInTheDocument()
+    expect(within(sidebar).getByRole('button', { name: 'PAPER' })).toBeInTheDocument()
+    fireEvent.click(paperButton())
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings' }))
+
+    const topbar = within(container.querySelector('.app-topbar'))
+    expect(topbar.getByRole('status', { name: 'Trading mode' })).toHaveTextContent('PAPER')
+    expect(topbar.queryByRole('button', { name: /^(LIVE|PAPER|Language)$/ })).not.toBeInTheDocument()
+    fireEvent.click(topbar.getByRole('button', { name: 'Settings' }))
+    expect(paperButton()).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('applies and persists language immediately from Settings', () => {
+    renderWithIbStatus(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Language' }))
+
+    expect(localStorage.getItem('stockai-language')).toBe('zh')
+    expect(document.documentElement.lang).toBe('zh-TW')
+    expect(screen.getByRole('dialog', { name: '設定' })).toBeInTheDocument()
+    expect(screen.getByRole('status', { name: '交易模式' })).toHaveTextContent('模擬')
   })
 })
 
