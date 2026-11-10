@@ -19,6 +19,7 @@ const IB_METHODS = [
 function loadRoutes(fetch, env = {}) {
   const routes = new Map();
   const timers = new Set();
+  const logs = [];
   const app = { use() {}, listen(_port, host) { assert.equal(host, '127.0.0.1'); } };
   for (const method of ['get', 'post', 'put', 'patch']) {
     app[method] = (url, handler) => routes.set(`${method} ${url}`, handler);
@@ -52,7 +53,7 @@ function loadRoutes(fetch, env = {}) {
       return localRequire(name);
     },
     process: { env: { DESKTOP_MODE: '1', BIND_HOST: '0.0.0.0', ...env }, on() {} },
-    console: { log() {}, warn() {}, error() {} },
+    console: Object.fromEntries(['log', 'warn', 'error'].map((level) => [level, (...args) => logs.push({ level, args })])),
     fetch, AbortSignal, URL, setImmediate, clearImmediate,
     setTimeout(fn, ms, ...args) {
       const id = setTimeout((...inner) => {
@@ -81,6 +82,7 @@ function loadRoutes(fetch, env = {}) {
     return response;
   };
   request.ib = ibInstance;
+  request.logs = logs;
   request.close = () => {
     for (const id of timers) clearTimeout(id);
     timers.clear();
@@ -119,6 +121,41 @@ function emitSummary(ib, reqId, rows) {
 function overview(request, account) {
   return request('get /api/account/overview', {}, { query: account ? { account } : {} });
 }
+
+it('logs IB offline once while retries continue, then reports recovery and later outages', async () => {
+  const request = loadRoutes(() => { throw new Error('Unexpected upstream request'); }, { IB_CLIENT_ID: '0' });
+  const refused = () => request.ib.emit('error', Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }));
+  const warnings = () => request.logs.filter(({ level }) => level === 'warn');
+  try {
+    refused();
+    request.ib.emit('disconnected');
+    refused();
+    assert.equal(warnings().length, 1);
+    assert.match(warnings()[0].args[0], /offline.*retrying automatically/);
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    assert.equal(ibCalls(request.ib, 'connect').length, 2);
+    refused();
+    assert.equal(warnings().length, 1);
+    assert.equal(request.logs.filter(({ args }) => String(args[0]).includes('Connecting to')).length, 1);
+    assert.equal((await request('get /api/orders/pending')).statusCode, 503);
+
+    request.ib.emit('error', new Error('Invalid client configuration'));
+    assert.ok(request.logs.some(({ level, args }) => level === 'error' && args[1] === 'Invalid client configuration'));
+    await connectBroker(request);
+    assert.ok(request.logs.some(({ args }) => String(args[0]).includes('Connected to IB Gateway')));
+    request.ib.emit('error', Object.assign(new Error('Order rejected'), { code: 'ECONNREFUSED' }));
+    assert.ok(request.logs.some(({ level, args }) => level === 'error' && args[1] === 'Order rejected'));
+    request.ib.emit('disconnected');
+    refused();
+    assert.equal(warnings().length, 2);
+    assert.match(warnings()[1].args[0], /Disconnected.*retrying automatically/);
+    await connectBroker(request);
+    request.ib.emit('disconnected');
+    assert.equal(warnings().length, 3);
+  } finally {
+    request.close();
+  }
+});
 
 const stock = (symbol, extra = {}) => ({ symbol, secType: 'STK', currency: 'USD', exchange: 'SMART', ...extra });
 

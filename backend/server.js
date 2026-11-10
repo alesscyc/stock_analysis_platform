@@ -64,6 +64,7 @@ let ibConnecting = false;
 let ibConnected = false;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
+let ibOfflineLogged = false;
 let nextOrderId = null;
 let requestingNextOrderId = false;
 const orderIdWaiters = new Set();
@@ -711,7 +712,9 @@ function connectIbGateway() {
   ibConnecting = true;
 
   try {
-    console.log(`[ib] Connecting to IB Gateway at ${IB_HOST}:${IB_PORT} (clientId ${IB_CLIENT_ID})`);
+    if (reconnectAttempts === 0) {
+      console.log(`[ib] Connecting to IB Gateway at ${IB_HOST}:${IB_PORT} (clientId ${IB_CLIENT_ID})`);
+    }
     ib.connect();
   } catch (error) {
     ibConnecting = false;
@@ -765,6 +768,7 @@ ib.on('connected', () => {
   ibConnecting = false;
   ibConnected = true;
   reconnectAttempts = 0;
+  ibOfflineLogged = false;
   lastPortfolioError = null;
   nextOrderId = null;
   requestingNextOrderId = false;
@@ -842,6 +846,10 @@ ib.on('nextValidId', (orderId) => {
 
 ib.on('disconnected', () => {
   const wasConnected = ibConnected || ibConnecting;
+  if (ibConnected) {
+    console.warn('[ib] Disconnected from IB Gateway; retrying automatically');
+    ibOfflineLogged = true;
+  }
   ibConnecting = false;
   ibConnected = false;
   nextOrderId = null;
@@ -849,7 +857,6 @@ ib.on('disconnected', () => {
   rejectOrderIdWaiters('IB Gateway disconnected');
 
   if (wasConnected) {
-    console.warn('[ib] Disconnected from IB Gateway');
     failPortfolioSnapshot('IB Gateway disconnected');
     failOpenOrdersSnapshot('IB Gateway disconnected');
     // Keep the last account snapshot visible; only its freshness changes.
@@ -863,7 +870,15 @@ ib.on('disconnected', () => {
 
 ib.on('error', (error, request) => {
   const message = error?.message || 'Unknown IB Gateway error';
-  console.error('[ib] Error:', message);
+  const offlineError = !ibConnected && ['ECONNREFUSED', 'ETIMEDOUT', 'EHOSTUNREACH', 'ENETUNREACH', 'ECONNRESET', 'ENOTFOUND'].includes(error?.code);
+  if (offlineError) {
+    if (!ibOfflineLogged) {
+      console.warn(`[ib] IB Gateway offline at ${IB_HOST}:${IB_PORT}; retrying automatically (${message})`);
+      ibOfflineLogged = true;
+    }
+  } else {
+    console.error('[ib] Error:', message);
+  }
   lastPortfolioError = message;
 
   if (!portfolioReady) {
