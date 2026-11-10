@@ -2,6 +2,11 @@
 
 Terms used for stock research and trading.
 
+## AI chat
+
+**AI chat connection**:
+The service URL and API key used to connect the app's AI chat to an AI provider.
+
 ## Trading
 
 **Trading mode**:
